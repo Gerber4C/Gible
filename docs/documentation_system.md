@@ -164,8 +164,8 @@ Use current formal terms:
 8. For each platform version update of the code, the full active documentation system must be reviewed and updated together. This includes version metadata, current behavior, examples, and limitations.
 9. Do not regenerate PDF copies during releases unless the user separately asks for PDFs.
 10. The version number in active documents is the platform version, not an individual gadget version. Each new platform version should update the version metadata in every active Markdown document.
-12. The platform version number changes only when the user explicitly says to release a new version. Routine edits, TODO additions, documentation improvements, and code checkpoints should keep the existing platform version unless the user asks for a release.
-13. When the user says "make a new version," "release a new version," or equivalent release language, the agent should update the platform version, review and update active documentation, run the test suite, commit the checkpoint, and push it to the configured GitHub `Partner` project when GitHub access is available.
+11. The platform version number changes only when the user explicitly says to release a new version. Routine edits, TODO additions, documentation improvements, and code checkpoints should keep the existing platform version unless the user asks for a release.
+12. When the user says "make a new version," "release a new version," or equivalent release language, the agent should update the platform version, review and update active documentation, run the test suite, commit the checkpoint, and push it to the configured GitHub `Partner` project when GitHub access is available.
 
 ## Fresh-Start Recovery Path
 
