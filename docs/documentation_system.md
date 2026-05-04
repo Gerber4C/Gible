@@ -1,6 +1,6 @@
 ﻿# Documentation System
 
-Platform Version: 0.0.4  
+Platform Version: 0.0.5  
 Author: Meow Li  
 Copyright: Copyright (c) 2026 Meow Li. All Rights Reserved.
 
@@ -18,7 +18,7 @@ The documentation has four jobs:
 
 ## Current Documents
 
-PDF copies of active Markdown documents are generated under `docs/pdf/`. The Markdown files are the editable source of truth; PDFs are distribution artifacts for reading and sharing. Between releases, PDF files may intentionally lag behind Markdown edits because PDFs are regenerated only for releases or explicit PDF-generation requests.
+The Markdown files are the editable source of truth. The active documentation system no longer maintains generated PDF copies by default.
 
 ### Product-Facing Documents
 
@@ -162,11 +162,10 @@ Use current formal terms:
 6. Route new design information by audience: product framing to `product_description.md`, user-facing workflows to `user_manual.md`, technical behavior to `implementation_design.md`, and planned/deferred work to `todo.md`.
 7. Any change to documentation organization should update this file.
 8. For each platform version update of the code, the full active documentation system must be reviewed and updated together. This includes version metadata, current behavior, examples, and limitations.
-9. PDF files are release artifacts. During intermediate editing, update the Markdown source documents only and do not regenerate PDFs.
-10. Regenerate PDF copies only when the user explicitly says to release a new version, or when the user separately asks for PDF regeneration.
-11. The version number in active documents is the platform version, not an individual gadget version. Each new platform version should update the version metadata in every active Markdown document and in the generated PDFs.
+9. Do not regenerate PDF copies during releases unless the user separately asks for PDFs.
+10. The version number in active documents is the platform version, not an individual gadget version. Each new platform version should update the version metadata in every active Markdown document.
 12. The platform version number changes only when the user explicitly says to release a new version. Routine edits, TODO additions, documentation improvements, and code checkpoints should keep the existing platform version unless the user asks for a release.
-13. When the user says "make a new version," "release a new version," or equivalent release language, the agent should update the platform version, review and update active documentation, regenerate PDF artifacts, run the test suite, and publish/upload the checkpoint to the configured GitHub `Partner` project when GitHub access is available.
+13. When the user says "make a new version," "release a new version," or equivalent release language, the agent should update the platform version, review and update active documentation, run the test suite, commit the checkpoint, and push it to the configured GitHub `Partner` project when GitHub access is available.
 
 ## Fresh-Start Recovery Path
 

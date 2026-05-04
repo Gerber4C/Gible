@@ -1,6 +1,6 @@
 # Semantic Ontology
 
-Platform Version: 0.0.4  
+Platform Version: 0.0.5  
 Author: Meow Li  
 Copyright: Copyright (c) 2026 Meow Li. All Rights Reserved.
 

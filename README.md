@@ -2,7 +2,7 @@
 
 A bridge bot that plays your conventions.
 
-Current release: `0.0.4`
+Current release: `0.0.5`
 
 This checkpoint includes:
 
@@ -12,6 +12,4 @@ This checkpoint includes:
 - fixture-driven backend tests,
 - software engineering documentation,
 - semantic ontology documentation,
-- Bridge System Language roadmap,
-- regenerated PDF documentation artifacts.
-
+- Bridge System Language roadmap.

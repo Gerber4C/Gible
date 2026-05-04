@@ -1,6 +1,6 @@
 # Bridge Bidding Platform Software Engineering Implementation Document
 
-Platform Version: 0.0.4  
+Platform Version: 0.0.5  
 Author: Meow Li  
 Copyright: Copyright (c) 2026 Meow Li. All Rights Reserved.
 
@@ -16,7 +16,7 @@ Read `docs/documentation_system.md` first. Companion documents:
 - `docs/bridge_system_language_roadmap.md`: roadmap for BSL, IR/YAML, GUI authoring, compiler, and interpreter layers.
 - `docs/todo.md`: future work, open issues, and deferred ideas.
 
-Markdown is the editable source of truth. PDFs in `docs/pdf/` are regenerated only for releases or explicit PDF-generation requests.
+Markdown is the editable source of truth. Generated PDFs are no longer maintained by default.
 
 ## 1. Repository Layout
 
@@ -63,7 +63,6 @@ docs/
   semantic_ontology.md
   todo.md
   user_manual.md
-  pdf/
 ```
 
 There is no production API server yet. `backend/app.py` exposes the current Python function boundary and a command-line sample.
@@ -661,3 +660,5 @@ Active limitations:
 ## 19. Documentation Maintenance Rule
 
 When changing code, update this document in the same checkpoint if structure, schemas, behavior, output, or limitations changed. Do not bump the platform version unless the user explicitly says to release a new version.
+
+Release process: when the user says to make a new version, update platform version metadata, review active documentation, run tests, commit, and push to GitHub. Do not regenerate PDFs unless the user separately requests PDFs.
