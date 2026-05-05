@@ -1,10 +1,12 @@
 # Bridge System Language Roadmap
 
-Platform Version: 0.0.5  
-Author: Meow Li  
+Platform Version: 0.0.6
+Author: Meow Li
 Copyright: Copyright (c) 2026 Meow Li. All Rights Reserved.
 
-This document defines the roadmap for moving from direct YAML gadget files toward a layered authoring system with a Bridge System Language, a strict intermediate representation, and GUI tools.
+This document defines the roadmap for moving from current direct YAML authoring toward a layered authoring system with a Bridge System Language, a strict Intermediate Representation, and GUI tools.
+
+The current YAML/IR language itself is specified in `docs/ir_language_spec.md`. This roadmap describes how BSL, GUI forms, compiler tooling, and validation should grow around that executable language.
 
 ## 1. Core Decision
 
@@ -13,24 +15,37 @@ Partner should separate human authoring from engine execution.
 Target architecture:
 
 ```text
-Guided GUI controls
-        |
-        v
-Bridge System Language source
-        |
-        v
-Compiler and validator
-        |
-        v
-Intermediate Representation
-        |
-        v
-Engine interpreter and executor
+Guided GUI controls  <->  Bridge System Language source  <->  IR/YAML inspector
+        |                         |                              |
+        v                         v                              v
+      IR draft              Compiler and validator          IR validation
+        \                         |                              /
+         \                        v                             /
+          ----------------> Intermediate Representation <-------
+                                  |
+                                  v
+                    Engine interpreter and executor
 ```
 
-The engine executes the strict intermediate representation. The Bridge System Language is an authoring layer, not the runtime object.
+The engine executes the strict Intermediate Representation. The Bridge System Language is an authoring layer, not the runtime object. The GUI may generate Bridge System Language or direct IR depending on the task; direct IR editing remains a first-class advanced workflow.
 
-YAML remains useful as the current file format for the intermediate representation. In the future, YAML can continue as the readable serialization format for compiled rule objects, tests, import/export, and debugging.
+YAML remains useful as the current file format for the Intermediate Representation. In the future, YAML can continue as the readable serialization format for compiled objects, tests, import/export, and debugging.
+
+## 1A. Python-Native Static Source Option
+
+A later authoring layer may use Python syntax as a static source format instead of inventing every surface grammar from scratch. This does not mean executing user Python at bidding time.
+
+The safe version is:
+
+- users write Python-like expressions, dataclass literals, or declarative class objects for Conventions, Call Specifications, Bidding Plans, Protocol Frames, Named Evaluators, and Call Selection Policies;
+- the platform parses the source with a restricted Python AST;
+- only whitelisted constructs are accepted: literals, dataclass construction, class attributes with approved base classes, boolean/comparison/arithmetic expressions, and references such as `self.hcp`, `self.length(H)`, `env.vulnerability_relation`, and `state.has(...)`;
+- imports, arbitrary function calls, mutation, loops, comprehensions, file/network/process access, reflection, and runtime execution are rejected;
+- accepted source compiles to the same typed IR object model that YAML currently serializes.
+
+This option may reduce burden because YAML/JSON is essentially static data, while Python syntax can express static data and limited formulas more compactly. It also supports richer editor tooling and type checking. The boundary remains the same: the engine executes validated IR, not arbitrary user code.
+
+Open design question: whether the long-term advanced source format should be BSL, restricted Python-source dataclasses, or both synchronized through the same IR inspector. The current checkpoint documents the option only; it does not change runtime architecture.
 
 ## 2. Definitions
 
@@ -54,11 +69,47 @@ after 1N P:
 
 BSL should use the ontology vocabulary from `docs/semantic_ontology.md`.
 
+BSL expression syntax may be Python-like, but BSL must not execute Python. The recommended path is:
+
+1. Parse a small expression grammar or a restricted Python AST.
+2. Accept only whitelisted names such as `self`, `partner`, `env`, `state`, `length`, `hcp`, `ace_count`, `keycard_count`, `has`, boolean operators, comparisons, and elementary arithmetic.
+3. Reject function calls, imports, attribute access outside the whitelist, mutation, loops, comprehensions, I/O, and any runtime evaluation.
+4. Compile the accepted expression into the structured IR expression tree used by YAML.
+
+Example BSL-style predicate:
+
+```text
+applies when self.hcp >= 16 and self.length(H) >= 6 and self.has(D, A)
+```
+
+Compiled IR shape:
+
+```yaml
+expr:
+  op: and
+  args:
+    - op: gte
+      left: {var: self.hcp}
+      right: {const: 16}
+    - op: gte
+      left:
+        op: length
+        hand: self
+        suit: H
+      right: {const: 6}
+    - op: contains_rank
+      hand: self
+      suit: D
+      rank: A
+```
+
+This gives users a familiar writing surface while preserving deterministic, inspectable IR.
+
 ### Intermediate Representation
 
-The intermediate representation, or IR, is the strict structured form that the engine can execute.
+The Intermediate Representation, or IR, is the strict structured form that the engine can execute.
 
-Current YAML gadget rules are an early version of this IR.
+Current YAML Call Specification files are an early version of this IR.
 
 Example IR shape:
 
@@ -71,9 +122,9 @@ applies_when:
     H:
       min_length: 5
 meaning:
-  call_nature: artificial
-  action_type: transfer
-  target_suit: H
+  nature_labels: [artificial, conventional]
+  call_act_types: [directive, context_initiating]
+  public_text: "Transfer to hearts."
 effects:
   - create_transfer:
       target_suit: H
@@ -81,6 +132,19 @@ effects:
 ```
 
 The IR should be explicit, normalized, validated, and executable. It is acceptable if technical users prefer editing IR directly.
+
+The target IR must contain several executable object types, not only a flat list of call definitions:
+
+- **Convention Set**: the complete selected partnership agreement.
+- **Convention**: a portable agreement module.
+- **Call Specification**: one call in one context, with applicability, public meaning, and effects.
+- **Protocol Frame**: a live auction context such as transfer, game force, relay, or keycard ask.
+- **Bidding Plan**: an internal multi-step route such as transfer-then-signoff or relay-until-shape-resolved.
+- **Call Selection Policy**: the explicit algorithm that compares candidate calls or plans.
+- **Named Evaluator**: a reusable limited hand/environment function.
+- **Relay Automaton**: step-based relay asking and response-decoding machinery.
+
+These object types can be serialized in YAML for readability, but the engine should validate them as typed IR.
 
 ### Compiler
 
@@ -105,13 +169,15 @@ Interpreter responsibilities:
 
 - replay auction history,
 - build semantic state,
-- match rule context,
+- match Call Specification context,
 - evaluate `requires` and `applies_when`,
-- compare candidate calls,
+- create active Protocol Frames,
+- generate candidate calls and candidate Bidding Plans,
+- compare candidates through Call Selection Policies,
 - update semantic state through effects,
 - produce public meaning, internal origin, and diagnostics.
 
-## 3. Important Product Rule
+## 3. Important Product Policy
 
 BSL is not always easier than IR.
 
@@ -199,17 +265,47 @@ Audience:
 
 Expected behavior:
 
-- show normalized compiled rules,
+- show normalized compiled objects,
 - allow direct editing in advanced mode,
 - validate against the IR schema,
-- show rule origins and semantic effects,
+- show Call Specification origins and semantic effects,
 - support diffing and debugging.
 
-The IR/YAML view should not be hidden, because some complex rules are clearer when written structurally.
+The IR/YAML view should not be hidden, because some complex objects are clearer when written structurally.
+
+### Protocol And Plan View
+
+Audience:
+
+- advanced bridge users,
+- relay-system authors,
+- teachers explaining multi-step auctions,
+- AI agents validating system notes.
+
+Expected behavior:
+
+- show active Protocol Frames created by earlier calls,
+- show Bidding Plans that compete for the current hand,
+- show which Call Selection Policy chose the current route,
+- let users define branches such as accept, superaccept, deny, relay answer, break relay, ask keycards, sign off, or place contract,
+- display relay steps as tables when a Convention uses a Relay Automaton.
+
+This view is necessary for auctions where a first call is chosen because of a later route. For example, after `1N P ?`, `2D` may be the first call of signoff, invitation, slam try, or 5-5 major plans. The user should describe those routes as Bidding Plans and continuations, not as unrelated meanings attached to the same `2D` string.
+
+Example form concept:
+
+```text
+Plan: Transfer then show spades with slam interest
+Entry call: 2D
+Use when: hearts >= 5, spades >= 5, slam interest
+If opener completes: bid spades
+If opener superaccepts: start control bidding
+If opener denies cooperation: place game or sign off by evaluator
+```
 
 ## 5. Source Of Truth Policy
 
-Each gadget should eventually declare its source mode.
+Each Convention should eventually declare its source mode.
 
 Recommended source modes:
 
@@ -219,7 +315,7 @@ Recommended source modes:
 
 The engine should only load approved, validated IR.
 
-BSL source and IR output should both preserve author metadata, platform version, gadget version, rule origin, and source locations when possible.
+BSL source and IR output should both preserve author metadata, platform version, Convention version, Call Specification origin, and source locations when possible.
 
 ## 6. Relationship To Ontology
 
@@ -232,14 +328,18 @@ BSL keywords should map to ontology concepts:
 - `notrump focus` maps to `notrump_focus`.
 - `game forcing` maps to `forcing_status: game_forcing`.
 - `keycard ask` maps to `keycard_context`.
+- `control bid` maps to `control` plus `slam_interest`.
+- `Gerber` maps to `ace_ask_context.method: gerber`.
+- `Kickback`, `Minorwood`, and `Exclusion` map to `keycard_context` with distinct `method` values.
+- `specific king ask` or `targeted king ask` maps to `targeted_king_ask`.
 - `interference` maps to competitive state.
 - `must` creates an obligation.
 
-If a BSL phrase cannot map to ontology or validated custom extension terms, the compiler should reject it or mark the rule as an unapproved draft.
+If a BSL phrase cannot map to ontology or validated custom extension terms, the compiler should reject it or mark the generated object as an unapproved draft.
 
 ## 7. Roadmap Milestones
 
-### Milestone 0: Current YAML Prototype
+### Milestone 0: Current YAML Prototype With Initial IR Objects
 
 Status: current checkpoint.
 
@@ -247,35 +347,39 @@ The platform has:
 
 - compact call and auction notation,
 - compact hand strings,
-- directory-based gadgets,
-- YAML rule files,
-- a starter 2/1 gadget,
-- a starter four-way Jacoby transfer gadget,
+- directory-based Convention files,
+- YAML Call Specification files,
+- a starter 2/1 Convention,
+- a starter four-way Jacoby transfer Convention,
 - fixture-driven tests,
 - public meaning and internal origin output.
+- loadable Protocol Frame, Bidding Plan, Call Selection Policy, Named Evaluator, and Relay Automaton classes.
+- named Call Selection Policy reporting for highest-score selection.
 
-YAML is currently both the authoring format and the executable structure.
+YAML is currently both the authoring format and the executable structure. The first IR checkpoint is structural: several target object types load and preserve provenance, while only Call Specifications and simple Call Selection Policies affect bidding behavior.
 
 ### Milestone 1: Formal IR Schema
 
-Goal: define the strict rule object the engine executes.
+Goal: define the strict executable objects the engine executes.
 
 Work:
 
-- decide final IR fields such as `context`, `call`, `applies_when`, `requires`, `selection`, `meaning`, `shows`, `effects`, and `clears`,
+- decide final IR object schemas for Convention Set, Convention, Call Specification, Protocol Frame, Bidding Plan, Call Selection Policy, Named Evaluator, and Relay Automaton,
+- decide final Call Specification fields such as `context`, `call`, `applies_when`, `requires`, `call_act_types`, `meaning`, `shows`, `effects`, and `clears`,
 - define schema validation,
 - normalize current YAML into the IR schema,
-- document compatibility with current `selection`, `meaning`, and `semantic_effects`.
+- define how current `selection`, `meaning`, and `effects` become stricter validated IR fields.
 
 Exit criteria:
 
-- invalid rule files produce clear validation errors,
-- every loaded rule has a normalized IR form,
+- invalid IR files produce clear validation errors,
+- every loaded Call Specification has a normalized IR form,
+- Convention-level policy files can be loaded as data and simple highest-score policies can be reported as selection provenance,
 - tests can inspect normalized IR.
 
 ### Milestone 2: Ontology-Backed Semantic State
 
-Goal: replace flexible ad-hoc semantic facts with formal semantic state.
+Goal: replace flexible ad-hoc semantic facts with formal Semantic State and Protocol Frames.
 
 Work:
 
@@ -286,13 +390,52 @@ Work:
 - support agreed-suit/trump and notrump-focus state,
 - support forcing and obligation state,
 - support competitive interference state,
+- support active Protocol Frames,
+- support Call Act Type history,
 - support ambiguity diagnostics.
 
 Exit criteria:
 
-- Jacoby transfer rules use formal transfer state,
+- Jacoby transfer Call Specifications use formal transfer state,
 - `4N` examples can be represented as semantic-resolution candidates,
 - diagnostics identify ambiguous or missing semantic state.
+
+### Milestone 2A: Selection Policies And Bidding Plans
+
+Goal: make judgmental choice explicit and portable.
+
+Work:
+
+- implement Bidding Plan loading and validation,
+- implement Call Selection Policy loading and validation,
+- implement decision-tree and decision-table policies first,
+- implement simple scoring evaluators with declared input primitives,
+- support deterministic random-source selection for declared randomized policies,
+- record Selection Provenance in internal origin output.
+
+Exit criteria:
+
+- opening `1M` versus `1N` can be resolved by a declared policy,
+- after-1N routes such as Jacoby transfer, Texas transfer, Smolen, signoff, and invitation can compete as Bidding Plans,
+- unresolved candidate conflicts produce diagnostics instead of hidden priority behavior.
+
+### Milestone 2B: Relay Automaton Proof Of Concept
+
+Goal: prove that step-based relay systems fit the architecture.
+
+Work:
+
+- implement cheapest-step ask calculation,
+- decode response steps,
+- store unresolved and resolved shape/state partitions,
+- allow a small declared relay table,
+- support declared relay breakoffs,
+- model pass/double/redouble as relay steps after interference in a restricted example.
+
+Exit criteria:
+
+- a miniature Symmetric Relay-style sequence can be represented without enumerating every auction string,
+- the engine can explain the relay ask, relay response, and updated known description.
 
 ### Milestone 3: BSL Grammar Draft
 
@@ -319,7 +462,7 @@ Goal: make source transformations inspectable.
 Work:
 
 - display BSL source beside compiled IR,
-- show semantic diff between rule versions,
+- show semantic diff between object versions,
 - preserve comments where practical,
 - preserve source locations from BSL to IR diagnostics,
 - define when IR can be converted back to readable BSL.
@@ -331,7 +474,7 @@ Exit criteria:
 
 ### Milestone 5: GUI Form Builder
 
-Goal: support non-programmer authoring for common rules.
+Goal: support non-programmer authoring for common agreement objects.
 
 Work:
 
@@ -339,11 +482,11 @@ Work:
 - generate BSL or IR from form input,
 - compile and validate before saving,
 - show generated source and diagnostics,
-- support common gadget templates.
+- support common Convention templates.
 
 Exit criteria:
 
-- a user can create a simple transfer rule without writing YAML,
+- a user can create a simple transfer Call Specification without writing YAML,
 - validation errors are understandable to a bridge player.
 
 ### Milestone 6: BSL Editor
@@ -377,7 +520,7 @@ Work:
 
 Exit criteria:
 
-- engineers and AI agents can debug the exact executable rule object.
+- engineers and AI agents can debug the exact executable IR object.
 
 ### Milestone 8: LLM-Assisted Drafting
 
@@ -389,16 +532,16 @@ Work:
 - compile generated BSL to IR,
 - validate against ontology and schema,
 - require user review and approval,
-- show differences from existing gadget rules.
+- show differences from existing Convention files.
 
 Exit criteria:
 
 - LLM output is never silently activated,
-- generated gadgets remain drafts until validated and approved.
+- generated Conventions remain drafts until validated and approved.
 
 ### Milestone 9: System Notes Import And Export
 
-Goal: connect formal rules with human-readable system notes.
+Goal: connect formal objects with human-readable system notes.
 
 Work:
 
@@ -420,9 +563,9 @@ Required test categories:
 - BSL parser accepts valid examples,
 - BSL parser rejects malformed examples,
 - BSL compiler emits expected IR,
-- IR schema rejects invalid rule objects,
-- ontology effects produce expected semantic state,
-- GUI-generated rules compile to expected IR,
+- IR schema rejects invalid objects,
+- ontology effects produce expected Semantic State,
+- GUI-generated objects compile to expected IR,
 - LLM-generated drafts must remain unapproved by default,
 - BSL and IR examples produce the same bidding behavior.
 
@@ -436,8 +579,12 @@ Questions to resolve before implementation:
 2. Should BSL be indentation-based, block-based, or line-oriented?
 3. How much free-form display text should BSL allow?
 4. How should comments survive BSL-to-IR compilation?
-5. Can every IR rule be represented in BSL, or should some advanced rules remain IR-only?
-6. How should source mode be stored per gadget?
-7. Should GUI forms generate BSL first or direct IR first for simple rules?
+5. Can every IR object be represented in BSL, or should some advanced objects remain IR-only?
+6. How should source mode be stored per Convention?
+7. Should GUI forms generate Bridge System Language first or direct IR first for simple objects?
+8. How much of a Relay Automaton should be editable through forms versus tables versus direct IR?
+9. Which Named Evaluator primitives should be built in for expert judgment without allowing unsafe arbitrary code?
+10. How should Convention Set-level Call Selection Policies override or combine Convention-level policies?
+11. What syntax should BSL use for Bidding Plans and contingent branches?
 
-The current recommendation is to make BSL the preferred human-readable source, but to keep direct IR editing as a first-class advanced workflow.
+The current recommendation is to make BSL the preferred human-readable source, but to keep direct IR editing as a first-class advanced workflow. Predicate syntax should be Python-like only as parsed source code that compiles to safe IR; the platform should not run user Python.

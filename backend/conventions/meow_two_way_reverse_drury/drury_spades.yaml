@@ -1,0 +1,76 @@
+call_specifications:
+  - id: cs_1
+    description: Two-way reverse Drury 2C by a passed hand, showing exactly three-card support.
+    system_notes: By a passed hand after a seat 3 or 4 major opening, 2C is two-way reverse Drury with exactly three-card support.
+    context:
+      auction_pattern: "1SP"
+      seat_positions: [3, 4]
+    call: 2C
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: exactly_three_spades
+          evaluator: expression
+          expr:
+            op: eq
+            left: {var: self.spades.length}
+            right: {const: 3}
+          weight: 50
+        - criterion_id: limit_values
+          evaluator: range_contains
+          input: self.hcp
+          min: 10
+          max: 12
+          weight: 50
+    meaning:
+      nature_labels: [artificial, conventional]
+      call_act_types: [descriptive, inquiry]
+      action_type: two_way_reverse_drury
+      target_suit: S
+      support_length: 3
+      alertable: true
+    effects:
+      - fact_type: agreed_suit
+        suit: S
+        source: drury
+      - fact_type: drury
+        suit: S
+        support_length: 3
+        status: pending
+
+  - id: cs_2
+    description: Two-way reverse Drury 2D by a passed hand, showing four-card or longer support.
+    system_notes: By a passed hand after a seat 3 or 4 major opening, 2D is two-way reverse Drury with four-card or longer support.
+    context:
+      auction_pattern: "1SP"
+      seat_positions: [3, 4]
+    call: 2D
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: four_spades
+          evaluator: min_value
+          input: self.spades
+          min: 4
+          weight: 50
+        - criterion_id: limit_values
+          evaluator: range_contains
+          input: self.hcp
+          min: 10
+          max: 12
+          weight: 50
+    meaning:
+      nature_labels: [artificial, conventional]
+      call_act_types: [descriptive, inquiry]
+      action_type: two_way_reverse_drury
+      target_suit: S
+      support_length_min: 4
+      alertable: true
+    effects:
+      - fact_type: agreed_suit
+        suit: S
+        source: drury
+      - fact_type: drury
+        suit: S
+        support_length_min: 4
+        status: pending

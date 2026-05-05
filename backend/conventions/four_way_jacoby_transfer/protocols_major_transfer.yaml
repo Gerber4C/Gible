@@ -1,0 +1,27 @@
+protocol_frames:
+  - id: frame_1
+    frame_type: major_transfer
+    description: >
+      Live transfer context created when responder bids 2D over 1N to show
+      hearts. Later continuations should query this frame instead of relying
+      on private meaning strings.
+    context:
+      auction_pattern: "1NP"
+      seat_positions: [1, 2, 3, 4]
+    source_call: 2D
+    variables:
+      target_suit: H
+      initiator: responder
+      acceptor: opener
+    stages:
+      - opener_rebid
+      - responder_continuation
+    allowed_continuations:
+      - complete_transfer
+      - superaccept
+      - responder_signoff
+      - responder_invite
+      - responder_second_suit
+      - responder_slam_exploration
+    break_conditions:
+      - undefined_interference_without_policy

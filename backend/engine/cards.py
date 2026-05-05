@@ -11,6 +11,12 @@ RANK_POINTS = {
 }
 
 SUITS = ("spades", "hearts", "diamonds", "clubs")
+SHORT_SUITS = {
+    "S": "spades",
+    "H": "hearts",
+    "D": "diamonds",
+    "C": "clubs",
+}
 SUIT_MARKERS = {
     "S": "spades",
     "H": "hearts",
@@ -65,9 +71,35 @@ class Hand:
         }
 
     def length(self, suit: str) -> int:
+        suit = normalize_suit_name(suit)
         if suit not in SUITS:
             raise ValueError(f"Unknown suit: {suit}")
         return len(getattr(self, suit))
+
+    def holding(self, suit: str) -> str:
+        return getattr(self, normalize_suit_name(suit))
+
+    def honor_count(self, suit: str, ranks: list[str] | tuple[str, ...] = ("A", "K", "Q", "J")) -> int:
+        ranks = tuple(rank.upper() for rank in ranks)
+        return sum(1 for rank in self.holding(suit) if rank in ranks)
+
+    def contains_rank(self, suit: str, rank: str) -> bool:
+        return rank.upper() in self.holding(suit)
+
+    def ace_count(self, excluded_suit: str | None = None) -> int:
+        excluded = normalize_suit_name(excluded_suit) if excluded_suit else None
+        return sum(1 for suit in SUITS if suit != excluded and self.contains_rank(suit, "A"))
+
+    def king_count(self, excluded_suit: str | None = None) -> int:
+        excluded = normalize_suit_name(excluded_suit) if excluded_suit else None
+        return sum(1 for suit in SUITS if suit != excluded and self.contains_rank(suit, "K"))
+
+    def keycard_count(self, trump_suit: str, excluded_suit: str | None = None) -> int:
+        trump_suit = normalize_suit_name(trump_suit)
+        excluded = normalize_suit_name(excluded_suit) if excluded_suit else None
+        trump_rank = "K" if self.contains_rank(trump_suit, "K") else None
+        aces = self.ace_count(excluded_suit=excluded)
+        return aces + (1 if trump_rank else 0)
 
     @property
     def balanced(self) -> bool:
@@ -100,6 +132,17 @@ def _normalize_suit(cards: str) -> str:
     if invalid:
         raise ValueError(f"Invalid card rank(s): {''.join(invalid)}")
     return normalized
+
+
+def normalize_suit_name(suit: str) -> str:
+    value = str(suit).strip()
+    upper = value.upper()
+    if upper in SHORT_SUITS:
+        return SHORT_SUITS[upper]
+    lower = value.lower()
+    if lower in SUITS:
+        return lower
+    raise ValueError(f"Unknown suit: {suit}")
 
 
 def _parse_compact_sections(text: str) -> dict[str, str]:

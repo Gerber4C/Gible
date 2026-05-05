@@ -1,0 +1,13 @@
+call_specifications:
+  - id: cs_13
+    description: Explicit fallback pass when no other Call Specification applies.
+    system_notes: Undefined auctions currently fall back to pass and emit a diagnostic.
+    default_policy: true
+    context:
+      auction_pattern: "*"
+    call: P
+    meaning:
+      nature_labels: [default]
+      call_act_types: [final_placement]
+      action_type: fallback_pass
+      alertable: false

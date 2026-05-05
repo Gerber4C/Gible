@@ -1,0 +1,381 @@
+call_specifications:
+  - id: cs_1
+    description: Opener asks for diamond help after 1S-2S.
+    system_notes: After 1S-2S, 3D asks whether responder can help in diamonds.
+    context:
+      auction_pattern: "1SP2SP"
+      seat_positions: [1, 2]
+    requires:
+      fact_exists:
+        fact_type: agreed_suit
+        suit: S
+    call: 3D
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: invitational_opener_values
+          evaluator: min_value
+          input: self.hcp
+          min: 14
+          weight: 30
+        - criterion_id: diamond_queen_third_style
+          evaluator: expression
+          expr:
+            op: and
+            args:
+              - op: gte
+                left:
+                  op: length
+                  hand: self
+                  suit: D
+                right: {const: 3}
+              - op: contains_rank
+                hand: self
+                suit: D
+                rank: Q
+          weight: 80
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [invitation, inquiry]
+      action_type: help_suit_game_try
+      target_suit: D
+      agreed_suit: S
+      alertable: false
+    effects:
+      - fact_type: game_try
+        game_try_type: help_suit
+        target_suit: D
+        agreed_suit: S
+        status: pending
+
+  - id: cs_2
+    description: Responder accepts the diamond help-suit game try by bidding 4S.
+    system_notes: After a diamond help-suit game try, 4S accepts and places the game.
+    context:
+      auction_pattern: "1SP2SP3DP"
+      seat_positions: [1, 2]
+    requires:
+      fact_exists:
+        fact_type: game_try
+        game_try_type: help_suit
+        target_suit: D
+        agreed_suit: S
+        status: pending
+    call: 4S
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: responder_has_diamond_help
+          evaluator: expression
+          expr:
+            op: or
+            args:
+              - op: gte
+                left:
+                  op: honor_count
+                  hand: self
+                  suit: D
+                  ranks: [A, K, Q, J]
+                right: {const: 1}
+              - op: lte
+                left:
+                  op: length
+                  hand: self
+                  suit: D
+                right: {const: 1}
+          weight: 80
+        - criterion_id: responder_has_constructive_maximum
+          evaluator: min_value
+          input: self.hcp
+          min: 9
+          weight: 30
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [final_placement]
+      action_type: accept_game_try
+      target_suit: S
+      level: 4
+      alertable: false
+    effects:
+      - fact_type: final_contract
+        target_suit: S
+        level: 4
+
+  - id: cs_3
+    description: Opener asks generally where responder can help after 1S-2S.
+    system_notes: After 1S-2S, 2N asks where responder can offer help.
+    context:
+      auction_pattern: "1SP2SP"
+      seat_positions: [1, 2]
+    requires:
+      fact_exists:
+        fact_type: agreed_suit
+        suit: S
+    call: 2N
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: invitational_opener_values
+          evaluator: min_value
+          input: self.hcp
+          min: 14
+          weight: 30
+    meaning:
+      nature_labels: [artificial, conventional]
+      call_act_types: [invitation, inquiry]
+      action_type: help_suit_game_try
+      ask_scope: any_help
+      agreed_suit: S
+      alertable: true
+
+  - id: cs_4
+    description: Opener asks for trump help after 1S-2S.
+    system_notes: After 1S-2S, 3S asks whether responder can help in trumps.
+    context:
+      auction_pattern: "1SP2SP"
+      seat_positions: [1, 2]
+    requires:
+      fact_exists:
+        fact_type: agreed_suit
+        suit: S
+    call: 3S
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: invitational_opener_values
+          evaluator: min_value
+          input: self.hcp
+          min: 14
+          weight: 30
+        - criterion_id: opener_lacks_spade_honor
+          evaluator: expression
+          expr:
+            op: eq
+            left:
+              op: honor_count
+              hand: self
+              suit: S
+              ranks: [A, K, Q]
+            right: {const: 0}
+          weight: 40
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [invitation, inquiry]
+      action_type: trump_help_game_try
+      target_suit: S
+      alertable: false
+
+  - id: cs_5
+    description: Opener passes after responder accepts the help-suit game try and the next hand passes.
+    system_notes: After 1S-2S-3D-4S, opener passes to end the auction.
+    context:
+      auction_pattern: "1SP2SP3DP4SP"
+      seat_positions: [1, 2]
+    requires:
+      fact_exists:
+        fact_type: final_contract
+        target_suit: S
+        level: 4
+    call: P
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: final_contract_placed
+          evaluator: fact_exists
+          query:
+            fact_type: final_contract
+            target_suit: S
+            level: 4
+          weight: 100
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [final_placement]
+      action_type: pass_final_contract
+      alertable: false
+
+  - id: cs_6
+    description: Opener asks generally where responder can help after 1H-2H.
+    system_notes: After 1H-2H, 2S asks where responder can offer help.
+    context:
+      auction_pattern: "1HP2HP"
+      seat_positions: [1, 2]
+    requires:
+      fact_exists:
+        fact_type: agreed_suit
+        suit: H
+    call: 2S
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: invitational_opener_values
+          evaluator: min_value
+          input: self.hcp
+          min: 14
+          weight: 30
+    meaning:
+      nature_labels: [artificial, conventional]
+      call_act_types: [invitation, inquiry]
+      action_type: help_suit_game_try
+      ask_scope: any_help
+      agreed_suit: H
+      alertable: true
+    effects:
+      - fact_type: game_try
+        game_try_type: help_suit
+        ask_scope: any_help
+        agreed_suit: H
+        status: pending
+
+  - id: cs_7
+    description: Responder shows spade help after the heart any-help game try.
+    system_notes: After 1H-2H-2S, 2N shows help in spades.
+    context:
+      auction_pattern: "1HP2HP2SP"
+      seat_positions: [1, 2]
+    requires:
+      fact_exists:
+        fact_type: game_try
+        game_try_type: help_suit
+        ask_scope: any_help
+        agreed_suit: H
+        status: pending
+    call: 2N
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: responder_has_spade_help
+          evaluator: expression
+          expr:
+            op: or
+            args:
+              - op: gte
+                left:
+                  op: honor_count
+                  hand: self
+                  suit: S
+                  ranks: [A, K, Q, J]
+                right: {const: 1}
+              - op: lte
+                left:
+                  op: length
+                  hand: self
+                  suit: S
+                right: {const: 1}
+          weight: 80
+        - criterion_id: responder_has_constructive_values
+          evaluator: min_value
+          input: self.hcp
+          min: 8
+          weight: 30
+    meaning:
+      nature_labels: [conventional]
+      call_act_types: [descriptive]
+      action_type: game_try_response
+      target_suit: S
+      agreed_suit: H
+      alertable: true
+    effects:
+      - fact_type: game_try_response
+        game_try_type: help_suit
+        target_suit: S
+        agreed_suit: H
+        status: accepted
+
+  - id: cs_8
+    description: Opener places the heart game after responder shows spade help.
+    system_notes: After 1H-2H-2S-2N, 4H places the game.
+    context:
+      auction_pattern: "1HP2HP2SP2NP"
+      seat_positions: [1, 2]
+    requires:
+      fact_exists:
+        fact_type: game_try_response
+        game_try_type: help_suit
+        target_suit: S
+        agreed_suit: H
+        status: accepted
+    call: 4H
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: opener_accepts_with_game_values
+          evaluator: min_value
+          input: self.hcp
+          min: 14
+          weight: 80
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [final_placement]
+      action_type: accept_game_try
+      target_suit: H
+      level: 4
+      alertable: false
+    effects:
+      - fact_type: final_contract
+        target_suit: H
+        level: 4
+
+  - id: cs_9
+    description: Opener asks for trump help after 1H-2H.
+    system_notes: After 1H-2H, 2N is a help-suit game try in hearts.
+    context:
+      auction_pattern: "1HP2HP"
+      seat_positions: [1, 2]
+    requires:
+      fact_exists:
+        fact_type: agreed_suit
+        suit: H
+    call: 2N
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: invitational_opener_values
+          evaluator: min_value
+          input: self.hcp
+          min: 14
+          weight: 30
+        - criterion_id: opener_lacks_heart_honor
+          evaluator: expression
+          expr:
+            op: eq
+            left:
+              op: honor_count
+              hand: self
+              suit: H
+              ranks: [A, K, Q]
+            right: {const: 0}
+          weight: 40
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [invitation, inquiry]
+      action_type: trump_help_game_try
+      target_suit: H
+      alertable: false
+
+  - id: cs_10
+    description: Opener passes after responder accepts the heart help-suit game try and the next hand passes.
+    system_notes: After 1H-2H-2S-2N-4H, opener's partner passes to end the auction.
+    context:
+      auction_pattern: "1HP2HP2SP2NP4HP"
+      seat_positions: [1, 2]
+    requires:
+      fact_exists:
+        fact_type: final_contract
+        target_suit: H
+        level: 4
+    call: P
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: final_contract_placed
+          evaluator: fact_exists
+          query:
+            fact_type: final_contract
+            target_suit: H
+            level: 4
+          weight: 100
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [final_placement]
+      action_type: pass_final_contract
+      alertable: false

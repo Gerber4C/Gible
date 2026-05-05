@@ -1,4 +1,3 @@
 # Frontend
 
-Deferred until the backend rule engine can replay auctions and produce explainable bids.
-
+Deferred until the backend engine can replay auctions and produce explainable bids.

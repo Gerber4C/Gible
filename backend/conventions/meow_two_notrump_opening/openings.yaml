@@ -1,0 +1,40 @@
+call_specifications:
+  - id: cs_1
+    description: Opens 2N with 20-21 HCP and balanced shape.
+    system_notes: 2N opening shows 20-21 HCP and balanced shape.
+    context:
+      auction_pattern: ""
+      seat_positions: [1, 2, 3, 4]
+    call: 2N
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: hcp_20_21
+          evaluator: range_contains
+          input: self.hcp
+          min: 20
+          max: 21
+          weight: 70
+        - criterion_id: balanced_shape
+          evaluator: equals
+          input: self.balanced
+          value: true
+          weight: 60
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [descriptive, context_initiating]
+      action_type: opening
+      target_suit: N
+      hcp_min: 20
+      hcp_max: 21
+      shape_class: balanced
+      alertable: false
+    effects:
+      - fact_type: notrump_opening
+        actor_role: opener
+        target_suit: N
+        hcp_min: 20
+        hcp_max: 21
+        shape_class: balanced
+      - fact_type: notrump_focus
+        status: active

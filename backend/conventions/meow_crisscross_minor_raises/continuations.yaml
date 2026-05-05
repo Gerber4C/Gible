@@ -1,0 +1,142 @@
+call_specifications:
+  - id: cs_3
+    description: Opener bids 3N after 1C-2D with a balanced hand and side-suit stoppers.
+    system_notes: After the game-forcing club crisscross raise, 3N is the practical notrump game when stoppers are present.
+    context:
+      auction_pattern: "1CP2DP"
+      seat_positions: [1, 2, 3, 4]
+    call: 3N
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: balanced_opening_hand
+          evaluator: equals
+          input: self.balanced
+          value: true
+          weight: 30
+        - criterion_id: diamond_stopper
+          evaluator: named_evaluator
+          evaluator_id: eval_crisscross_stopper
+          params: {target_suit: D}
+          weight: 40
+        - criterion_id: heart_stopper
+          evaluator: named_evaluator
+          evaluator_id: eval_crisscross_stopper
+          params: {target_suit: H}
+          weight: 40
+        - criterion_id: spade_stopper
+          evaluator: named_evaluator
+          evaluator_id: eval_crisscross_stopper
+          params: {target_suit: S}
+          weight: 40
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [final_placement]
+      action_type: place_contract
+      target_suit: N
+      level: 3
+      alertable: false
+    effects:
+      - fact_type: final_contract
+        target_suit: N
+        level: 3
+        source: crisscross
+
+  - id: cs_4
+    description: Opener rebids 3C after 1C-2D when 3N is unattractive.
+    system_notes: After the game-forcing club crisscross raise, 3C keeps the auction in clubs when notrump is unattractive.
+    context:
+      auction_pattern: "1CP2DP"
+      seat_positions: [1, 2, 3, 4]
+    call: 3C
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: club_fit_exists
+          evaluator: fact_exists
+          query:
+            fact_type: minor_raise
+            target_suit: C
+            method: crisscross
+          weight: 70
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [support_showing]
+      action_type: minor_fallback
+      target_suit: C
+      alertable: false
+    effects:
+      - fact_type: minor_contract_interest
+        target_suit: C
+        source: crisscross
+
+  - id: cs_5
+    description: Opener bids 3N after 1D-3C with a balanced hand and side-suit stoppers.
+    system_notes: After the game-forcing diamond crisscross raise, 3N is the practical notrump game when stoppers are present.
+    context:
+      auction_pattern: "1DP3CP"
+      seat_positions: [1, 2, 3, 4]
+    call: 3N
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: balanced_opening_hand
+          evaluator: equals
+          input: self.balanced
+          value: true
+          weight: 30
+        - criterion_id: club_stopper
+          evaluator: named_evaluator
+          evaluator_id: eval_crisscross_stopper
+          params: {target_suit: C}
+          weight: 40
+        - criterion_id: heart_stopper
+          evaluator: named_evaluator
+          evaluator_id: eval_crisscross_stopper
+          params: {target_suit: H}
+          weight: 40
+        - criterion_id: spade_stopper
+          evaluator: named_evaluator
+          evaluator_id: eval_crisscross_stopper
+          params: {target_suit: S}
+          weight: 40
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [final_placement]
+      action_type: place_contract
+      target_suit: N
+      level: 3
+      alertable: false
+    effects:
+      - fact_type: final_contract
+        target_suit: N
+        level: 3
+        source: crisscross
+
+  - id: cs_6
+    description: Opener rebids 3D after 1D-3C when 3N is unattractive.
+    system_notes: After the game-forcing diamond crisscross raise, 3D keeps the auction in diamonds when notrump is unattractive.
+    context:
+      auction_pattern: "1DP3CP"
+      seat_positions: [1, 2, 3, 4]
+    call: 3D
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: diamond_fit_exists
+          evaluator: fact_exists
+          query:
+            fact_type: minor_raise
+            target_suit: D
+            method: crisscross
+          weight: 70
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [support_showing]
+      action_type: minor_fallback
+      target_suit: D
+      alertable: false
+    effects:
+      - fact_type: minor_contract_interest
+        target_suit: D
+        source: crisscross

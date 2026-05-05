@@ -1,0 +1,7 @@
+id: test_ambiguous_four_notrump
+namespace: test
+name: Test Ambiguous Four Notrump
+version: 0.1.0
+description: Test-only Convention that deliberately defines two same-call meanings.
+author:
+  name: Meow Li

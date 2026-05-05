@@ -1,0 +1,8 @@
+id: test_ambiguous_4n
+name: Test Ambiguous 4N
+version: 0.1.0
+description: Test-only Convention Set with two unresolved meanings for the same 4N call.
+author:
+  name: Meow Li
+conventions:
+  - test_ambiguous_four_notrump

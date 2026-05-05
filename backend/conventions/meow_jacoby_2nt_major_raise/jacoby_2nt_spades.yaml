@@ -1,0 +1,34 @@
+call_specifications:
+  - id: cs_1
+    description: Jacoby 2N game-forcing spade raise declaration.
+    system_notes: After 1S, 2N is Jacoby 2N, game forcing with four-card support.
+    context:
+      auction_pattern: "1SP"
+      seat_positions: [1, 2]
+    call: 2N
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: four_spades
+          evaluator: min_value
+          input: self.spades
+          min: 4
+          weight: 50
+        - criterion_id: game_forcing_values
+          evaluator: min_value
+          input: self.hcp
+          min: 13
+          weight: 60
+    meaning:
+      nature_labels: [artificial, conventional]
+      call_act_types: [context_initiating, forcing]
+      action_type: jacoby_2n
+      target_suit: S
+      forcing_status: game_forcing
+      alertable: true
+    effects:
+      - fact_type: agreed_suit
+        suit: S
+        source: jacoby_2n
+      - fact_type: forcing_status
+        status: game_forcing

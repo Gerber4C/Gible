@@ -1,0 +1,18 @@
+call_selection_policies:
+  - id: policy_1
+    description: Opener game-try selection after 1S-2S.
+    scope:
+      context:
+        auction_pattern: "1SP2SP"
+        seat_positions: [1, 2]
+    algorithm: highest_score
+    tie_breaker: diagnose
+
+  - id: policy_2
+    description: Opener game-try selection after 1H-2H.
+    scope:
+      context:
+        auction_pattern: "1HP2HP"
+        seat_positions: [1, 2]
+    algorithm: highest_score
+    tie_breaker: diagnose

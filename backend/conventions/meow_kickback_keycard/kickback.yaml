@@ -1,0 +1,253 @@
+call_specifications:
+  - id: cs_1
+    description: Asker bids 4S as Kickback keycard for hearts.
+    system_notes: With hearts agreed, 4S asks for keycards using Kickback.
+    context:
+      auction_pattern: "*"
+    requires:
+      all:
+        - fact_exists:
+            fact_type: agreed_suit
+            suit: H
+        - not:
+            fact_exists:
+              fact_type: keycard_context
+              status: pending
+        - not:
+            fact_exists:
+              fact_type: final_contract
+    call: 4S
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: heart_slam_values
+          evaluator: min_value
+          input: self.hcp
+          min: 18
+          weight: 120
+        - criterion_id: six_hearts
+          evaluator: min_value
+          input: self.hearts
+          min: 6
+          weight: 80
+        - criterion_id: no_diamond_control
+          evaluator: expression
+          expr:
+            op: not
+            arg:
+              op: or
+              args:
+                - op: contains_rank
+                  hand: self
+                  suit: D
+                  rank: A
+                - op: contains_rank
+                  hand: self
+                  suit: D
+                  rank: K
+                - op: lte
+                  left:
+                    op: length
+                    hand: self
+                    suit: D
+                  right: {const: 1}
+          weight: 20
+    meaning:
+      nature_labels: [artificial, conventional]
+      call_act_types: [inquiry, keycard_asking, context_initiating]
+      action_type: kickback_1430
+      target_suit: H
+      alertable: true
+    effects:
+      - fact_type: keycard_context
+        trump_suit: H
+        method: kickback_1430
+        status: pending
+
+  - id: cs_2
+    description: Responder to heart Kickback answers 4N, showing 1 or 4 keycards.
+    system_notes: Over heart Kickback, 4N is the first 1430 step, showing 1 or 4 keycards.
+    context:
+      auction_pattern: "*"
+    requires:
+      all:
+        - fact_exists:
+            fact_type: keycard_context
+            method: kickback_1430
+            trump_suit: H
+            status: pending
+        - not:
+            fact_exists:
+              fact_type: keycard_response
+              method: kickback_1430
+    call: 4N
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: one_or_four_keycards
+          evaluator: expression
+          expr:
+            op: in
+            left:
+              op: keycard_count
+              hand: self
+              trump_suit: H
+            right: {const: [1, 4]}
+          weight: 100
+    meaning:
+      nature_labels: [artificial, conventional]
+      call_act_types: [relay_response]
+      action_type: keycard_response
+      keycard_range: [1, 4]
+      alertable: true
+    effects:
+      - fact_type: keycard_response
+        trump_suit: H
+        method: kickback_1430
+        response: one_or_four
+
+  - id: cs_3
+    description: Responder to heart Kickback answers 5C, showing 0 or 3 keycards.
+    system_notes: Over heart Kickback, 5C is the second 1430 step, showing 0 or 3 keycards.
+    context:
+      auction_pattern: "*"
+    requires:
+      all:
+        - fact_exists:
+            fact_type: keycard_context
+            method: kickback_1430
+            trump_suit: H
+            status: pending
+        - not:
+            fact_exists:
+              fact_type: keycard_response
+              method: kickback_1430
+    call: 5C
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: zero_or_three_keycards
+          evaluator: expression
+          expr:
+            op: in
+            left:
+              op: keycard_count
+              hand: self
+              trump_suit: H
+            right: {const: [0, 3]}
+          weight: 100
+    meaning:
+      nature_labels: [artificial, conventional]
+      call_act_types: [relay_response]
+      action_type: keycard_response
+      keycard_range: [0, 3]
+      alertable: true
+    effects:
+      - fact_type: keycard_response
+        trump_suit: H
+        method: kickback_1430
+        response: zero_or_three
+
+  - id: cs_4
+    description: Responder to heart Kickback answers 5D, showing two keycards without the heart queen.
+    system_notes: Over heart Kickback, 5D shows 2 keycards without the heart queen.
+    context:
+      auction_pattern: "*"
+    requires:
+      all:
+        - fact_exists:
+            fact_type: keycard_context
+            method: kickback_1430
+            trump_suit: H
+            status: pending
+        - not:
+            fact_exists:
+              fact_type: keycard_response
+              method: kickback_1430
+    call: 5D
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: two_keycards
+          evaluator: expression
+          expr:
+            op: eq
+            left:
+              op: keycard_count
+              hand: self
+              trump_suit: H
+            right: {const: 2}
+          weight: 100
+        - criterion_id: lacks_heart_queen
+          evaluator: expression
+          expr:
+            op: not
+            arg:
+              op: contains_rank
+              hand: self
+              suit: H
+              rank: Q
+          weight: 20
+    meaning:
+      nature_labels: [artificial, conventional]
+      call_act_types: [relay_response]
+      action_type: keycard_response
+      keycard_count: 2
+      trump_queen: false
+      alertable: true
+    effects:
+      - fact_type: keycard_response
+        trump_suit: H
+        method: kickback_1430
+        response: two_without_queen
+
+  - id: cs_5
+    description: Responder to heart Kickback answers 5H, showing two keycards with the heart queen.
+    system_notes: Over heart Kickback, 5H shows 2 keycards with the heart queen.
+    context:
+      auction_pattern: "*"
+    requires:
+      all:
+        - fact_exists:
+            fact_type: keycard_context
+            method: kickback_1430
+            trump_suit: H
+            status: pending
+        - not:
+            fact_exists:
+              fact_type: keycard_response
+              method: kickback_1430
+    call: 5H
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: two_keycards
+          evaluator: expression
+          expr:
+            op: eq
+            left:
+              op: keycard_count
+              hand: self
+              trump_suit: H
+            right: {const: 2}
+          weight: 100
+        - criterion_id: has_heart_queen
+          evaluator: expression
+          expr:
+            op: contains_rank
+            hand: self
+            suit: H
+            rank: Q
+          weight: 20
+    meaning:
+      nature_labels: [artificial, conventional]
+      call_act_types: [relay_response]
+      action_type: keycard_response
+      keycard_count: 2
+      trump_queen: true
+      alertable: true
+    effects:
+      - fact_type: keycard_response
+        trump_suit: H
+        method: kickback_1430
+        response: two_with_queen

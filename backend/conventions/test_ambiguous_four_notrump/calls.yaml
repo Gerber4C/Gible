@@ -1,0 +1,38 @@
+call_specifications:
+  - id: cs_1
+    description: Test 4N meaning A.
+    context:
+      auction_pattern: ""
+    call: 4N
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: always
+          evaluator: min_value
+          input: self.hcp
+          min: 0
+          weight: 100
+    meaning:
+      nature_labels: [artificial]
+      call_act_types: [inquiry]
+      action_type: test_meaning_a
+      alertable: false
+
+  - id: cs_2
+    description: Test 4N meaning B.
+    context:
+      auction_pattern: ""
+    call: 4N
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: always
+          evaluator: min_value
+          input: self.hcp
+          min: 0
+          weight: 100
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [invitation]
+      action_type: test_meaning_b
+      alertable: false

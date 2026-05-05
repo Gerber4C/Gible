@@ -1,0 +1,9 @@
+id: meow_bergen_raises
+namespace: meow_2over1
+name: Meow Bergen Raises
+version: 0.1.0
+description: >
+  Standalone Bergen raise Convention by an unpassed responder after first- or
+  second-seat major openings.
+author:
+  name: Meow Li

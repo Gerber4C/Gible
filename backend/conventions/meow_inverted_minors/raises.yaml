@@ -1,0 +1,708 @@
+call_specifications:
+  - id: cs_1
+    description: "Inverted raise 1C-2C: invitational or better club support, no four-card major, forcing to 2N or 3C."
+    system_notes: After 1C, 2C is an inverted minor raise, invitational or better, denying a four-card major.
+    context:
+      auction_pattern: "1CP"
+      seat_positions: [1, 2, 3, 4]
+    call: 2C
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: invitational_plus
+          evaluator: min_value
+          input: self.hcp
+          min: 10
+          weight: 80
+        - criterion_id: five_card_club_support
+          evaluator: min_value
+          input: self.clubs
+          min: 5
+          weight: 70
+        - criterion_id: no_four_card_major
+          evaluator: expression
+          expr:
+            op: and
+            args:
+              - op: lte
+                left:
+                  op: length
+                  hand: self
+                  suit: H
+                right: {const: 3}
+              - op: lte
+                left:
+                  op: length
+                  hand: self
+                  suit: S
+                right: {const: 3}
+          weight: 30
+    meaning:
+      nature_labels: [conventional]
+      call_act_types: [support_showing, forcing, context_initiating]
+      action_type: inverted_minor_raise
+      target_suit: C
+      raise_strength: invitational_plus
+      alertable: true
+    effects:
+      - fact_type: minor_raise
+        target_suit: C
+        strength: invitational_plus
+        method: inverted_minor
+      - fact_type: agreed_suit
+        suit: C
+        source: inverted_minor
+      - fact_type: forcing_status
+        status: forcing_to_2N_or_3m
+        target_suit: C
+
+  - id: cs_2
+    description: "Inverted raise 1D-2D: invitational or better diamond support, no four-card major, forcing to 2N or 3D."
+    system_notes: After 1D, 2D is an inverted minor raise, invitational or better, denying a four-card major.
+    context:
+      auction_pattern: "1DP"
+      seat_positions: [1, 2, 3, 4]
+    call: 2D
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: invitational_plus
+          evaluator: min_value
+          input: self.hcp
+          min: 10
+          weight: 80
+        - criterion_id: four_card_diamond_support
+          evaluator: min_value
+          input: self.diamonds
+          min: 4
+          weight: 70
+        - criterion_id: no_four_card_major
+          evaluator: expression
+          expr:
+            op: and
+            args:
+              - op: lte
+                left:
+                  op: length
+                  hand: self
+                  suit: H
+                right: {const: 3}
+              - op: lte
+                left:
+                  op: length
+                  hand: self
+                  suit: S
+                right: {const: 3}
+          weight: 30
+    meaning:
+      nature_labels: [conventional]
+      call_act_types: [support_showing, forcing, context_initiating]
+      action_type: inverted_minor_raise
+      target_suit: D
+      raise_strength: invitational_plus
+      alertable: true
+    effects:
+      - fact_type: minor_raise
+        target_suit: D
+        strength: invitational_plus
+        method: inverted_minor
+      - fact_type: agreed_suit
+        suit: D
+        source: inverted_minor
+      - fact_type: forcing_status
+        status: forcing_to_2N_or_3m
+        target_suit: D
+
+  - id: cs_3
+    description: Opener rebids 2N after 1C-2C with a minimum balanced hand and stoppers in the side suits.
+    system_notes: After 1C-2C, 2N shows a minimum balanced hand with side-suit stoppers.
+    context:
+      auction_pattern: "1CP2CP"
+      seat_positions: [1, 2, 3, 4]
+    call: 2N
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: minimum_balanced
+          evaluator: range_contains
+          input: self.hcp
+          min: 12
+          max: 14
+          weight: 70
+        - criterion_id: balanced
+          evaluator: equals
+          input: self.balanced
+          value: true
+          weight: 40
+        - criterion_id: diamond_stopper
+          evaluator: named_evaluator
+          evaluator_id: eval_stopper
+          params: {target_suit: D}
+          weight: 40
+        - criterion_id: heart_stopper
+          evaluator: named_evaluator
+          evaluator_id: eval_stopper
+          params: {target_suit: H}
+          weight: 40
+        - criterion_id: spade_stopper
+          evaluator: named_evaluator
+          evaluator_id: eval_stopper
+          params: {target_suit: S}
+          weight: 40
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [descriptive, context_setting]
+      action_type: stopper_notrump_rebid
+      target_suit: N
+      level: 2
+      alertable: false
+    effects:
+      - fact_type: notrump_contract_interest
+        level: 2
+        source: inverted_minor
+
+  - id: cs_4
+    description: Opener shows a diamond stopper after 1C-2C when not making the immediate 2N rebid.
+    system_notes: After 1C-2C, 2D shows a diamond stopper up the line.
+    context:
+      auction_pattern: "1CP2CP"
+      seat_positions: [1, 2, 3, 4]
+    call: 2D
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: diamond_stopper
+          evaluator: named_evaluator
+          evaluator_id: eval_stopper
+          params: {target_suit: D}
+          weight: 180
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [stopper_showing, forcing]
+      action_type: stopper_bid
+      target_suit: D
+      alertable: false
+    effects:
+      - fact_type: stopper
+        suit: D
+        source: inverted_minor
+
+  - id: cs_5
+    description: Opener shows a heart stopper after 1C-2C when no diamond stopper has been shown.
+    system_notes: After 1C-2C, 2H shows a heart stopper when diamonds were not stopped.
+    context:
+      auction_pattern: "1CP2CP"
+      seat_positions: [1, 2, 3, 4]
+    call: 2H
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: no_diamond_stopper
+          evaluator: expression
+          expr:
+            op: not
+            arg:
+              op: fact_exists
+              query:
+                fact_type: stopper
+                suit: D
+          weight: 10
+        - criterion_id: heart_stopper
+          evaluator: named_evaluator
+          evaluator_id: eval_stopper
+          params: {target_suit: H}
+          weight: 170
+        - criterion_id: lacks_diamond_stopper
+          evaluator: expression
+          expr:
+            op: not
+            arg:
+              op: or
+              args:
+                - op: contains_rank
+                  hand: self
+                  suit: D
+                  rank: A
+                - op: contains_rank
+                  hand: self
+                  suit: D
+                  rank: K
+                - op: and
+                  args:
+                    - op: contains_rank
+                      hand: self
+                      suit: D
+                      rank: Q
+                    - op: gte
+                      left:
+                        op: length
+                        hand: self
+                        suit: D
+                      right: {const: 2}
+          weight: 10
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [stopper_showing, forcing]
+      action_type: stopper_bid
+      target_suit: H
+      alertable: false
+    effects:
+      - fact_type: stopper
+        suit: H
+        source: inverted_minor
+
+  - id: cs_6
+    description: Opener shows a spade stopper after 1C-2C when lower side suits were not stopped.
+    system_notes: After 1C-2C, 2S shows a spade stopper when lower side suits were not stopped.
+    context:
+      auction_pattern: "1CP2CP"
+      seat_positions: [1, 2, 3, 4]
+    call: 2S
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: spade_stopper
+          evaluator: named_evaluator
+          evaluator_id: eval_stopper
+          params: {target_suit: S}
+          weight: 160
+        - criterion_id: lacks_lower_stoppers
+          evaluator: expression
+          expr:
+            op: and
+            args:
+              - op: not
+                arg:
+                  op: or
+                  args:
+                    - op: contains_rank
+                      hand: self
+                      suit: D
+                      rank: A
+                    - op: contains_rank
+                      hand: self
+                      suit: D
+                      rank: K
+                    - op: and
+                      args:
+                        - op: contains_rank
+                          hand: self
+                          suit: D
+                          rank: Q
+                        - op: gte
+                          left:
+                            op: length
+                            hand: self
+                            suit: D
+                          right: {const: 2}
+              - op: not
+                arg:
+                  op: or
+                  args:
+                    - op: contains_rank
+                      hand: self
+                      suit: H
+                      rank: A
+                    - op: contains_rank
+                      hand: self
+                      suit: H
+                      rank: K
+                    - op: and
+                      args:
+                        - op: contains_rank
+                          hand: self
+                          suit: H
+                          rank: Q
+                        - op: gte
+                          left:
+                            op: length
+                            hand: self
+                            suit: H
+                          right: {const: 2}
+          weight: 10
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [stopper_showing, forcing]
+      action_type: stopper_bid
+      target_suit: S
+      alertable: false
+    effects:
+      - fact_type: stopper
+        suit: S
+        source: inverted_minor
+
+  - id: cs_7
+    description: Opener rebids 3C after 1C-2C when notrump is unattractive.
+    system_notes: After 1C-2C, 3C is the minor fallback when opener does not show a notrump route.
+    context:
+      auction_pattern: "1CP2CP"
+      seat_positions: [1, 2, 3, 4]
+    call: 3C
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: club_fit_fallback
+          evaluator: fact_exists
+          query:
+            fact_type: minor_raise
+            target_suit: C
+          weight: 80
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [support_showing]
+      action_type: minor_fallback
+      target_suit: C
+      alertable: false
+    effects:
+      - fact_type: minor_contract_interest
+        target_suit: C
+        source: inverted_minor
+
+  - id: cs_8
+    description: Responder passes opener's 2N with invitational values after 1C-2C.
+    system_notes: After 1C-2C-2N, pass accepts playing 2N with invitational values.
+    context:
+      auction_pattern: "1CP2CP2NP"
+      seat_positions: [1, 2, 3, 4]
+    call: P
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: invitational_range
+          evaluator: range_contains
+          input: self.hcp
+          min: 10
+          max: 12
+          weight: 100
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [final_placement]
+      action_type: pass_final_contract
+      target_suit: N
+      level: 2
+      alertable: false
+    effects:
+      - fact_type: final_contract
+        target_suit: N
+        level: 2
+        source: inverted_minor
+
+  - id: cs_9
+    description: Responder bids 3N with game-going values after 1C-2C-2N.
+    system_notes: After 1C-2C-2N, 3N accepts notrump game with game-going values.
+    context:
+      auction_pattern: "1CP2CP2NP"
+      seat_positions: [1, 2, 3, 4]
+    call: 3N
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: game_values
+          evaluator: min_value
+          input: self.hcp
+          min: 13
+          weight: 110
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [final_placement]
+      action_type: place_contract
+      target_suit: N
+      level: 3
+      alertable: false
+    effects:
+      - fact_type: final_contract
+        target_suit: N
+        level: 3
+        source: inverted_minor
+
+  - id: cs_10
+    description: Opener rebids 2N after 1D-2D with a minimum balanced hand and stoppers in clubs and both majors.
+    system_notes: After 1D-2D, 2N shows a minimum balanced hand with side-suit stoppers.
+    context:
+      auction_pattern: "1DP2DP"
+      seat_positions: [1, 2, 3, 4]
+    call: 2N
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: minimum_balanced
+          evaluator: range_contains
+          input: self.hcp
+          min: 12
+          max: 14
+          weight: 70
+        - criterion_id: balanced
+          evaluator: equals
+          input: self.balanced
+          value: true
+          weight: 40
+        - criterion_id: club_stopper
+          evaluator: named_evaluator
+          evaluator_id: eval_stopper
+          params: {target_suit: C}
+          weight: 40
+        - criterion_id: heart_stopper
+          evaluator: named_evaluator
+          evaluator_id: eval_stopper
+          params: {target_suit: H}
+          weight: 40
+        - criterion_id: spade_stopper
+          evaluator: named_evaluator
+          evaluator_id: eval_stopper
+          params: {target_suit: S}
+          weight: 40
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [descriptive, context_setting]
+      action_type: stopper_notrump_rebid
+      target_suit: N
+      level: 2
+      alertable: false
+    effects:
+      - fact_type: notrump_contract_interest
+        level: 2
+        source: inverted_minor
+
+  - id: cs_11
+    description: Opener shows a heart stopper after 1D-2D.
+    system_notes: After 1D-2D, 2H shows a heart stopper up the line.
+    context:
+      auction_pattern: "1DP2DP"
+      seat_positions: [1, 2, 3, 4]
+    call: 2H
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: heart_stopper
+          evaluator: named_evaluator
+          evaluator_id: eval_stopper
+          params: {target_suit: H}
+          weight: 180
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [stopper_showing, forcing]
+      action_type: stopper_bid
+      target_suit: H
+      alertable: false
+    effects:
+      - fact_type: stopper
+        suit: H
+        source: inverted_minor
+
+  - id: cs_12
+    description: Opener shows a spade stopper after 1D-2D when hearts were not stopped.
+    system_notes: After 1D-2D, 2S shows a spade stopper when hearts were not stopped.
+    context:
+      auction_pattern: "1DP2DP"
+      seat_positions: [1, 2, 3, 4]
+    call: 2S
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: spade_stopper
+          evaluator: named_evaluator
+          evaluator_id: eval_stopper
+          params: {target_suit: S}
+          weight: 170
+        - criterion_id: lacks_heart_stopper
+          evaluator: expression
+          expr:
+            op: not
+            arg:
+              op: or
+              args:
+                - op: contains_rank
+                  hand: self
+                  suit: H
+                  rank: A
+                - op: contains_rank
+                  hand: self
+                  suit: H
+                  rank: K
+                - op: and
+                  args:
+                    - op: contains_rank
+                      hand: self
+                      suit: H
+                      rank: Q
+                    - op: gte
+                      left:
+                        op: length
+                        hand: self
+                        suit: H
+                      right: {const: 2}
+          weight: 10
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [stopper_showing, forcing]
+      action_type: stopper_bid
+      target_suit: S
+      alertable: false
+    effects:
+      - fact_type: stopper
+        suit: S
+        source: inverted_minor
+
+  - id: cs_13
+    description: Opener shows a club stopper after 1D-2D when major stoppers were not available.
+    system_notes: After 1D-2D, 3C shows a club stopper when major stoppers were not available.
+    context:
+      auction_pattern: "1DP2DP"
+      seat_positions: [1, 2, 3, 4]
+    call: 3C
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: club_stopper
+          evaluator: named_evaluator
+          evaluator_id: eval_stopper
+          params: {target_suit: C}
+          weight: 160
+        - criterion_id: lacks_major_stoppers
+          evaluator: expression
+          expr:
+            op: and
+            args:
+              - op: not
+                arg:
+                  op: or
+                  args:
+                    - op: contains_rank
+                      hand: self
+                      suit: H
+                      rank: A
+                    - op: contains_rank
+                      hand: self
+                      suit: H
+                      rank: K
+                    - op: and
+                      args:
+                        - op: contains_rank
+                          hand: self
+                          suit: H
+                          rank: Q
+                        - op: gte
+                          left:
+                            op: length
+                            hand: self
+                            suit: H
+                          right: {const: 2}
+              - op: not
+                arg:
+                  op: or
+                  args:
+                    - op: contains_rank
+                      hand: self
+                      suit: S
+                      rank: A
+                    - op: contains_rank
+                      hand: self
+                      suit: S
+                      rank: K
+                    - op: and
+                      args:
+                        - op: contains_rank
+                          hand: self
+                          suit: S
+                          rank: Q
+                        - op: gte
+                          left:
+                            op: length
+                            hand: self
+                            suit: S
+                          right: {const: 2}
+          weight: 10
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [stopper_showing, forcing]
+      action_type: stopper_bid
+      target_suit: C
+      alertable: false
+    effects:
+      - fact_type: stopper
+        suit: C
+        source: inverted_minor
+
+  - id: cs_14
+    description: Opener rebids 3D after 1D-2D when notrump is unattractive.
+    system_notes: After 1D-2D, 3D is the minor fallback when opener does not show a notrump route.
+    context:
+      auction_pattern: "1DP2DP"
+      seat_positions: [1, 2, 3, 4]
+    call: 3D
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: diamond_fit_fallback
+          evaluator: fact_exists
+          query:
+            fact_type: minor_raise
+            target_suit: D
+          weight: 80
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [support_showing]
+      action_type: minor_fallback
+      target_suit: D
+      alertable: false
+    effects:
+      - fact_type: minor_contract_interest
+        target_suit: D
+        source: inverted_minor
+
+  - id: cs_15
+    description: Responder passes opener's 2N with invitational values after 1D-2D.
+    system_notes: After 1D-2D-2N, pass accepts playing 2N with invitational values.
+    context:
+      auction_pattern: "1DP2DP2NP"
+      seat_positions: [1, 2, 3, 4]
+    call: P
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: invitational_range
+          evaluator: range_contains
+          input: self.hcp
+          min: 10
+          max: 12
+          weight: 100
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [final_placement]
+      action_type: pass_final_contract
+      target_suit: N
+      level: 2
+      alertable: false
+    effects:
+      - fact_type: final_contract
+        target_suit: N
+        level: 2
+        source: inverted_minor
+
+  - id: cs_16
+    description: Responder bids 3N with game-going values after 1D-2D-2N.
+    system_notes: After 1D-2D-2N, 3N accepts notrump game with game-going values.
+    context:
+      auction_pattern: "1DP2DP2NP"
+      seat_positions: [1, 2, 3, 4]
+    call: 3N
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: game_values
+          evaluator: min_value
+          input: self.hcp
+          min: 13
+          weight: 110
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [final_placement]
+      action_type: place_contract
+      target_suit: N
+      level: 3
+      alertable: false
+    effects:
+      - fact_type: final_contract
+        target_suit: N
+        level: 3
+        source: inverted_minor

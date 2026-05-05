@@ -1,0 +1,10 @@
+id: meow_one_notrump_opening
+namespace: meow_2over1
+name: Meow 1N Opening
+version: 0.1.0
+description: >
+  Standalone 1N opening Convention for the Meow 2/1 benchmark. Response
+  structures such as Stayman, transfers, Texas, and Puppet Stayman are separate
+  Conventions that consume the notrump semantic state created here.
+author:
+  name: Meow Li

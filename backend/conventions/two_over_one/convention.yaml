@@ -1,0 +1,9 @@
+id: two_over_one
+namespace: two_over_one
+name: 2/1 Game Forcing
+version: 0.1.0
+description: >
+  Foundation Convention for natural 2/1-style openings in the current
+  prototype.
+author:
+  name: Partner Prototype

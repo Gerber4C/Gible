@@ -1,6 +1,6 @@
 cases:
   - name: transfer_to_hearts_superaccept_is_selected
-    system: expert_2over1
+    convention_set: expert_2over1
     auction: 1NP2DP
     hand: SAQ74HKJ83DA62CQ5
     environment: &imp_none
@@ -10,124 +10,124 @@ cases:
     expected:
       call: 3H
       origin:
-        rule_id: superaccept_hearts
-        gadget_id: four_way_jacoby_transfer
-        qualified_rule_id: notrump_response/four_way_jacoby_transfer@0.1.0:superaccept_hearts
+        object_id: cs_3
+        convention_id: four_way_jacoby_transfer
+        qualified_id: notrump_response/four_way_jacoby_transfer@0.1.0:call_specification:cs_3
       public_meaning:
         alertable: true
       compared_candidate_calls: [3H, 2H]
       diagnostics: []
       semantic_fact_types: [notrump_opening, transfer]
       semantic_fact_origins:
-        - qualified_rule_id: two_over_one/two_over_one@0.1.0:open_1N
+        - qualified_id: two_over_one/two_over_one@0.1.0:call_specification:cs_1
       selected_criteria_include: [pending_heart_transfer]
 
   - name: transfer_to_hearts_normal_completion_is_selected
-    system: expert_2over1
+    convention_set: expert_2over1
     auction: 1NP2DP
     hand: SAKQH83DQ762CKJ54
     environment: *imp_none
     expected:
       call: 2H
       origin:
-        rule_id: complete_hearts
+        object_id: cs_2
       semantic_fact_types: [notrump_opening, transfer]
 
   - name: responder_uses_2d_transfer_with_five_hearts
-    system: expert_2over1
+    convention_set: expert_2over1
     auction: 1NP
     hand: S74HKJ832DA762CQ5
     environment: *imp_none
     expected:
       call: 2D
       origin:
-        rule_id: transfer_hearts_2D
-        gadget_id: four_way_jacoby_transfer
+        object_id: cs_1
+        convention_id: four_way_jacoby_transfer
       selected_criteria_include: [jacoby_transfer_heart_length]
 
   - name: notrump_opening_seat_1
-    system: expert_2over1
+    convention_set: expert_2over1
     auction: ""
     hand: &balanced_16 SAQ7HKJ8DA762CQ54
     environment: *imp_none
-    expected: &open_1n_expected
+    expected: &balanced_notrump_expected
       call: 1N
       origin:
-        rule_id: open_1N
+        object_id: cs_1
 
   - name: notrump_opening_seat_2
-    system: expert_2over1
+    convention_set: expert_2over1
     auction: P
     hand: *balanced_16
     environment: *imp_none
-    expected: *open_1n_expected
+    expected: *balanced_notrump_expected
 
   - name: notrump_opening_seat_3
-    system: expert_2over1
+    convention_set: expert_2over1
     auction: PP
     hand: *balanced_16
     environment: *imp_none
-    expected: *open_1n_expected
+    expected: *balanced_notrump_expected
 
   - name: notrump_opening_seat_4
-    system: expert_2over1
+    convention_set: expert_2over1
     auction: PPP
     hand: *balanced_16
     environment: *imp_none
-    expected: *open_1n_expected
+    expected: *balanced_notrump_expected
 
   - name: notrump_2n_opening
-    system: expert_2over1
+    convention_set: expert_2over1
     auction: ""
     hand: SAK7HKJ8DAQ76CK54
     environment: *imp_none
     expected:
       call: 2N
       origin:
-        rule_id: open_2N
+        object_id: cs_2
 
   - name: one_heart_opening_seat_1_2
-    system: expert_2over1
+    convention_set: expert_2over1
     auction: ""
     hand: SK2HAKQ87D765C432
     environment: *imp_none
     expected:
       call: 1H
       origin:
-        rule_id: open_1H_seat_1_2
+        object_id: cs_3
 
   - name: one_spade_opening_seat_1_2
-    system: expert_2over1
+    convention_set: expert_2over1
     auction: ""
     hand: SAKQ87H32D765CK32
     environment: *imp_none
     expected:
       call: 1S
       origin:
-        rule_id: open_1S_seat_1_2
+        object_id: cs_4
 
   - name: one_club_opening_seat_1_2
-    system: expert_2over1
+    convention_set: expert_2over1
     auction: ""
     hand: SA32HKQ7D865CK432
     environment: *imp_none
     expected:
       call: 1C
       origin:
-        rule_id: open_1C_seat_1_2
+        object_id: cs_5
 
   - name: one_diamond_opening_seat_1_2
-    system: expert_2over1
+    convention_set: expert_2over1
     auction: ""
     hand: SA432HKQ7DK432C65
     environment: *imp_none
     expected:
       call: 1D
       origin:
-        rule_id: open_1D_seat_1_2
+        object_id: cs_6
 
   - name: one_major_placeholder_seat_3_4
-    system: expert_2over1
+    convention_set: expert_2over1
     auction: PP
     hand: S432H8765D765C432
     environment:
@@ -138,10 +138,10 @@ cases:
     expected:
       call: 1H
       origin:
-        rule_id: open_1M_seat_3_4_placeholder
+        object_id: cs_7
 
   - name: one_minor_placeholder_seat_3_4
-    system: expert_2over1
+    convention_set: expert_2over1
     auction: PPP
     hand: S432H876D7654C432
     environment:
@@ -152,60 +152,60 @@ cases:
     expected:
       call: 1C
       origin:
-        rule_id: open_1m_seat_3_4_placeholder
+        object_id: cs_8
 
   - name: strong_two_club_opening
-    system: expert_2over1
+    convention_set: expert_2over1
     auction: ""
     hand: SAKQHAKQDAKQ7C543
     environment: *imp_none
     expected:
       call: 2C
       origin:
-        rule_id: open_2C
+        object_id: cs_9
 
   - name: weak_two_diamond_opening
-    system: expert_2over1
+    convention_set: expert_2over1
     auction: ""
     hand: SJ32H87DKQ9876C54
     environment: *imp_none
     expected:
       call: 2D
       origin:
-        rule_id: open_2D
+        object_id: cs_10
 
   - name: weak_two_heart_opening
-    system: expert_2over1
+    convention_set: expert_2over1
     auction: ""
     hand: SJ32HKQ9876D87C54
     environment: *imp_none
     expected:
       call: 2H
       origin:
-        rule_id: open_2H
+        object_id: cs_11
 
   - name: weak_two_spade_opening
-    system: expert_2over1
+    convention_set: expert_2over1
     auction: ""
     hand: SKQ9876HJ32D87C54
     environment: *imp_none
     expected:
       call: 2S
       origin:
-        rule_id: open_2S
+        object_id: cs_12
 
   - name: notrump_response_expands_by_seat_position
-    system: expert_2over1
+    convention_set: expert_2over1
     auction: PP1NP
     hand: S74HKJ832DA762CQ5
     environment: *imp_none
     expected:
       call: 2D
       origin:
-        rule_id: transfer_hearts_2D
+        object_id: cs_1
 
   - name: notrump_continuation_expands_by_seat_position
-    system: expert_2over1
+    convention_set: expert_2over1
     auction: PP1NP2DP
     hand: SAQ74HKJ83DA62CQ5
     environment: *imp_none
@@ -214,19 +214,19 @@ cases:
       semantic_fact_types: [notrump_opening, transfer]
 
   - name: responder_does_not_use_2d_transfer_with_four_hearts
-    system: expert_2over1
+    convention_set: expert_2over1
     auction: 1NP
     hand: SA74HKJ83DA762CQ5
     environment: *imp_none
     expected:
       call: P
       origin:
-        qualified_rule_id: two_over_one/two_over_one@0.1.0:default_pass
+        qualified_id: two_over_one/two_over_one@0.1.0:call_specification:cs_13
       diagnostics_include:
         - defaulting to P
 
   - name: unmatched_auction_defaults_to_pass
-    system: expert_2over1
+    convention_set: expert_2over1
     auction: 1CP1D
     hand: SA74HKJ83DA762CQ5
     environment: *imp_none
@@ -234,5 +234,1023 @@ cases:
       call: P
       selected_algorithm: default_policy
       diagnostics_include:
-        - Undefined historical call 1D
+        - Undefined prior call 1D
         - defaulting to P
+
+  - name: meow_opening_policy_prefers_1n_over_five_spades
+    convention_set: meow_2over1
+    auction: ""
+    hand: SAQJ87HK2DA76CQ54
+    environment: *imp_none
+    expected:
+      call: 1N
+      origin:
+        object_id: cs_1
+        convention_id: meow_one_notrump_opening
+      compared_candidate_calls: [1N, 1S]
+      selection_policy:
+        object_id: policy_1
+        algorithm: ordered_condition
+        fallback: highest_score
+      diagnostics: []
+
+  - name: meow_opening_policy_prefers_1n_over_five_hearts
+    convention_set: meow_2over1
+    auction: ""
+    hand: SK2HAQJ87DA76CQ54
+    environment: *imp_none
+    expected:
+      call: 1N
+      origin:
+        object_id: cs_1
+        convention_id: meow_one_notrump_opening
+      compared_candidate_calls: [1N, 1H]
+      selection_policy:
+        object_id: policy_1
+        algorithm: ordered_condition
+        fallback: highest_score
+      diagnostics: []
+
+  - name: meow_opening_policy_prefers_spades_with_five_five_majors
+    convention_set: meow_2over1
+    auction: ""
+    hand: SKQJ87HQJ984DA6C2
+    environment: *imp_none
+    expected:
+      call: 1S
+      origin:
+        object_id: cs_1
+        convention_id: meow_two_over_one_core
+      compared_candidate_calls: [1S, 1H]
+      selection_policy:
+        object_id: policy_1
+        algorithm: ordered_condition
+        fallback: highest_score
+      diagnostics: []
+
+  - name: meow_club_transfer_gap_superaccept
+    convention_set: meow_2over1
+    auction: 1NP2SP
+    hand: SA54HKQ2DK83CQJ76
+    environment: *imp_none
+    expected:
+      call: 2N
+      origin:
+        object_id: cs_5
+        convention_id: meow_four_way_transfers_over_1n
+      selected_criteria_include: [honor_third_club_support]
+
+  - name: meow_club_transfer_normal_accept_without_honor_third
+    convention_set: meow_2over1
+    auction: 1NP2SP
+    hand: SA54HKQ2DAK3C8764
+    environment: *imp_none
+    expected:
+      call: 3C
+      origin:
+        object_id: cs_6
+        convention_id: meow_four_way_transfers_over_1n
+
+  - name: meow_diamond_transfer_gap_superaccept
+    convention_set: meow_2over1
+    auction: 1NP2NP
+    hand: SA54HKQ2DK83CQJ76
+    environment: *imp_none
+    expected:
+      call: 3C
+      origin:
+        object_id: cs_8
+        convention_id: meow_four_way_transfers_over_1n
+      selected_criteria_include: [honor_third_diamond_support]
+
+  - name: meow_heart_transfer_superaccept_selected
+    convention_set: meow_2over1
+    auction: 1NP2DP
+    hand: SAQ74HKJ83DA62CQ5
+    environment: *imp_none
+    expected:
+      call: 3H
+      origin:
+        object_id: cs_11
+        convention_id: meow_four_way_transfers_over_1n
+      compared_candidate_calls: [3H, 2H]
+      selected_criteria_include: [pending_heart_transfer, four_heart_support, maximum_notrump_values]
+      diagnostics: []
+
+  - name: meow_slam_heart_transfer_plan_enters_with_2d
+    convention_set: meow_2over1
+    auction: 1NP
+    hand: SA2HAKQJ87D53CKQ2
+    environment: *imp_none
+    expected:
+      call: 2D
+      origin:
+        object_id: cs_1
+        object_type: call_specification
+        convention_id: meow_four_way_transfers_over_1n
+      selected_plan_origin:
+        object_id: plan_2
+        object_type: bidding_plan
+        convention_id: meow_four_way_transfers_over_1n
+      compared_candidate_calls: [2D, 4D, 2C]
+      diagnostics: []
+
+  - name: meow_rkcb_after_heart_transfer_superaccept_with_five_hearts
+    convention_set: meow_2over1
+    auction: 1NP2DP3HP
+    hand: SA2HAKQJ8DA3CKQ32
+    environment: *imp_none
+    expected:
+      call: 4N
+      origin:
+        object_id: cs_1
+        object_type: call_specification
+        convention_id: meow_rkcb_1430
+      compared_candidate_calls: [4N]
+      semantic_fact_types: [notrump_opening, notrump_focus, transfer, transfer_superaccept, agreed_suit]
+      protocol_frames:
+        - frame_id: frame_1
+          frame_type: major_transfer
+          status: active
+          current_stage: responder_continuation
+      plan_states:
+        - plan_id: plan_1
+          goal: signoff
+          owner: responder
+          current_node: make_1
+          status: active
+        - plan_id: plan_2
+          goal: ask_keycards
+          owner: responder
+          current_node: make_1
+          status: active
+      diagnostics: []
+
+  - name: meow_control_bid_after_heart_superaccept_precedes_keycard
+    convention_set: meow_2over1
+    auction: 1NP2DP3HP
+    hand: SA2HAKQJ87DA3CKQ2
+    environment: *imp_none
+    expected:
+      call: 4D
+      origin:
+        object_id: cs_1
+        convention_id: meow_control_bidding
+      compared_candidate_calls: [4D, 4N]
+      public_meaning:
+        action_type: control_bid
+        target_suit: D
+      selected_criteria_include: [diamond_control]
+      diagnostics: []
+
+  - name: meow_kickback_selected_when_heart_slam_hand_lacks_diamond_control
+    convention_set: meow_2over1
+    auction: 1NP2DP3HP
+    hand: SA2HAKQJ87D53CKQ2
+    environment: *imp_none
+    expected:
+      call: 4S
+      origin:
+        object_id: cs_1
+        convention_id: meow_kickback_keycard
+      compared_candidate_calls: [4S, 4N]
+      public_meaning:
+        action_type: kickback_1430
+        target_suit: H
+      diagnostics: []
+
+  - name: meow_kickback_response_uses_semantic_keycard_context
+    convention_set: meow_2over1
+    auction: 1NP2DP3HP4SP
+    hand: SAQ74HKJ83DA62CQ5
+    environment: *imp_none
+    expected:
+      call: 5C
+      origin:
+        object_id: cs_3
+        convention_id: meow_kickback_keycard
+      public_meaning:
+        action_type: keycard_response
+      semantic_fact_types: [notrump_opening, notrump_focus, transfer, transfer_superaccept, agreed_suit, keycard_context]
+      diagnostics: []
+
+  - name: meow_exclusion_keycard_selected_with_diamond_void
+    convention_set: meow_2over1
+    auction: 1NP2DP3HP
+    hand: SA2HAKQJ87D-CKQJ24
+    environment: *imp_none
+    expected:
+      call: 5D
+      origin:
+        object_id: cs_1
+        convention_id: meow_exclusion_keycard
+      compared_candidate_calls: [5D, 4D, 4N]
+      public_meaning:
+        action_type: exclusion_1430
+        excluded_suit: D
+      selected_criteria_include: [diamond_void]
+      diagnostics: []
+
+  - name: meow_exclusion_response_counts_keycards_outside_void_suit
+    convention_set: meow_2over1
+    auction: 1NP2DP3HP5DP
+    hand: SAQ74HKJ83DA62CQ5
+    environment: *imp_none
+    expected:
+      call: 5N
+      origin:
+        object_id: cs_4
+        convention_id: meow_exclusion_keycard
+      public_meaning:
+        action_type: keycard_response
+        excluded_suit: D
+      diagnostics: []
+
+  - name: meow_gerber_selected_over_notrump_focus
+    convention_set: meow_2over1
+    auction: 1NP
+    hand: SAQ7HKQ8DKQ6CAJ42
+    environment: *imp_none
+    expected:
+      call: 4C
+      origin:
+        object_id: cs_1
+        convention_id: meow_gerber_over_notrump
+      compared_candidate_calls: [4C, 3C]
+      public_meaning:
+        action_type: gerber_ace_ask
+      diagnostics: []
+
+  - name: meow_gerber_response_counts_aces
+    convention_set: meow_2over1
+    auction: 1NP4CP
+    hand: SA54HKQ2DK83CQJ76
+    environment: *imp_none
+    expected:
+      call: 4H
+      origin:
+        object_id: cs_3
+        convention_id: meow_gerber_over_notrump
+      public_meaning:
+        action_type: ace_ask_response
+        ace_count: 1
+      diagnostics: []
+
+  - name: meow_minorwood_selected_after_diamond_transfer_superaccept
+    convention_set: meow_2over1
+    auction: 1NP2NP3CP
+    hand: S2H84DAQJ987CKQ32
+    environment: *imp_none
+    expected:
+      call: 4D
+      origin:
+        object_id: cs_1
+        convention_id: meow_minorwood_keycard
+      public_meaning:
+        action_type: minorwood_1430
+        target_suit: D
+      diagnostics: []
+
+  - name: meow_minorwood_response_uses_diamond_keycards
+    convention_set: meow_2over1
+    auction: 1NP2NP3CP4DP
+    hand: SA54HKQ2DK83CQJ76
+    environment: *imp_none
+    expected:
+      call: 4N
+      origin:
+        object_id: cs_4
+        convention_id: meow_minorwood_keycard
+      public_meaning:
+        action_type: keycard_response
+        keycard_count: 2
+      diagnostics: []
+
+  - name: meow_targeted_diamond_king_ask_after_heart_rkcb
+    convention_set: meow_2over1
+    auction: 1NP2DP3HP4NP5DP
+    hand: SA2HAKQJ87D53CKQ2
+    environment: *imp_none
+    expected:
+      call: 5N
+      origin:
+        object_id: cs_1
+        convention_id: meow_targeted_king_ask
+      public_meaning:
+        action_type: targeted_king_ask
+        target_suit: D
+      diagnostics: []
+
+  - name: meow_targeted_diamond_king_response
+    convention_set: meow_2over1
+    auction: 1NP2DP3HP4NP5DP5NP
+    hand: SA54HKQ2DK83CQJ76
+    environment: *imp_none
+    expected:
+      call: 6D
+      origin:
+        object_id: cs_2
+        convention_id: meow_targeted_king_ask
+      public_meaning:
+        action_type: targeted_king_response
+        target_suit: D
+      diagnostics: []
+
+  - name: meow_targeted_diamond_king_route_places_grand
+    convention_set: meow_2over1
+    auction: 1NP2DP3HP4NP5DP5NP6DP
+    hand: SA2HAKQJ87D53CKQ2
+    environment: *imp_none
+    expected:
+      call: 7H
+      origin:
+        object_id: cs_3
+        convention_id: meow_targeted_king_ask
+      public_meaning:
+        action_type: place_contract
+        target_suit: H
+      diagnostics: []
+
+  - name: meow_rkcb_frame_opens_after_transfer_slam_plan_4n
+    convention_set: meow_2over1
+    auction: 1NP2DP3HP4NP
+    hand: SAQ74HKJ83DA62CQ5
+    environment: *imp_none
+    expected:
+      call: 5D
+      origin:
+        object_id: cs_3
+        convention_id: meow_rkcb_1430
+      semantic_fact_types: [notrump_opening, notrump_focus, transfer, transfer_superaccept, agreed_suit, keycard_context]
+      protocol_frames:
+        - frame_id: frame_1
+          frame_type: major_transfer
+          status: active
+          current_stage: responder_continuation
+        - frame_id: frame_1
+          frame_type: rkcb_1430
+          status: active
+          current_stage: keycard_response
+      diagnostics: []
+
+  - name: meow_weak_heart_transfer_plan_passes_completion
+    convention_set: meow_2over1
+    auction: 1NP2DP2HP
+    hand: S74H98765D762CQ54
+    environment: *imp_none
+    expected:
+      call: P
+      origin:
+        object_id: plan_1
+        object_type: bidding_plan
+        convention_id: meow_four_way_transfers_over_1n
+      compared_candidate_calls: [P]
+      semantic_fact_types: [notrump_opening, notrump_focus, transfer, transfer_completion]
+      protocol_frames:
+        - frame_id: frame_1
+          frame_type: major_transfer
+          status: active
+          current_stage: responder_continuation
+      plan_states:
+        - plan_id: plan_1
+          goal: signoff
+          owner: responder
+          current_node: make_1
+          status: active
+      diagnostics: []
+
+  - name: meow_stayman_two_notrump_invitational_alertable
+    convention_set: meow_2over1
+    auction: 1NP2CP2DP
+    hand: SK874H92DQ83CK762
+    environment: *imp_none
+    expected:
+      call: 2N
+      origin:
+        object_id: cs_3
+        convention_id: meow_regular_stayman_over_1n
+      public_meaning:
+        alertable: true
+
+  - name: meow_puppet_stayman_over_1n_is_standalone
+    convention_set: meow_2over1
+    auction: 1NP
+    hand: S82H93DAQJ4CKQJ76
+    environment: *imp_none
+    expected:
+      call: 3C
+      origin:
+        object_id: cs_1
+        convention_id: meow_puppet_stayman_over_1n
+
+  - name: meow_puppet_stayman_over_2n_is_standalone
+    convention_set: meow_2over1
+    auction: 2NP
+    hand: S82H93DAQJ4CKQJ76
+    environment: *imp_none
+    expected:
+      call: 3C
+      origin:
+        object_id: cs_1
+        convention_id: meow_puppet_stayman_over_2n
+
+  - name: meow_rkcb_after_texas_is_standalone
+    convention_set: meow_2over1
+    auction: 1NP4HP4SP
+    hand: SKQJT98HA43DA2CAK
+    environment: *imp_none
+    expected:
+      call: 4N
+      origin:
+        object_id: cs_1
+        convention_id: meow_rkcb_1430
+      semantic_fact_types: [notrump_opening, notrump_focus, texas_transfer, texas_transfer, agreed_suit]
+
+  - name: meow_bergen_raise_is_standalone
+    convention_set: meow_2over1
+    auction: 1SP
+    hand: SK987H74DQJ7CK985
+    environment: *imp_none
+    expected:
+      call: 3C
+      origin:
+        object_id: cs_1
+        convention_id: meow_bergen_raises
+
+  - name: meow_drury_is_standalone
+    convention_set: meow_2over1
+    auction: PP1SP
+    hand: S987H74DAJ7CKQ854
+    environment: *imp_none
+    expected:
+      call: 2C
+      origin:
+        object_id: cs_1
+        convention_id: meow_two_way_reverse_drury
+
+  - name: meow_spade_simple_raise_three_card_support
+    convention_set: meow_2over1
+    auction: 1SP
+    hand: S987H74DAQ7CK9852
+    environment: *imp_none
+    expected:
+      call: 2S
+      origin:
+        object_id: cs_1
+        convention_id: meow_simple_major_raise
+
+  - name: meow_heart_simple_raise_three_card_support
+    convention_set: meow_2over1
+    auction: 1HP
+    hand: S72H987DKQ7CA9852
+    environment: *imp_none
+    expected:
+      call: 2H
+      origin:
+        object_id: cs_2
+        convention_id: meow_simple_major_raise
+
+  - name: meow_heart_bergen_constructive_raise
+    convention_set: meow_2over1
+    auction: 1HP
+    hand: S72HK987DQ87CA982
+    environment: *imp_none
+    expected:
+      call: 3C
+      origin:
+        object_id: cs_4
+        convention_id: meow_bergen_raises
+      public_meaning:
+        raise_strength: constructive
+
+  - name: meow_heart_bergen_limit_raise
+    convention_set: meow_2over1
+    auction: 1HP
+    hand: S72HK987DKQ7CA982
+    environment: *imp_none
+    expected:
+      call: 3D
+      origin:
+        object_id: cs_5
+        convention_id: meow_bergen_raises
+      public_meaning:
+        raise_strength: limit
+
+  - name: meow_heart_bergen_preemptive_raise
+    convention_set: meow_2over1
+    auction: 1HP
+    hand: S72H9876D987C9852
+    environment: *imp_none
+    expected:
+      call: 3H
+      origin:
+        object_id: cs_6
+        convention_id: meow_bergen_raises
+      public_meaning:
+        raise_strength: preemptive
+
+  - name: meow_heart_any_help_game_try_selected
+    convention_set: meow_2over1
+    auction: 1HP2HP
+    hand: SAQ2HAKJ74D82C983
+    environment: *imp_none
+    expected:
+      call: 2S
+      origin:
+        object_id: cs_6
+        convention_id: meow_kokish_game_tries
+
+  - name: meow_heart_trump_help_game_try_selected
+    convention_set: meow_2over1
+    auction: 1HP2HP
+    hand: SAQ2H98754DAK2CK3
+    environment: *imp_none
+    expected:
+      call: 2N
+      origin:
+        object_id: cs_9
+        convention_id: meow_kokish_game_tries
+
+  - name: meow_heart_any_help_response_shows_spades
+    convention_set: meow_2over1
+    auction: 1HP2HP2SP
+    hand: SK72H987DQ76CA982
+    environment: *imp_none
+    expected:
+      call: 2N
+      origin:
+        object_id: cs_7
+        convention_id: meow_kokish_game_tries
+
+  - name: meow_rkcb_after_simple_raise_uses_semantic_agreed_suit
+    convention_set: meow_2over1
+    auction: 1SP2SP
+    hand: SKQJT98HA43DA2CAK
+    environment: *imp_none
+    expected:
+      call: 4N
+      origin:
+        object_id: cs_1
+        convention_id: meow_rkcb_1430
+      semantic_fact_types: [major_opening, agreed_suit, major_raise]
+
+  - name: meow_rkcb_response_after_simple_raise_uses_semantic_context
+    convention_set: meow_2over1
+    auction: 1SP2SP4NP
+    hand: SA54H872DK83CQ762
+    environment: *imp_none
+    expected:
+      call: 5C
+      origin:
+        object_id: cs_2
+        convention_id: meow_rkcb_1430
+      semantic_fact_types: [major_opening, agreed_suit, major_raise, keycard_context]
+
+  - name: meow_rkcb_specific_king_ask_after_simple_raise
+    convention_set: meow_2over1
+    auction: 1SP2SP4NP5CP
+    hand: SKQJT98HA43DA2CAK
+    environment: *imp_none
+    expected:
+      call: 5N
+      origin:
+        object_id: cs_6
+        convention_id: meow_rkcb_1430
+
+  - name: meow_rkcb_specific_king_response_after_simple_raise
+    convention_set: meow_2over1
+    auction: 1SP2SP4NP5CP5NP
+    hand: SA54H872DK83CQ762
+    environment: *imp_none
+    expected:
+      call: 6D
+      origin:
+        object_id: cs_7
+        convention_id: meow_rkcb_1430
+
+  - name: meow_rkcb_grand_placement_after_simple_raise
+    convention_set: meow_2over1
+    auction: 1SP2SP4NP5CP5NP6DP
+    hand: SKQJT98HA43DA2CAK
+    environment: *imp_none
+    expected:
+      call: 7S
+      origin:
+        object_id: cs_8
+        convention_id: meow_rkcb_1430
+
+  - name: meow_quantitative_four_notrump_after_one_notrump
+    convention_set: meow_2over1
+    auction: 1NP
+    hand: SAQ7HKJ8DKJ6CQ542
+    environment: *imp_none
+    expected:
+      call: 4N
+      origin:
+        object_id: cs_1
+        convention_id: meow_quantitative_notrump
+      public_meaning:
+        action_type: quantitative_notrump_invite
+
+  - name: meow_rkcb_not_quantitative_after_texas_sets_agreed_suit
+    convention_set: meow_2over1
+    auction: 1NP4HP4SP
+    hand: SKQJT98HA43DA2CAK
+    environment: *imp_none
+    expected:
+      call: 4N
+      origin:
+        object_id: cs_1
+        convention_id: meow_rkcb_1430
+
+  - name: illegal_candidate_is_filtered_after_higher_contract
+    convention_set: meow_2over1
+    auction: 1SP2SP5NP
+    hand: SKQJT98HA43DA2CAK
+    environment: *imp_none
+    expected:
+      call: P
+      selected_algorithm: default_policy
+      diagnostics_include:
+        - Illegal candidate 4N
+        - defaulting to P
+
+  - name: meow_minor_response_bypasses_diamonds_for_hearts
+    convention_set: meow_2over1
+    auction: 1CP
+    hand: S72HKJ87DQ876C542
+    environment: *imp_none
+    expected:
+      call: 1H
+      origin:
+        object_id: cs_4
+        convention_id: meow_minor_opening_structure
+      diagnostics: []
+
+  - name: meow_minor_response_bids_one_diamond_without_major
+    convention_set: meow_2over1
+    auction: 1CP
+    hand: S72H83DKJ87CQ9652
+    environment: *imp_none
+    expected:
+      call: 1D
+      origin:
+        object_id: cs_3
+        convention_id: meow_minor_opening_structure
+      compared_candidate_calls: [1D, 1N]
+      diagnostics: []
+
+  - name: meow_minor_response_one_notrump_six_to_ten
+    convention_set: meow_2over1
+    auction: 1CP
+    hand: S72HK83DQ87CJ9652
+    environment: *imp_none
+    expected:
+      call: 1N
+      origin:
+        object_id: cs_8
+        convention_id: meow_minor_opening_structure
+      public_meaning:
+        hcp_range: [6, 10]
+
+  - name: meow_minor_response_two_notrump_eleven_to_twelve
+    convention_set: meow_2over1
+    auction: 1CP
+    hand: SQ72HK83DAQ7CJ654
+    environment: *imp_none
+    expected:
+      call: 2N
+      origin:
+        object_id: cs_10
+        convention_id: meow_minor_opening_structure
+      public_meaning:
+        hcp_range: [11, 12]
+
+  - name: meow_minor_response_three_notrump_thirteen_to_fifteen
+    convention_set: meow_2over1
+    auction: 1DP
+    hand: SA72HK83DQ7CKJ542
+    environment: *imp_none
+    expected:
+      call: 3N
+      origin:
+        object_id: cs_13
+        convention_id: meow_minor_opening_structure
+      public_meaning:
+        hcp_range: [13, 15]
+
+  - name: meow_minor_weak_jump_shift_spades_is_alertable
+    convention_set: meow_2over1
+    auction: 1CP
+    hand: SKJ9876H72D83C542
+    environment: *imp_none
+    expected:
+      call: 2S
+      origin:
+        object_id: cs_15
+        convention_id: meow_minor_opening_structure
+      public_meaning:
+        alertable: true
+        action_type: weak_jump_shift
+
+  - name: meow_inverted_club_raise_invitational_plus
+    convention_set: meow_2over1
+    auction: 1CP
+    hand: S72H83DAQ7CKJ6542
+    environment: *imp_none
+    expected:
+      call: 2C
+      origin:
+        object_id: cs_1
+        convention_id: meow_inverted_minors
+      compared_candidate_calls: [2C, 1N]
+      public_meaning:
+        alertable: true
+        raise_strength: invitational_plus
+
+  - name: meow_crisscross_club_raise_game_force
+    convention_set: meow_2over1
+    auction: 1CP
+    hand: S72HK3DAQ7CKJ6542
+    environment: *imp_none
+    expected:
+      call: 2D
+      origin:
+        object_id: cs_1
+        convention_id: meow_crisscross_minor_raises
+      compared_candidate_calls: [2D, 2C]
+      public_meaning:
+        alertable: true
+        raise_strength: game_force
+
+  - name: meow_inverted_diamond_raise_invitational_plus
+    convention_set: meow_2over1
+    auction: 1DP
+    hand: S972H83DKJ876CAQ2
+    environment: *imp_none
+    expected:
+      call: 2D
+      origin:
+        object_id: cs_2
+        convention_id: meow_inverted_minors
+      compared_candidate_calls: [2D, 1N]
+      public_meaning:
+        raise_strength: invitational_plus
+
+  - name: meow_crisscross_diamond_raise_game_force
+    convention_set: meow_2over1
+    auction: 1DP
+    hand: S972H83DAKJ76CKQ4
+    environment: *imp_none
+    expected:
+      call: 3C
+      origin:
+        object_id: cs_2
+        convention_id: meow_crisscross_minor_raises
+      compared_candidate_calls: [3C, 2D, 3N]
+      public_meaning:
+        raise_strength: game_force
+
+  - name: meow_inverted_club_raise_opener_rebids_two_notrump_with_stoppers
+    convention_set: meow_2over1
+    auction: 1CP2CP
+    hand: SA72HK83DQ87CKJ62
+    environment: *imp_none
+    expected:
+      call: 2N
+      origin:
+        object_id: cs_3
+        convention_id: meow_inverted_minors
+      compared_candidate_calls: [2N, 2D, 3C]
+      selected_criteria_include: [diamond_stopper, heart_stopper, spade_stopper]
+
+  - name: meow_inverted_club_raise_opener_bids_stopper_up_the_line
+    convention_set: meow_2over1
+    auction: 1CP2CP
+    hand: SA72H983DKQ7CAJ62
+    environment: *imp_none
+    expected:
+      call: 2D
+      origin:
+        object_id: cs_4
+        convention_id: meow_inverted_minors
+      public_meaning:
+        action_type: stopper_bid
+        target_suit: D
+
+  - name: meow_inverted_club_raise_game_values_place_three_notrump
+    convention_set: meow_2over1
+    auction: 1CP2CP2NP
+    hand: S72HK3DAQ7CKJ6542
+    environment: *imp_none
+    expected:
+      call: 3N
+      origin:
+        object_id: cs_9
+        convention_id: meow_inverted_minors
+      public_meaning:
+        action_type: place_contract
+
+  - name: meow_two_way_nmf_two_club_invitational_relay
+    convention_set: meow_2over1
+    auction: 1CP1HP1NP
+    hand: SA72HKQJ83D87CQ54
+    environment: *imp_none
+    expected:
+      call: 2C
+      origin:
+        object_id: cs_1
+        convention_id: meow_two_way_nmf_xyz
+      public_meaning:
+        alertable: true
+        action_type: checkback_two_club_relay
+
+  - name: meow_one_diamond_response_notrump_rebid_records_negative_major_state
+    convention_set: meow_2over1
+    auction: 1CP1DP1NP
+    hand: SA72HKJ3DQ876CQ54
+    environment: *imp_none
+    expected:
+      call: 2C
+      origin:
+        object_id: cs_1
+        convention_id: meow_two_way_nmf_xyz
+      auction_state_include:
+        - key: opener.hcp
+          owner: opener
+          min_value: 12
+          max_value: 14
+        - key: opener.length.H
+          owner: opener
+          max_value: 3
+        - key: opener.length.S
+          owner: opener
+          max_value: 3
+
+  - name: meow_two_way_nmf_two_diamond_game_force
+    convention_set: meow_2over1
+    auction: 1CP1HP1NP
+    hand: SA72HAJ873D87CKQ4
+    environment: *imp_none
+    expected:
+      call: 2D
+      origin:
+        object_id: cs_2
+        convention_id: meow_two_way_nmf_xyz
+      public_meaning:
+        alertable: true
+        action_type: checkback_game_force
+
+  - name: meow_long_hearts_uses_force_route_before_rebidding
+    convention_set: meow_2over1
+    auction: 1CP1HP1SP
+    hand: SQ7HAKQ9876DKJC54
+    environment: *imp_none
+    expected:
+      call: 2D
+      origin:
+        object_id: cs_2
+        convention_id: meow_two_way_nmf_xyz
+      public_meaning:
+        alertable: true
+        action_type: checkback_game_force
+      selected_criteria_include: [force_before_long_suit_rebid]
+      auction_state_include:
+        - key: responder.length.H
+          owner: responder
+          min_value: 4
+        - key: opener.length.S
+          owner: opener
+          min_value: 4
+
+  - name: meow_xyz_two_notrump_club_drop_dead_relay
+    convention_set: meow_2over1
+    auction: 1CP1DP1HP
+    hand: S72H83D876CJ87652
+    environment: *imp_none
+    expected:
+      call: 2N
+      origin:
+        object_id: cs_3
+        convention_id: meow_two_way_nmf_xyz
+      public_meaning:
+        alertable: true
+        action_type: checkback_two_notrump_club_relay
+
+  - name: meow_xyz_club_drop_dead_opener_completes_three_clubs
+    convention_set: meow_2over1
+    auction: 1CP1DP1HP2NP
+    hand: SA72HK83D87CQ6542
+    environment: *imp_none
+    expected:
+      call: 3C
+      origin:
+        object_id: cs_9
+        convention_id: meow_two_way_nmf_xyz
+      public_meaning:
+        alertable: true
+        action_type: checkback_club_relay_completion
+
+  - name: meow_weak_two_favorable_first_seat
+    convention_set: meow_2over1
+    auction: ""
+    hand: S72HKQ9876D83C542
+    environment:
+      dealer: n
+      vulnerability: ew
+      scoring: IMP
+    expected:
+      call: 2H
+      origin:
+        object_id: cs_2
+        convention_id: meow_preemptive_openings
+      public_meaning:
+        alertable: false
+        action_type: weak_two_opening
+
+  - name: meow_weak_two_unfavorable_bad_hand_passes
+    convention_set: meow_2over1
+    auction: ""
+    hand: S72HJT9876D83C542
+    environment:
+      dealer: n
+      vulnerability: ns
+      scoring: IMP
+    expected:
+      call: P
+      selected_algorithm: default_policy
+      diagnostics_include:
+        - defaulting to P
+
+  - name: meow_weak_two_unfavorable_good_hand_opens
+    convention_set: meow_2over1
+    auction: ""
+    hand: SA72HKQ9876D83C54
+    environment:
+      dealer: n
+      vulnerability: ns
+      scoring: IMP
+    expected:
+      call: 2H
+      origin:
+        object_id: cs_2
+        convention_id: meow_preemptive_openings
+
+  - name: meow_third_seat_light_weak_two_opens
+    convention_set: meow_2over1
+    auction: PP
+    hand: S72HJT9876DK3C542
+    environment: *imp_none
+    expected:
+      call: 2H
+      origin:
+        object_id: cs_2
+        convention_id: meow_preemptive_openings
+
+  - name: meow_fourth_seat_weak_two_style_passes
+    convention_set: meow_2over1
+    auction: PPP
+    hand: SA72HKQ9876D83C54
+    environment: *imp_none
+    expected:
+      call: P
+      selected_algorithm: default_policy
+      diagnostics_include:
+        - defaulting to P
+
+  - name: meow_three_spade_preempt_selected_over_weak_two_with_seven_cards
+    convention_set: meow_2over1
+    auction: ""
+    hand: SKQJ9876H72D83C54
+    environment: *imp_none
+    expected:
+      call: 3S
+      origin:
+        object_id: cs_7
+        convention_id: meow_preemptive_openings
+      compared_candidate_calls: [3S, 2S]
+
+  - name: meow_gambling_three_notrump_clubs_alertable
+    convention_set: meow_2over1
+    auction: ""
+    hand: S87H83D76CAKQJ987
+    environment: *imp_none
+    expected:
+      call: 3N
+      origin:
+        object_id: cs_1
+        convention_id: meow_gambling_3nt
+      compared_candidate_calls: [3N, 3C]
+      public_meaning:
+        alertable: true
+        action_type: gambling_3nt_opening
+
+  - name: ambiguous_same_call_meaning_reports_diagnostic
+    convention_set: test_ambiguous_4n
+    auction: ""
+    hand: SAQ7HKJ8DKJ6CQ542
+    environment: *imp_none
+    expected:
+      call: 4N
+      diagnostics_include:
+        - Ambiguous meaning for call 4N

@@ -1,0 +1,168 @@
+call_specifications:
+  - id: cs_3
+    description: Opens 1H in seat 1 or 2 with opening values and at least five hearts.
+    system_notes: In seat 1 or 2, 1H is natural and shows at least five hearts.
+    context:
+      auction_pattern: ""
+      seat_positions: [1, 2]
+    call: 1H
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: opening_values
+          evaluator: min_value
+          input: self.hcp
+          min: 12
+          weight: 40
+        - criterion_id: five_card_heart_length
+          evaluator: min_value
+          input: self.hearts
+          min: 5
+          weight: 60
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [descriptive, context_initiating]
+      action_type: opening
+      target_suit: H
+      shown_length_min: 5
+      alertable: false
+
+  - id: cs_4
+    description: Opens 1S in seat 1 or 2 with opening values and at least five spades.
+    system_notes: In seat 1 or 2, 1S is natural and shows at least five spades.
+    context:
+      auction_pattern: ""
+      seat_positions: [1, 2]
+    call: 1S
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: opening_values
+          evaluator: min_value
+          input: self.hcp
+          min: 12
+          weight: 40
+        - criterion_id: five_card_spade_length
+          evaluator: min_value
+          input: self.spades
+          min: 5
+          weight: 60
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [descriptive, context_initiating]
+      action_type: opening
+      target_suit: S
+      shown_length_min: 5
+      alertable: false
+
+  - id: cs_5
+    description: Opens 1C in seat 1 or 2 with opening values and at least three clubs.
+    system_notes: In seat 1 or 2, 1C is natural and shows at least three clubs in this prototype.
+    context:
+      auction_pattern: ""
+      seat_positions: [1, 2]
+    call: 1C
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: opening_values
+          evaluator: min_value
+          input: self.hcp
+          min: 12
+          weight: 40
+        - criterion_id: three_card_club_length
+          evaluator: min_value
+          input: self.clubs
+          min: 3
+          weight: 40
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [descriptive, context_initiating]
+      action_type: opening
+      target_suit: C
+      shown_length_min: 3
+      alertable: false
+
+  - id: cs_6
+    description: Opens 1D in seat 1 or 2 with opening values and at least three diamonds.
+    system_notes: In seat 1 or 2, 1D is natural and shows at least three diamonds in this prototype.
+    context:
+      auction_pattern: ""
+      seat_positions: [1, 2]
+    call: 1D
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: opening_values
+          evaluator: min_value
+          input: self.hcp
+          min: 12
+          weight: 40
+        - criterion_id: three_card_diamond_length
+          evaluator: min_value
+          input: self.diamonds
+          min: 3
+          weight: 40
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [descriptive, context_initiating]
+      action_type: opening
+      target_suit: D
+      shown_length_min: 3
+      alertable: false
+
+  - id: cs_7
+    description: Placeholder seat 3 or 4 major opening enabled only by an environment flag.
+    system_notes: Seat 3 or 4 major openings are a placeholder in this checkpoint.
+    context:
+      auction_pattern: ""
+      seat_positions: [3, 4]
+    call: 1H
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: four_card_heart_length
+          evaluator: min_value
+          input: self.hearts
+          min: 4
+          weight: 20
+        - criterion_id: placeholder_major_opening_policy
+          evaluator: equals
+          input: env.enable_placeholder_openings
+          value: true
+          weight: 1
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [descriptive, context_initiating]
+      action_type: opening
+      target_suit: H
+      alertable: false
+
+  - id: cs_8
+    description: Placeholder seat 3 or 4 minor opening enabled only by an environment flag.
+    system_notes: Seat 3 or 4 minor openings are a placeholder in this checkpoint.
+    context:
+      auction_pattern: ""
+      seat_positions: [3, 4]
+    call: 1C
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: three_card_club_length
+          evaluator: min_value
+          input: self.clubs
+          min: 3
+          weight: 20
+        - criterion_id: placeholder_minor_opening_policy
+          evaluator: equals
+          input: env.enable_placeholder_openings
+          value: true
+          weight: 1
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [descriptive, context_initiating]
+      action_type: opening
+      target_suit: C
+      alertable: false
+
+

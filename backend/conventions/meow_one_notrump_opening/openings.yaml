@@ -1,0 +1,40 @@
+call_specifications:
+  - id: cs_1
+    description: Opens 1N with 15-17 HCP and balanced shape.
+    system_notes: 1N opening shows 15-17 HCP and balanced shape.
+    context:
+      auction_pattern: ""
+      seat_positions: [1, 2, 3, 4]
+    call: 1N
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: hcp_15_17
+          evaluator: range_contains
+          input: self.hcp
+          min: 15
+          max: 17
+          weight: 70
+        - criterion_id: balanced_shape
+          evaluator: equals
+          input: self.balanced
+          value: true
+          weight: 60
+    meaning:
+      nature_labels: [natural]
+      call_act_types: [descriptive, context_initiating]
+      action_type: opening
+      target_suit: N
+      hcp_min: 15
+      hcp_max: 17
+      shape_class: balanced
+      alertable: false
+    effects:
+      - fact_type: notrump_opening
+        actor_role: opener
+        target_suit: N
+        hcp_min: 15
+        hcp_max: 17
+        shape_class: balanced
+      - fact_type: notrump_focus
+        status: active

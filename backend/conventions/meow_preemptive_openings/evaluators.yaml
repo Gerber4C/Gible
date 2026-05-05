@@ -1,0 +1,182 @@
+named_evaluators:
+  - id: eval_weak_two_opening
+    evaluator_type: expression
+    description: Seat- and vulnerability-sensitive weak two opening evaluator.
+    definition:
+      op: and
+      args:
+        - op: gte
+          left:
+            op: length
+            hand: self
+            suit: {param: target_suit}
+          right: {const: 6}
+        - op: lte
+          left: {var: self.hcp}
+          right: {const: 10}
+        - op: or
+          args:
+            - op: and
+              args:
+                - op: eq
+                  left: {var: env.seat_position}
+                  right: {const: 3}
+                - op: gte
+                  left: {var: self.hcp}
+                  right: {const: 4}
+            - op: and
+              args:
+                - op: eq
+                  left: {var: env.seat_position}
+                  right: {const: 1}
+                - op: eq
+                  left: {var: env.vulnerability_relation}
+                  right: {const: favorable}
+                - op: gte
+                  left: {var: self.hcp}
+                  right: {const: 5}
+            - op: and
+              args:
+                - op: eq
+                  left: {var: env.seat_position}
+                  right: {const: 1}
+                - op: in
+                  left: {var: env.vulnerability_relation}
+                  right: {const: [none, both]}
+                - op: gte
+                  left: {var: self.hcp}
+                  right: {const: 6}
+            - op: and
+              args:
+                - op: eq
+                  left: {var: env.seat_position}
+                  right: {const: 1}
+                - op: eq
+                  left: {var: env.vulnerability_relation}
+                  right: {const: unfavorable}
+                - op: gte
+                  left: {var: self.hcp}
+                  right: {const: 7}
+                - op: or
+                  args:
+                    - op: gte
+                      left:
+                        op: honor_count
+                        hand: self
+                        suit: {param: target_suit}
+                        ranks: [A, K, Q]
+                      right: {const: 2}
+                    - op: gte
+                      left:
+                        op: honor_count
+                        hand: self
+                        suit: {param: target_suit}
+                        ranks: [A, K, Q, J, T]
+                      right: {const: 3}
+            - op: and
+              args:
+                - op: eq
+                  left: {var: env.seat_position}
+                  right: {const: 2}
+                - op: gte
+                  left: {var: self.hcp}
+                  right: {const: 6}
+                - op: or
+                  args:
+                    - op: gte
+                      left:
+                        op: honor_count
+                        hand: self
+                        suit: {param: target_suit}
+                        ranks: [A, K, Q]
+                      right: {const: 2}
+                    - op: gte
+                      left:
+                        op: honor_count
+                        hand: self
+                        suit: {param: target_suit}
+                        ranks: [A, K, Q, J, T]
+                      right: {const: 3}
+
+  - id: eval_three_level_preempt
+    evaluator_type: expression
+    description: Seat- and vulnerability-sensitive natural three-level preempt evaluator.
+    definition:
+      op: and
+      args:
+        - op: gte
+          left:
+            op: length
+            hand: self
+            suit: {param: target_suit}
+          right: {const: 7}
+        - op: lte
+          left: {var: self.hcp}
+          right: {const: 10}
+        - op: or
+          args:
+            - op: and
+              args:
+                - op: eq
+                  left: {var: env.seat_position}
+                  right: {const: 3}
+                - op: gte
+                  left: {var: self.hcp}
+                  right: {const: 3}
+            - op: and
+              args:
+                - op: eq
+                  left: {var: env.seat_position}
+                  right: {const: 1}
+                - op: eq
+                  left: {var: env.vulnerability_relation}
+                  right: {const: favorable}
+                - op: gte
+                  left: {var: self.hcp}
+                  right: {const: 4}
+            - op: and
+              args:
+                - op: eq
+                  left: {var: env.seat_position}
+                  right: {const: 1}
+                - op: in
+                  left: {var: env.vulnerability_relation}
+                  right: {const: [none, both]}
+                - op: gte
+                  left: {var: self.hcp}
+                  right: {const: 5}
+            - op: and
+              args:
+                - op: eq
+                  left: {var: env.seat_position}
+                  right: {const: 1}
+                - op: eq
+                  left: {var: env.vulnerability_relation}
+                  right: {const: unfavorable}
+                - op: gte
+                  left: {var: self.hcp}
+                  right: {const: 6}
+            - op: and
+              args:
+                - op: eq
+                  left: {var: env.seat_position}
+                  right: {const: 2}
+                - op: gte
+                  left: {var: self.hcp}
+                  right: {const: 6}
+                - op: or
+                  args:
+                    - op: gte
+                      left:
+                        op: honor_count
+                        hand: self
+                        suit: {param: target_suit}
+                        ranks: [A, K, Q]
+                      right: {const: 2}
+                    - op: gte
+                      left:
+                        op: honor_count
+                        hand: self
+                        suit: {param: target_suit}
+                        ranks: [A, K, Q, J, T]
+                      right: {const: 3}

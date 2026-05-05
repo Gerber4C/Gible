@@ -1,0 +1,9 @@
+id: four_way_jacoby_transfer
+namespace: notrump_response
+name: Four-Way Jacoby Transfer
+version: 0.1.0
+description: >
+  Prototype after-1N transfer Convention. The current executable subset covers
+  the heart-transfer response and opener's basic completion/superaccept branch.
+author:
+  name: Partner Prototype

@@ -1,0 +1,9 @@
+id: meow_notrump_response_policy
+namespace: meow_2over1
+name: Meow Notrump Response Policy
+version: 0.1.0
+description: >
+  Convention Set integration policy for choosing among active 1N response
+  modules and minor-transfer continuations.
+author:
+  name: Meow Li

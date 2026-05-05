@@ -1,2 +1,1 @@
-"""Bridge bidding rule engine prototype."""
-
+"""Bridge bidding engine prototype."""

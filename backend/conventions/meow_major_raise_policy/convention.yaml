@@ -1,0 +1,9 @@
+id: meow_major_raise_policy
+namespace: meow_2over1
+name: Meow Major Raise Policy
+version: 0.1.0
+description: >
+  Convention Set integration policy for choosing among simple raises, Bergen,
+  Drury, Jacoby 2N, and other active major-raise modules.
+author:
+  name: Meow Li

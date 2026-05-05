@@ -1,0 +1,35 @@
+cases:
+  - name: opening_position_all_contracts_and_pass_are_legal
+    auction: ""
+    expected:
+      complete: false
+      legal: [P, 1C, 1D, 1H, 1S, 1N, 7N]
+      illegal: [X, R]
+
+  - name: lower_contracts_are_illegal_after_one_spade
+    auction: 1S
+    expected:
+      complete: false
+      legal: [P, 1N, 2C, X]
+      illegal: [1C, 1D, 1H, 1S, R]
+
+  - name: opener_side_can_redouble_after_opponent_double
+    auction: 1SX
+    expected:
+      complete: false
+      legal: [P, R, 1N, 2C]
+      illegal: [X, 1S]
+
+  - name: auction_complete_after_contract_and_three_passes
+    auction: 1SPPP
+    expected:
+      complete: true
+      legal: []
+      illegal: [P, 1N, X, R]
+
+  - name: auction_complete_after_four_passes
+    auction: PPPP
+    expected:
+      complete: true
+      legal: []
+      illegal: [P, 1C, X, R]

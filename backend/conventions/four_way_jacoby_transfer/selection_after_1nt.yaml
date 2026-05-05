@@ -1,0 +1,58 @@
+call_selection_policies:
+  - id: policy_1
+    description: >
+      Temporary explicit policy for after-1N responder choices. Future versions
+      should compare Bidding Plans such as signoff, invitation, Smolen, Texas,
+      and slam exploration.
+    scope:
+      context:
+        auction_pattern: "1NP"
+        seat_positions: [1, 2, 3, 4]
+    algorithm: highest_score
+    tie_breaker: diagnose
+
+  - id: policy_2
+    description: >
+      Temporary explicit policy for opener's continuation after a heart
+      transfer. It keeps current complete-versus-superaccept behavior while
+      giving the selection origin a formal object.
+    scope:
+      context:
+        auction_pattern: "1NP2DP"
+        seat_positions: [1, 2, 3, 4]
+    algorithm: highest_score
+    tie_breaker: diagnose
+
+bidding_plans:
+  - id: plan_1
+    description: >
+      Prototype plan for hands that start with a Jacoby transfer to hearts.
+      The first implemented branch is normal completion or superaccept.
+    owner: responder
+    goal: place_contract
+    context:
+      auction_pattern: "1NP"
+      seat_positions: [1, 2, 3, 4]
+    preconditions:
+      self.hearts:
+        min: 5
+    entry_call: 2D
+    workflow:
+      start: wait_1
+      nodes:
+        wait_1:
+          kind: wait_for_call
+          actor: opener
+          branches:
+            - when:
+                kind: call_is
+                value: 2H
+              goto: select_1
+            - when:
+                kind: call_is
+                value: 3H
+              goto: select_1
+        select_1:
+          kind: select_by_policy
+          policy: policy_2
+          terminal_if: final_contract_placed

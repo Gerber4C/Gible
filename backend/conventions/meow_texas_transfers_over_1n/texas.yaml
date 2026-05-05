@@ -1,0 +1,142 @@
+call_specifications:
+  - id: cs_1
+    description: Responder bids 4H as Texas transfer to spades.
+    system_notes: After 1N, 4H is Texas transfer to spades.
+    context:
+      auction_pattern: "1NP"
+      seat_positions: [1, 2, 3, 4]
+    requires:
+      fact_exists:
+        fact_type: notrump_focus
+        status: active
+    call: 4H
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: six_spades
+          evaluator: min_value
+          input: self.spades
+          min: 6
+          weight: 60
+        - criterion_id: game_forcing_values
+          evaluator: min_value
+          input: self.hcp
+          min: 10
+          weight: 70
+    meaning:
+      nature_labels: [artificial, conventional]
+      call_act_types: [directive, context_initiating, forcing]
+      action_type: texas_transfer
+      target_suit: S
+      alertable: true
+    effects:
+      - fact_type: texas_transfer
+        target_suit: S
+        status: pending
+
+  - id: cs_2
+    description: Opener completes the Texas transfer to spades.
+    system_notes: After 1N-4H, 4S completes the Texas transfer.
+    context:
+      auction_pattern: "1NP4HP"
+      seat_positions: [1, 2, 3, 4]
+    requires:
+      fact_exists:
+        fact_type: texas_transfer
+        target_suit: S
+        status: pending
+    call: 4S
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: pending_texas_spades
+          evaluator: fact_exists
+          query:
+            fact_type: texas_transfer
+            target_suit: S
+            status: pending
+          weight: 100
+    meaning:
+      nature_labels: [conventional]
+      call_act_types: [directive, context_setting]
+      action_type: texas_completion
+      target_suit: S
+      alertable: false
+    effects:
+      - fact_type: texas_transfer
+        target_suit: S
+        status: completed
+      - fact_type: agreed_suit
+        suit: S
+        source: texas_transfer
+
+  - id: cs_3
+    description: Responder bids 4D as Texas transfer to hearts.
+    system_notes: After 1N, 4D is Texas transfer to hearts.
+    context:
+      auction_pattern: "1NP"
+      seat_positions: [1, 2, 3, 4]
+    requires:
+      fact_exists:
+        fact_type: notrump_focus
+        status: active
+    call: 4D
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: six_hearts
+          evaluator: min_value
+          input: self.hearts
+          min: 6
+          weight: 60
+        - criterion_id: game_forcing_values
+          evaluator: min_value
+          input: self.hcp
+          min: 10
+          weight: 70
+    meaning:
+      nature_labels: [artificial, conventional]
+      call_act_types: [directive, context_initiating, forcing]
+      action_type: texas_transfer
+      target_suit: H
+      alertable: true
+    effects:
+      - fact_type: texas_transfer
+        target_suit: H
+        status: pending
+
+  - id: cs_4
+    description: Opener completes the Texas transfer to hearts.
+    system_notes: After 1N-4D, 4H completes the Texas transfer.
+    context:
+      auction_pattern: "1NP4DP"
+      seat_positions: [1, 2, 3, 4]
+    requires:
+      fact_exists:
+        fact_type: texas_transfer
+        target_suit: H
+        status: pending
+    call: 4H
+    selection:
+      algorithm: weighted_score
+      criteria:
+        - criterion_id: pending_texas_hearts
+          evaluator: fact_exists
+          query:
+            fact_type: texas_transfer
+            target_suit: H
+            status: pending
+          weight: 100
+    meaning:
+      nature_labels: [conventional]
+      call_act_types: [directive, context_setting]
+      action_type: texas_completion
+      target_suit: H
+      alertable: false
+    effects:
+      - fact_type: texas_transfer
+        target_suit: H
+        status: completed
+      - fact_type: agreed_suit
+        suit: H
+        source: texas_transfer

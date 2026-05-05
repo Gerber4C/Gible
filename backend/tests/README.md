@@ -13,7 +13,7 @@ Minimal shape:
 ```yaml
 cases:
   - name: short_unique_name
-    system: expert_2over1
+    convention_set: meow_2over1
     auction: 1NP
     hand: S74HKJ832DA762CQ5
     environment:
@@ -26,9 +26,9 @@ cases:
 
 Optional expectations include:
 
-- `origin.rule_id`
-- `origin.gadget_id`
-- `origin.qualified_rule_id`
+- `origin.object_id`
+- `origin.convention_id`
+- `origin.qualified_id`
 - `public_meaning.alertable`
 - `compared_candidate_calls`
 - `diagnostics`
@@ -37,6 +37,31 @@ Optional expectations include:
 - `semantic_fact_types`
 - `semantic_fact_origins`
 - `selected_criteria_include`
+
+## Full-Auction Cases
+
+Add complete partnership simulation cases to `backend/tests/cases/full_auctions.yaml`.
+
+Minimal shape:
+
+```yaml
+cases:
+  - name: complete_sequence_name
+    convention_set: meow_2over1
+    hands:
+      n: SAQJ76H82DQ82CAJ3
+      s: SK98H74DKJ7CK9852
+    environment:
+      dealer: n
+      vulnerability: none
+      scoring: IMP
+    expected:
+      auction: 1SP2SP3DP4SPPP
+      calls_by_our_side: [1S, 2S, 3D, 4S, P]
+      diagnostics: []
+```
+
+Opponents without supplied hands automatically pass. The expected auction should still be a bridge-sensible full auction ending with three passes after the final contract.
 
 ## Hand Parser Cases
 
@@ -74,6 +99,22 @@ cases:
       - 1HP
       - P1HP
 ```
+
+## Legality Cases
+
+Add auction-legality cases to `backend/tests/cases/legality.yaml`.
+
+```yaml
+cases:
+  - name: lower_contracts_are_illegal_after_one_spade
+    auction: 1S
+    expected:
+      complete: false
+      legal: [P, 1N, 2C, X]
+      illegal: [1C, 1D, 1H, 1S, R]
+```
+
+Legality fixtures exercise the central helper used by bidding selection and simulation. Keep these cases about universal auction legality, not partnership agreements.
 
 ## Run Tests
 
