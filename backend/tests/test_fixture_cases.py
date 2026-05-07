@@ -1,18 +1,22 @@
-from pathlib import Path
-import json
 import unittest
+from pathlib import Path
 
 import yaml
 
 from engine.auction import Auction
+from engine.bsl import BSLValidationError, load_bsl_files
+from engine.call_space import relation_to_last_contract, steps_after, steps_between
 from engine.cards import Hand
+from engine.context import StateView, UNDEFINED
 from engine.explanation import explain
 from app import simulate, system_notes
 from engine.legality import auction_is_complete, is_call_legal, legal_calls
-from engine.loader import load_convention_set
+from engine.loader import load_profile
 from engine.matcher import matches_context
-from engine.selector import choose_bid
+from engine.memory import SeatMemory
+from engine.selector import choose_bid, replay_auction
 from engine.system_notes import generate_system_notes
+from engine.trace import AuctionTrace, StateRecord
 
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
@@ -24,7 +28,7 @@ def _read_cases(file_name: str) -> list[dict]:
 
 
 def _read_yaml(file_name: str) -> dict:
-    return yaml.safe_load((CASES_DIR / file_name).read_text(encoding="utf-8")) or {}
+    return yaml.safe_load((CASES_DIR / file_name).read_text(encoding="utf-8").lstrip("\ufeff")) or {}
 
 
 class FixtureBiddingTests(unittest.TestCase):
@@ -36,14 +40,14 @@ class FixtureBiddingTests(unittest.TestCase):
 
     def _run_bidding_case(self, case: dict) -> dict:
         environment = case.get("environment", {})
-        convention_set = load_convention_set(case["convention_set"], BACKEND_DIR)
+        profile = load_profile(case["profile"], BACKEND_DIR)
         auction = Auction.parse(
             case.get("auction", []),
             dealer=environment.get("dealer", "n"),
             vulnerability=environment.get("vulnerability", "none"),
         )
         hand = Hand.parse(case["hand"])
-        return explain(choose_bid(convention_set, auction, hand, environment))
+        return explain(choose_bid(profile, auction, hand, environment))
 
     def _assert_bidding_expectations(self, result: dict, expected: dict) -> None:
         if "call" in expected:
@@ -65,13 +69,13 @@ class FixtureBiddingTests(unittest.TestCase):
                 expected["compared_candidate_calls"],
             )
 
-        if "selected_algorithm" in expected:
-            self.assertEqual(result["internal_origin"]["selected"]["algorithm"], expected["selected_algorithm"])
+        if "selected_source_kind" in expected:
+            self.assertEqual(result["internal_origin"]["selected"]["source_kind"], expected["selected_source_kind"])
 
-        selected_plan_origin = expected.get("selected_plan_origin", {})
-        actual_selected_plan_origin = result["internal_origin"]["selected"].get("plan_origin") or {}
-        for key, value in selected_plan_origin.items():
-            self.assertEqual(actual_selected_plan_origin.get(key), value)
+        selected_private_route_origin = expected.get("selected_private_route_origin", {})
+        actual_selected_private_route_origin = result["internal_origin"]["selected"].get("private_route_origin") or {}
+        for key, value in selected_private_route_origin.items():
+            self.assertEqual(actual_selected_private_route_origin.get(key), value)
 
         selection_policy = expected.get("selection_policy", {})
         actual_policy = result["internal_origin"]["selection_policy"] or {}
@@ -84,34 +88,34 @@ class FixtureBiddingTests(unittest.TestCase):
         for text in expected.get("diagnostics_include", []):
             self.assertTrue(any(text in diagnostic for diagnostic in result["diagnostics"]), result["diagnostics"])
 
-        if "semantic_fact_types" in expected:
+        if "state_keys" in expected:
             self.assertEqual(
-                [fact["fact_type"] for fact in result["internal_origin"]["semantic_facts"]],
-                expected["semantic_fact_types"],
+                [state["key"] for state in result["internal_origin"]["state_records"]],
+                expected["state_keys"],
             )
 
-        for state_expected in expected.get("auction_state_include", []):
+        for state_expected in expected.get("state_records_include", []):
             self.assertTrue(
-                any(_mapping_contains(actual, state_expected) for actual in result["internal_origin"]["auction_state"]),
+                any(_mapping_contains(actual, state_expected) for actual in result["internal_origin"]["state_records"]),
                 {
                     "expected": state_expected,
-                    "actual": result["internal_origin"]["auction_state"],
+                    "actual": result["internal_origin"]["state_records"],
                 },
             )
 
-        for index, fact_origin in enumerate(expected.get("semantic_fact_origins", [])):
-            actual = result["internal_origin"]["semantic_facts"][index]["origin"]
+        for index, fact_origin in enumerate(expected.get("state_origins", [])):
+            actual = result["internal_origin"]["state_records"][index]["origin"]
             for key, value in fact_origin.items():
                 self.assertEqual(actual.get(key), value)
 
-        for index, frame_expected in enumerate(expected.get("protocol_frames", [])):
-            actual = result["internal_origin"]["protocol_frames"][index]
+        for index, frame_expected in enumerate(expected.get("frame_states", [])):
+            actual = result["internal_origin"]["frame_states"][index]
             for key, value in frame_expected.items():
                 self.assertEqual(actual.get(key), value)
 
-        for index, plan_expected in enumerate(expected.get("plan_states", [])):
-            actual = result["internal_origin"]["plan_states"][index]
-            for key, value in plan_expected.items():
+        for index, route_expected in enumerate(expected.get("private_route_states", [])):
+            actual = result["internal_origin"]["private_route_states"][index]
+            for key, value in route_expected.items():
                 self.assertEqual(actual.get(key), value)
 
         selected_criteria = {
@@ -128,7 +132,7 @@ class FixtureFullAuctionTests(unittest.TestCase):
             with self.subTest(case=case["name"]):
                 result = simulate(
                     {
-                        "convention_set": {"id": case["convention_set"]},
+                        "profile": {"id": case["profile"]},
                         "hands": case["hands"],
                         "environment": case.get("environment", {}),
                         "max_calls": case.get("max_calls", 80),
@@ -211,48 +215,37 @@ class InfrastructureTests(unittest.TestCase):
         self.assertEqual(auction.calls, ("1N", "P", "1S", "P", "X", "R"))
         self.assertEqual(auction.compact_sequence(), "1NP1SPXR")
 
-    def test_loader_accepts_json_compatible_yaml(self):
-        scratch = BACKEND_DIR / "tmp_json_compat"
-        convention_sets_dir = scratch / "convention_sets"
-        convention_dir = scratch / "conventions" / "nt" / "simple"
-        convention_sets_dir.mkdir(parents=True, exist_ok=True)
-        convention_dir.mkdir(parents=True, exist_ok=True)
+    def test_loader_accepts_bsl_source(self):
+        scratch = BACKEND_DIR / "tmp_bsl_source"
+        profiles_dir = scratch / "profiles"
+        gadget_dir = scratch / "gadgets" / "nt" / "simple"
+        profiles_dir.mkdir(parents=True, exist_ok=True)
+        gadget_dir.mkdir(parents=True, exist_ok=True)
         try:
-            (convention_sets_dir / "json_style.yaml").write_text(
-                json.dumps({"id": "json_style", "name": "JSON Style", "conventions": ["nt.simple"]}),
+            (profiles_dir / "bsl_style.bsl.py").write_text(
+                "Profile(id='bsl_style', name='BSL Style', gadgets=['nt.simple'])\n",
                 encoding="utf-8",
             )
-            (convention_dir / "convention.yaml").write_text(
-                json.dumps(
-                    {
-                        "id": "simple",
-                        "namespace": "nt",
-                        "name": "Simple JSON-Compatible Convention",
-                        "version": "0.1.0",
-                        "author": {"name": "Partner Prototype"},
-                    }
-                ),
-                encoding="utf-8",
-            )
-            (convention_dir / "calls.yaml").write_text(
-                json.dumps(
-                    {
-                        "call_specifications": [
-                            {
-                                "id": "c1",
-                                "context": {"auction_pattern": ""},
-                                "call": "1N",
-                            }
-                        ],
-                    }
+            (gadget_dir / "gadget.bsl.py").write_text(
+                "\n".join(
+                    [
+                        "Gadget(",
+                        "    id='simple',",
+                        "    namespace='nt',",
+                        "    name='Simple BSL Gadget',",
+                        "    version='0.1.0',",
+                        "    author={'name': 'Partner Prototype'},",
+                        ")",
+                        "Call(id='c1', context={'auction_pattern': ''}, bid='1N')",
+                    ]
                 ),
                 encoding="utf-8",
             )
 
-            convention_set = load_convention_set("json_style", scratch)
+            profile = load_profile("bsl_style", scratch)
 
-            self.assertEqual(len(convention_set.call_specifications), 1)
-            self.assertEqual(convention_set.call_specifications[0].qualified_id, "nt/simple@0.1.0:call_specification:c1")
+            self.assertEqual(len(profile.call_specs), 1)
+            self.assertEqual(profile.call_specs[0].qualified_id, "nt/simple@0.1.0:call_spec:c1")
         finally:
             for path in sorted(scratch.rglob("*"), reverse=True):
                 if path.is_file():
@@ -260,55 +253,469 @@ class InfrastructureTests(unittest.TestCase):
                 elif path.is_dir():
                     path.rmdir()
 
-    def test_loader_returns_convention_set_ir_objects(self):
-        convention_set = load_convention_set("expert_2over1", BACKEND_DIR)
+    def test_python_policy_function_selects_from_recovered_state(self):
+        scratch = BACKEND_DIR / "tmp_state_policy"
+        profiles_dir = scratch / "profiles"
+        gadget_dir = scratch / "gadgets" / "test" / "state_policy"
+        profiles_dir.mkdir(parents=True, exist_ok=True)
+        gadget_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            (profiles_dir / "state_policy.bsl.py").write_text(
+                "Profile(id='state_policy', name='State Policy', gadgets=['test.state_policy'])\n",
+                encoding="utf-8",
+            )
+            (gadget_dir / "gadget.bsl.py").write_text(
+                "\n".join(
+                    [
+                        "Gadget(id='state_policy', namespace='test', name='State Policy Demo')",
+                        "Call(",
+                        "    id='prior_1s',",
+                        "    when=Auction(''),",
+                        "    bid=Bid('1S'),",
+                        "    meaning=Meaning(action='opening', target_suit=S),",
+                        "    effects=[State('opener.length.S', owner='opener', min_value=5)],",
+                        ")",
+                        "Call(",
+                        "    id='raise_game',",
+                        "    when=Auction('1SP'),",
+                        "    bid=Bid('4S'),",
+                        "    selection=Selection(criteria=[Criterion('available', condition=True)]),",
+                        "    meaning=Meaning(action='place_contract', target_suit=S),",
+                        ")",
+                        "Call(",
+                        "    id='raise_partscore',",
+                        "    when=Auction('1SP'),",
+                        "    bid=Bid('2S'),",
+                        "    selection=Selection(criteria=[Criterion('available', condition=True)]),",
+                        "    meaning=Meaning(action='simple_raise', target_suit=S),",
+                        ")",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (gadget_dir / "raise.policy.py").write_text(
+                "\n".join(
+                    [
+                        "def state_raise_policy(ctx, candidates):",
+                        "    spades = ctx.state.estimate('opener.length.S')",
+                        "    if spades.min_value >= 5:",
+                        "        return candidates.get('4S')",
+                        "    return None",
+                        "",
+                        "selection_policies = [state_raise_policy]",
+                    ]
+                ),
+                encoding="utf-8",
+            )
 
-        self.assertEqual(convention_set.id, "expert_2over1")
-        self.assertGreaterEqual(len(convention_set.call_specifications), 1)
-        self.assertGreaterEqual(len(convention_set.protocol_frames), 1)
-        self.assertGreaterEqual(len(convention_set.bidding_plans), 1)
-        self.assertGreaterEqual(len(convention_set.call_selection_policies), 1)
+            profile = load_profile("state_policy", scratch)
+            result = explain(
+                choose_bid(
+                    profile,
+                    Auction.parse("1SP", dealer="n", vulnerability="none"),
+                    Hand.parse("SA2H765D432C98765"),
+                    {"dealer": "n", "vulnerability": "none"},
+                )
+            )
 
-    def test_convention_set_selection_policy_is_reported(self):
-        convention_set = load_convention_set("expert_2over1", BACKEND_DIR)
+            self.assertEqual(result["call"], "4S")
+            self.assertEqual(result["internal_origin"]["selection_policy"]["object_type"], "policy_function")
+            self.assertEqual(result["internal_origin"]["selection_policy"]["object_id"], "state_raise_policy")
+            self.assertEqual(
+                result["internal_origin"]["state_view"]["estimates"]["opener.length.S"]["min_value"],
+                5,
+            )
+        finally:
+            for path in sorted(scratch.rglob("*"), reverse=True):
+                if path.is_file():
+                    path.unlink()
+                elif path.is_dir():
+                    path.rmdir()
+
+    def test_loader_returns_profile_runtime_objects(self):
+        profile = load_profile("meow_2over1", BACKEND_DIR)
+
+        self.assertEqual(profile.id, "meow_2over1")
+        self.assertGreaterEqual(len(profile.call_specs), 1)
+        self.assertGreaterEqual(len(profile.frame_specs), 1)
+        self.assertGreaterEqual(len(profile.private_route_specs), 1)
+        self.assertGreaterEqual(len(profile.all_policy_functions), 1)
+
+    def test_current_bsl_sources_do_not_use_route_policy_objects(self):
+        source_roots = [BACKEND_DIR / "profiles", BACKEND_DIR / "gadgets"]
+        offenders = []
+        for root in source_roots:
+            for path in root.rglob("*.bsl.py"):
+                if "RoutePolicy(" in path.read_text(encoding="utf-8"):
+                    offenders.append(str(path.relative_to(BACKEND_DIR)))
+
+        self.assertEqual(offenders, [])
+
+    def test_loader_accepts_python_shaped_bsl(self):
+        profile = load_profile("test_bsl_demo", BACKEND_DIR)
+        auction = Auction.parse("", dealer="n", vulnerability="none")
+        hand = Hand.parse("SAKQ87H32D765CK32")
+
+        result = explain(choose_bid(profile, auction, hand, {"dealer": "n", "vulnerability": "none"}))
+
+        self.assertEqual(result["call"], "1S")
+        self.assertEqual(result["public_meaning"]["origin"]["gadget_id"], "test_bsl_demo")
+        self.assertEqual(result["public_meaning"]["meaning"]["target_suit"], "S")
+
+        trace = replay_auction(profile, Auction.parse("1S", dealer="n", vulnerability="none"), hand)
+        self.assertTrue(
+            any(
+                _mapping_contains(state, {"key": "opener.length.S", "owner": "opener", "min_value": 5})
+                for state in [item.to_dict() for item in trace.state_records]
+            )
+        )
+
+    def test_bsl_rejects_imports(self):
+        scratch = BACKEND_DIR / "tmp_bad_bsl.bsl.py"
+        scratch.write_text("import os\nGadget(id='bad')\n", encoding="utf-8")
+        try:
+            with self.assertRaisesRegex(BSLValidationError, "Unsupported top-level syntax"):
+                load_bsl_files([scratch])
+        finally:
+            scratch.unlink()
+
+    def test_bsl_predicate_helpers_compile_as_conditions(self):
+        scratch = BACKEND_DIR / "tmp_bsl_condition.bsl.py"
+        scratch.write_text(
+            "\n".join(
+                [
+                    "Gadget(id='condition_demo')",
+                    "Call(",
+                    "    id='cs_1',",
+                    "    when=Auction('*'),",
+                    "    bid=Bid('4N'),",
+                    "    requires=StateExists('agreed_suit', target_suit=S),",
+                    ")",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        try:
+            module_data = load_bsl_files([scratch])
+        finally:
+            scratch.unlink()
+
+        self.assertEqual(
+            module_data.call_specs[0]["requires"],
+            {"expr": {"op": "state_exists", "query": {"key": "agreed_suit", "target_suit": "S"}}},
+        )
+
+    def test_bsl_keyword_criterion_condition_compiles_to_expression(self):
+        scratch = BACKEND_DIR / "tmp_bsl_criterion.bsl.py"
+        scratch.write_text(
+            "\n".join(
+                [
+                    "Gadget(id='condition_demo')",
+                    "Call(",
+                    "    id='cs_1',",
+                    "    when=Auction(''),",
+                    "    bid=Bid('1N'),",
+                    "    selection=Selection(criteria=[Criterion('balanced_range', condition=15 <= self.hcp <= 17)]),",
+                    ")",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        try:
+            module_data = load_bsl_files([scratch])
+        finally:
+            scratch.unlink()
+
+        criterion = module_data.call_specs[0]["selection"]["criteria"][0]
+        self.assertEqual(criterion["evaluator"], "expression")
+        self.assertEqual(criterion["expr"]["op"], "and")
+
+    def test_profile_selection_policy_is_reported(self):
+        profile = load_profile("meow_2over1", BACKEND_DIR)
         auction = Auction.parse("", dealer="n", vulnerability="none")
         hand = Hand.parse("SAQ7HKJ8DA762CQ54")
 
-        result = explain(choose_bid(convention_set, auction, hand, {"dealer": "n", "vulnerability": "none"}))
+        result = explain(choose_bid(profile, auction, hand, {"dealer": "n", "vulnerability": "none"}))
 
         policy = result["internal_origin"]["selection_policy"]
         self.assertIsNotNone(policy)
-        self.assertEqual(policy["object_type"], "call_selection_policy")
-        self.assertEqual(policy["object_id"], "policy_1")
+        self.assertEqual(policy["object_type"], "policy_function")
+        self.assertEqual(policy["object_id"], "meow_opening_seat_1_2")
+
+    def test_state_view_supports_undefined_estimates(self):
+        self.assertFalse(UNDEFINED > 0)
+        self.assertEqual(UNDEFINED.or_default(0), 0)
+
+        state = StateView()
+        estimate = state.estimate("slam_interest")
+        self.assertFalse(estimate.known)
+        self.assertIs(state.value("slam_interest"), UNDEFINED)
+        self.assertFalse(state.exists("unknown_field"))
+
+    def test_state_view_combines_user_defined_ranges(self):
+        origin = {"qualified_id": "test:state"}
+        trace = AuctionTrace()
+        trace.add_state(
+            StateRecord.from_dict(
+                {"key": "partner.hcp", "owner": "partner", "min_value": 6, "max_value": 10},
+                origin,
+            )
+        )
+        trace.add_state(
+            StateRecord.from_dict(
+                {"key": "partner.hcp", "owner": "partner", "min_value": 8, "max_value": 9},
+                origin,
+            )
+        )
+        trace.add_state(StateRecord.from_dict({"key": "fit", "suit": "S", "min_length": 8}, origin))
+
+        state = StateView.from_trace(trace)
+        estimate = state.estimate("partner.hcp")
+
+        self.assertEqual(estimate.min_value, 8)
+        self.assertEqual(estimate.max_value, 9)
+        self.assertTrue(estimate.contains(8))
+        self.assertFalse(estimate.contains(10))
+        self.assertEqual(len(estimate.evidence), 2)
+        self.assertTrue(state.exists("fit", suit="S"))
+        self.assertFalse(state.exists("fit", suit="H"))
+
+    def test_call_space_supports_relative_step_calls(self):
+        self.assertEqual(steps_after("4S", 1), "4N")
+        self.assertEqual(steps_after("4S", 2), "5C")
+        self.assertEqual(steps_between("4S", "5C"), 2)
+
+        relation = relation_to_last_contract(Auction.parse("1NP2DP3HP4S"), "5C")
+        self.assertEqual(relation.last_contract, "4S")
+        self.assertEqual(relation.steps_over_last_contract, 2)
+
+    def test_decision_context_contains_candidate_pool_and_active_private_routes(self):
+        profile = load_profile("meow_2over1", BACKEND_DIR)
+        auction = Auction.parse("1NP2DP3HP", dealer="n", vulnerability="none")
+        hand = Hand.parse("SA2HAKQJ8DA3CKQ32")
+
+        selection = choose_bid(profile, auction, hand, {"dealer": "n", "vulnerability": "none", "scoring": "IMP"})
+
+        self.assertIsNotNone(selection.context)
+        self.assertIn("4N", selection.context.candidates.calls)
+        self.assertGreaterEqual(len(selection.context.private_routes), 1)
+        self.assertTrue(selection.context.state.exists("agreed_suit", suit="H"))
+        self.assertGreaterEqual(len(selection.context.state.active_private_routes()), 1)
+
+    def test_active_private_route_make_call_node_generates_candidate(self):
+        profile = load_profile("meow_2over1", BACKEND_DIR)
+        auction = Auction.parse("1NP2DP3HP", dealer="n", vulnerability="none")
+        hand = Hand.parse("SA2HAKQJ87D53CKQ2")
+
+        selection = choose_bid(profile, auction, hand, {"dealer": "n", "vulnerability": "none", "scoring": "IMP"})
+
+        route_candidates = [
+            candidate
+            for candidate in selection.candidate_pool.candidates
+            if candidate.call == "4N"
+            and candidate.source_kind == "private_route_continuation"
+            and candidate.private_route_origin is not None
+        ]
+
+        self.assertEqual(len(route_candidates), 1)
+        self.assertEqual(route_candidates[0].private_route_origin["object_id"], "route_2")
+        self.assertEqual(route_candidates[0].implementation_origin["gadget_id"], "meow_rkcb_1430")
+
+    def test_new_frame_closes_prior_procedural_frame_but_keeps_state(self):
+        profile = load_profile("meow_2over1", BACKEND_DIR)
+        auction = Auction.parse("1NP2DP3HP4DP4N", dealer="n", vulnerability="none")
+        hand = Hand.parse("SA2HAKQJ87D53CKQ2")
+
+        trace = replay_auction(profile, auction, hand, {"dealer": "n", "vulnerability": "none"})
+
+        self.assertTrue(trace.state_exists({"key": "agreed_suit", "suit": "H"}))
+        frame_statuses = {(frame.frame_type, frame.status) for frame in trace.frame_states}
+        self.assertIn(("major_transfer", "closed"), frame_statuses)
+        self.assertIn(("control_bidding", "closed"), frame_statuses)
+        self.assertIn(("rkcb_1430", "active"), frame_statuses)
+        self.assertEqual([frame.frame_type for frame in trace.frame_states if frame.status == "active"], ["rkcb_1430"])
+        self.assertEqual(StateView.from_trace(trace).dominant_frame().frame_type, "rkcb_1430")
+
+    def test_dominant_frame_obligation_and_answer_capabilities_are_visible(self):
+        profile = load_profile("meow_2over1", BACKEND_DIR)
+        auction = Auction.parse("1NP2DP3HP4NP", dealer="n", vulnerability="none")
+        hand = Hand.parse("SAQ74HKJ83DA62CQ5")
+
+        selection = choose_bid(profile, auction, hand, {"dealer": "n", "vulnerability": "none"})
+
+        self.assertEqual(selection.call, "5D")
+        self.assertEqual(selection.context.dominant_frame.frame_type, "rkcb_1430")
+        self.assertEqual(selection.context.frame_obligation["action"], "answer_frame")
+        self.assertIn("answer_frame", selection.selected_candidate.capabilities)
+        self.assertIn("keycard_response", selection.selected_candidate.capabilities)
+        self.assertIn("5D", [candidate.call for candidate in selection.context.candidates.by_capability("answer_frame")])
+        self.assertEqual([candidate.call for candidate in selection.context.obligation_candidates], ["5D"])
+
+    def test_seat_memory_continues_selected_private_route_only_for_same_seat(self):
+        scratch = BACKEND_DIR / "tmp_seat_memory"
+        profiles_dir = scratch / "profiles"
+        gadget_dir = scratch / "gadgets" / "test" / "seat_memory"
+        profiles_dir.mkdir(parents=True, exist_ok=True)
+        gadget_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            (profiles_dir / "seat_memory.bsl.py").write_text(
+                "Profile(id='seat_memory', name='Seat Memory', gadgets=['test.seat_memory'])\n",
+                encoding="utf-8",
+            )
+            (gadget_dir / "gadget.bsl.py").write_text(
+                "\n".join(
+                    [
+                        "Gadget(id='seat_memory', namespace='test', name='Seat Memory Demo')",
+                        "Call(",
+                        "    id='open_1n',",
+                        "    when=Auction(''),",
+                        "    bid=Bid('1N'),",
+                        "    meaning=Meaning(action='notrump_opening'),",
+                        "    effects=[State('notrump_focus', status='active')],",
+                        ")",
+                        "Call(",
+                        "    id='transfer',",
+                        "    when=Auction('1NP'),",
+                        "    bid=Bid('2D'),",
+                        "    selection=Selection(criteria=[Criterion('available', condition=True)]),",
+                        "    meaning=Meaning(action='transfer', target_suit=H),",
+                        ")",
+                        "Call(",
+                        "    id='complete_transfer',",
+                        "    when=Auction('1NP2DP'),",
+                        "    bid=Bid('2H'),",
+                        "    selection=Selection(criteria=[Criterion('available', condition=True)]),",
+                        "    meaning=Meaning(action='transfer_completion', target_suit=H),",
+                        ")",
+                        "PrivateRoute(",
+                        "    id='route_a',",
+                        "    owner='responder',",
+                        "    goal='place_contract',",
+                        "    context={'auction_pattern': '1NP'},",
+                        "    preconditions={},",
+                        "    entry_candidate=True,",
+                        "    entry_call='2D',",
+                        "    entry_score=100,",
+                        "    workflow={'start': 'wait_1', 'nodes': {",
+                        "        'wait_1': {'kind': 'wait_for_call', 'branches': [",
+                        "            {'when': {'kind': 'call_is', 'value': '2H'}, 'goto': 'make_1'},",
+                        "        ]},",
+                        "        'make_1': {'kind': 'make_call', 'call': '3H', 'score': 300,",
+                        "                   'meaning': {'action_type': 'place_contract', 'target_suit': 'H'}},",
+                        "    }},",
+                        ")",
+                        "PrivateRoute(",
+                        "    id='route_b',",
+                        "    owner='responder',",
+                        "    goal='place_contract',",
+                        "    context={'auction_pattern': '1NP'},",
+                        "    preconditions={},",
+                        "    entry_candidate=True,",
+                        "    entry_call='2D',",
+                        "    entry_score=200,",
+                        "    workflow={'start': 'wait_1', 'nodes': {",
+                        "        'wait_1': {'kind': 'wait_for_call', 'branches': [",
+                        "            {'when': {'kind': 'call_is', 'value': '2H'}, 'goto': 'make_1'},",
+                        "        ]},",
+                        "        'make_1': {'kind': 'make_call', 'call': '4H', 'score': 100,",
+                        "                   'meaning': {'action_type': 'place_contract', 'target_suit': 'H'}},",
+                        "    }},",
+                        ")",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            profile = load_profile("seat_memory", scratch)
+            responder_hand = Hand.parse("SA2HAKQJ8D765C432")
+            opener_hand = Hand.parse("SK3H765D5432CAKQJ")
+            environment = {"dealer": "n", "vulnerability": "none"}
+
+            first_decision = choose_bid(
+                profile,
+                Auction.parse("1NP", dealer="n", vulnerability="none"),
+                responder_hand,
+                environment,
+            )
+
+            self.assertEqual(first_decision.call, "2D")
+            self.assertEqual(first_decision.private_memory.selected_routes[0].route_id, "route_b")
+
+            opener_decision = choose_bid(
+                profile,
+                Auction.parse("1NP2DP", dealer="n", vulnerability="none"),
+                opener_hand,
+                environment,
+                SeatMemory(),
+            )
+
+            self.assertEqual(opener_decision.call, "2H")
+            self.assertEqual(opener_decision.context.memory.selected_routes, ())
+
+            public_only_followup = choose_bid(
+                profile,
+                Auction.parse("1NP2DP2HP", dealer="n", vulnerability="none"),
+                responder_hand,
+                environment,
+            )
+            self.assertEqual(
+                [candidate.call for candidate in public_only_followup.candidate_pool.candidates],
+                ["3H", "4H"],
+            )
+            self.assertEqual(public_only_followup.call, "3H")
+
+            memory_followup = choose_bid(
+                profile,
+                Auction.parse("1NP2DP2HP", dealer="n", vulnerability="none"),
+                responder_hand,
+                environment,
+                first_decision.private_memory,
+            )
+
+            self.assertEqual(
+                [candidate.call for candidate in memory_followup.candidate_pool.candidates],
+                ["4H"],
+            )
+            self.assertEqual(memory_followup.call, "4H")
+            self.assertEqual(memory_followup.context.memory.selected_routes[0].route_id, "route_b")
+        finally:
+            for path in sorted(scratch.rglob("*"), reverse=True):
+                if path.is_file():
+                    path.unlink()
+                elif path.is_dir():
+                    path.rmdir()
 
     def test_system_notes_are_generated_from_ir(self):
-        convention_set = load_convention_set("expert_2over1", BACKEND_DIR)
+        profile = load_profile("meow_2over1", BACKEND_DIR)
 
-        notes = generate_system_notes(convention_set)
+        notes = generate_system_notes(profile)
 
-        self.assertIn("# Expert 2/1", notes)
-        self.assertIn("## Four-Way Jacoby Transfer", notes)
-        self.assertIn("### Bidding Plans", notes)
+        self.assertIn("# Meow 2/1 Benchmark", notes)
+        self.assertIn("## Meow Four-Way Transfers Over 1N", notes)
+        self.assertIn("### Private Routes", notes)
         self.assertIn("Workflow nodes", notes)
-        self.assertIn("`policy_1`", notes)
+        self.assertIn("`meow_opening_seat_1_2`", notes)
         self.assertIn("`alertable`=`false`", notes)
         self.assertIn('`auction_pattern`=`""`', notes)
 
     def test_system_notes_app_entrypoint_returns_markdown(self):
-        result = system_notes({"convention_set": {"id": "expert_2over1"}})
+        result = system_notes({"profile": {"id": "meow_2over1"}})
 
         self.assertEqual(result["format"], "markdown")
-        self.assertEqual(result["convention_set"]["id"], "expert_2over1")
+        self.assertEqual(result["profile"]["id"], "meow_2over1")
         self.assertIn("1N opening shows 15-17 HCP", result["content"])
 
     def test_meow_named_evaluator_is_loaded_and_reported(self):
-        convention_set = load_convention_set("meow_2over1", BACKEND_DIR)
+        profile = load_profile("meow_2over1", BACKEND_DIR)
 
-        notes = generate_system_notes(convention_set)
+        notes = generate_system_notes(profile)
 
-        self.assertIn("eval_minor_honor_third", [item.id for item in convention_set.named_evaluators])
+        self.assertIn("eval_minor_honor_third", [item.id for item in profile.named_evaluators])
         self.assertIn("### Named Evaluators", notes)
         self.assertIn("Minor-transfer superaccept support requires honor-third", notes)
+        self.assertIn("## Profile Policy Functions", notes)
+        self.assertIn("`meow_opening_seat_1_2`", notes)
+        self.assertIn("`meow_major_raise_route`", notes)
 
 
 def _mapping_contains(actual: dict, expected: dict) -> bool:
@@ -317,3 +724,4 @@ def _mapping_contains(actual: dict, expected: dict) -> bool:
 
 if __name__ == "__main__":
     unittest.main()
+

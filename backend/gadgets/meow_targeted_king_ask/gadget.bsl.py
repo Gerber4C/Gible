@@ -1,0 +1,12 @@
+# BSL source for Partner bidding agreements.
+# Edit this file as the source of truth for this Gadget object set.
+
+Gadget(
+    id='meow_targeted_king_ask',
+    namespace='meow_2over1',
+    name='Meow Targeted King Ask',
+    version='0.1.0',
+    description='Targeted follow-up asks for a named king after keycard information is available.',
+    system_notes='After keycard information, 5N can ask for the diamond king in the benchmark heart-slam route.\n',
+    author={'name': 'Meow Li'},
+)

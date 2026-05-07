@@ -5,61 +5,33 @@ from typing import Any
 
 
 @dataclass(frozen=True)
-class SemanticFact:
-    fact_type: str
-    attributes: dict[str, Any]
-    origin: dict[str, Any]
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any], origin: dict[str, Any]) -> "SemanticFact":
-        attributes = dict(data)
-        fact_type = str(attributes.pop("fact_type"))
-        return cls(fact_type=fact_type, attributes=attributes, origin=origin)
-
-    def matches(self, query: dict[str, Any]) -> bool:
-        for key, expected in query.items():
-            if key == "fact_type":
-                actual = self.fact_type
-            else:
-                actual = self.attributes.get(key)
-            if actual != expected:
-                return False
-        return True
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "fact_type": self.fact_type,
-            **self.attributes,
-            "origin": self.origin,
-        }
-
-
-@dataclass(frozen=True)
-class AuctionStateVariable:
+class StateRecord:
     key: str
-    namespace: str
-    owner: str | None
     attributes: dict[str, Any]
     origin: dict[str, Any]
+    namespace: str = "public"
+    owner: str | None = None
+    visibility: str = "partnership"
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any], origin: dict[str, Any]) -> "AuctionStateVariable":
+    def from_dict(cls, data: dict[str, Any], origin: dict[str, Any]) -> "StateRecord":
         attributes = dict(data)
         key = str(attributes.pop("key"))
         namespace = str(attributes.pop("namespace", "public"))
         owner = attributes.pop("owner", None)
-        return cls(key=key, namespace=namespace, owner=owner, attributes=attributes, origin=origin)
+        visibility = str(attributes.pop("visibility", "partnership"))
+        return cls(
+            key=key,
+            namespace=namespace,
+            owner=owner,
+            visibility=visibility,
+            attributes=attributes,
+            origin=origin,
+        )
 
     def matches(self, query: dict[str, Any]) -> bool:
         for key, expected in query.items():
-            if key == "key":
-                actual = self.key
-            elif key == "namespace":
-                actual = self.namespace
-            elif key == "owner":
-                actual = self.owner
-            else:
-                actual = self.attributes.get(key)
+            actual = self.attribute(key)
             if actual != expected:
                 return False
         return True
@@ -71,12 +43,15 @@ class AuctionStateVariable:
             return self.namespace
         if name == "owner":
             return self.owner
+        if name == "visibility":
+            return self.visibility
         return self.attributes.get(name)
 
     def to_dict(self) -> dict[str, Any]:
         result = {
             "key": self.key,
             "namespace": self.namespace,
+            "visibility": self.visibility,
             **self.attributes,
             "origin": self.origin,
         }
@@ -86,13 +61,16 @@ class AuctionStateVariable:
 
 
 @dataclass(frozen=True)
-class ProtocolFrameState:
+class FrameState:
     frame_id: str
     frame_type: str
     status: str
     variables: dict[str, Any]
     origin: dict[str, Any]
     current_stage: str | None = None
+    obligation: dict[str, Any] = field(default_factory=dict)
+    close_on_actions: tuple[str, ...] = ()
+    close_on_act_types: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -101,13 +79,14 @@ class ProtocolFrameState:
             "status": self.status,
             "current_stage": self.current_stage,
             "variables": self.variables,
+            "obligation": self.obligation,
             "origin": self.origin,
         }
 
 
 @dataclass(frozen=True)
-class PlanState:
-    plan_id: str
+class PrivateRouteState:
+    route_id: str
     goal: str
     owner: str
     current_node: str
@@ -116,7 +95,7 @@ class PlanState:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "plan_id": self.plan_id,
+            "route_id": self.route_id,
             "goal": self.goal,
             "owner": self.owner,
             "current_node": self.current_node,
@@ -126,61 +105,53 @@ class PlanState:
 
 
 @dataclass
-class SemanticTrace:
-    facts: list[SemanticFact] = field(default_factory=list)
-    auction_state: list[AuctionStateVariable] = field(default_factory=list)
+class AuctionTrace:
+    state_records: list[StateRecord] = field(default_factory=list)
     applied_meanings: list[dict[str, Any]] = field(default_factory=list)
-    protocol_frames: list[ProtocolFrameState] = field(default_factory=list)
-    plan_states: list[PlanState] = field(default_factory=list)
+    frame_states: list[FrameState] = field(default_factory=list)
+    private_route_states: list[PrivateRouteState] = field(default_factory=list)
     diagnostics: list[str] = field(default_factory=list)
 
-    def add_fact(self, fact: SemanticFact) -> None:
-        self.facts.append(fact)
+    def add_state(self, record: StateRecord) -> None:
+        self.state_records.append(record)
 
-    def add_auction_state(self, variable: AuctionStateVariable) -> None:
-        self.auction_state.append(variable)
+    def state_exists(self, query: dict[str, Any]) -> bool:
+        return any(record.matches(query) for record in self.state_records)
 
-    def fact_exists(self, query: dict[str, Any]) -> bool:
-        return any(fact.matches(query) for fact in self.facts)
+    def matching_state(self, query: dict[str, Any]) -> list[StateRecord]:
+        return [record for record in self.state_records if record.matches(query)]
 
-    def matching_facts(self, query: dict[str, Any]) -> list[SemanticFact]:
-        return [fact for fact in self.facts if fact.matches(query)]
-
-    def auction_state_exists(self, query: dict[str, Any]) -> bool:
-        return any(variable.matches(query) for variable in self.auction_state)
-
-    def matching_auction_state(self, query: dict[str, Any]) -> list[AuctionStateVariable]:
-        return [variable for variable in self.auction_state if variable.matches(query)]
-
-    def auction_state_compare(self, query: dict[str, Any]) -> bool:
+    def state_compare(self, query: dict[str, Any]) -> bool:
         lookup = dict(query.get("query", {}))
         attribute = query.get("attribute", "value")
         comparison = {key: value for key, value in query.items() if key not in ("query", "attribute")}
-        matches = self.matching_auction_state(lookup)
-        return any(_compare_state_value(variable.attribute(attribute), comparison) for variable in matches)
+        matches = self.matching_state(lookup)
+        return any(_compare_state_value(record.attribute(attribute), comparison) for record in matches)
 
     def state_has(self, query: dict[str, Any]) -> bool:
-        return all(self.fact_exists(_semantic_state_query(state_type, attributes)) for state_type, attributes in query.items())
+        if "key" in query:
+            return self.state_exists(query)
+        return all(self.state_exists(_state_query(key, attributes)) for key, attributes in query.items())
 
     def add_applied_meaning(self, entry: dict[str, Any]) -> None:
         self.applied_meanings.append(entry)
 
-    def add_protocol_frame(self, frame: ProtocolFrameState) -> None:
-        self.protocol_frames.append(frame)
+    def add_frame_state(self, frame: FrameState) -> None:
+        self.frame_states.append(frame)
 
-    def add_plan_state(self, plan_state: PlanState) -> None:
-        self.plan_states.append(plan_state)
+    def add_private_route_state(self, route_state: PrivateRouteState) -> None:
+        self.private_route_states.append(route_state)
 
     def warn(self, text: str) -> None:
         self.diagnostics.append(text)
 
 
-def _semantic_state_query(state_type: str, attributes: Any) -> dict[str, Any]:
+def _state_query(key: str, attributes: Any) -> dict[str, Any]:
     if attributes is None:
         attributes = {}
     if not isinstance(attributes, dict):
-        raise ValueError(f"Semantic state query for {state_type} must be a mapping")
-    return {"fact_type": state_type, **attributes}
+        raise ValueError(f"State query for {key} must be a mapping")
+    return {"key": key, **attributes}
 
 
 def _compare_state_value(actual: Any, comparison: dict[str, Any]) -> bool:

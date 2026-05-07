@@ -1,0 +1,11 @@
+# BSL source for Partner bidding agreements.
+# Edit this file as the source of truth for this Gadget object set.
+
+Gadget(
+    id='meow_regular_stayman_over_1n',
+    namespace='meow_2over1',
+    name='Meow Regular Stayman Over 1N',
+    version='0.1.0',
+    description='Regular Stayman over a 1N opening. Puppet Stayman is a separate Gadget.\n',
+    author={'name': 'Meow Li'},
+)

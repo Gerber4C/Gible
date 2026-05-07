@@ -1,55 +1,62 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
-from .convention import BiddingPlan, CallSpecification, Convention, ConventionSet
+from .model import CallSpec, Gadget, PartnershipProfile, PrivateRouteSpec
 
 
-def generate_system_notes(convention_set: ConventionSet) -> str:
+def generate_system_notes(profile: PartnershipProfile) -> str:
     lines: list[str] = [
-        f"# {convention_set.name}",
+        f"# {profile.name}",
         "",
-        f"Convention Set ID: `{convention_set.id}`",
-        f"Version: `{convention_set.version}`",
-        f"Author: {convention_set.author.name}",
+        f"Profile ID: `{profile.id}`",
+        f"Version: `{profile.version}`",
+        f"Author: {profile.author.name}",
     ]
-    if convention_set.description:
-        lines.extend(["", convention_set.description.strip()])
-    if convention_set.system_notes:
-        lines.extend(["", convention_set.system_notes.strip()])
+    if profile.description:
+        lines.extend(["", profile.description.strip()])
+    if profile.system_notes:
+        lines.extend(["", profile.system_notes.strip()])
 
-    for convention in convention_set.conventions:
-        _render_convention(lines, convention)
+    for gadget in profile.gadgets:
+        _render_gadget(lines, gadget)
+
+    if profile.policy_functions:
+        lines.extend(["", "## Profile Policy Functions"])
+        for policy_function in profile.policy_functions:
+            source = Path(policy_function.source_path).name if policy_function.source_path else "unknown"
+            lines.extend(["", f"- `{policy_function.id}`", "  - Algorithm: `python_bsl_function`", f"  - Source: `{source}`"])
 
     lines.append("")
     return "\n".join(lines)
 
 
-def _render_convention(lines: list[str], convention: Convention) -> None:
+def _render_gadget(lines: list[str], gadget: Gadget) -> None:
     lines.extend(
         [
             "",
-            f"## {convention.name}",
+            f"## {gadget.name}",
             "",
-            f"Convention ID: `{convention.id}`",
-            f"Namespace: `{convention.namespace}`",
-            f"Version: `{convention.version}`",
-            f"Author: {convention.author.name}",
+            f"Gadget ID: `{gadget.id}`",
+            f"Namespace: `{gadget.namespace}`",
+            f"Version: `{gadget.version}`",
+            f"Author: {gadget.author.name}",
         ]
     )
-    if convention.description:
-        lines.extend(["", convention.description.strip()])
-    if convention.system_notes:
-        lines.extend(["", convention.system_notes.strip()])
+    if gadget.description:
+        lines.extend(["", gadget.description.strip()])
+    if gadget.system_notes:
+        lines.extend(["", gadget.system_notes.strip()])
 
-    if convention.call_specifications:
+    if gadget.call_specs:
         lines.extend(["", "### Call Specifications"])
-        for item in convention.call_specifications:
+        for item in gadget.call_specs:
             _render_call_specification(lines, item)
 
-    if convention.protocol_frames:
-        lines.extend(["", "### Protocol Frames"])
-        for frame in convention.protocol_frames:
+    if gadget.frame_specs:
+        lines.extend(["", "### Frames"])
+        for frame in gadget.frame_specs:
             lines.extend(
                 [
                     "",
@@ -57,36 +64,36 @@ def _render_convention(lines: list[str], convention: Convention) -> None:
                     f"  - Context: {_format_context(frame.context)}",
                     f"  - Source call: `{frame.source_call}`",
                     f"  - Variables: {_format_mapping(frame.variables)}",
+                    f"  - Obligation: {_format_mapping(frame.obligation)}",
+                    f"  - Closes: {_format_list(frame.closes)}",
+                    f"  - Close on actions: {_format_list(frame.close_on_actions)}",
+                    f"  - Close on act types: {_format_list(frame.close_on_act_types)}",
                 ]
             )
             if frame.description:
                 lines.append(f"  - Notes: {frame.description.strip()}")
 
-    if convention.bidding_plans:
-        lines.extend(["", "### Bidding Plans"])
-        for plan in convention.bidding_plans:
-            _render_bidding_plan(lines, plan)
+    if gadget.private_route_specs:
+        lines.extend(["", "### Private Routes"])
+        for route in gadget.private_route_specs:
+            _render_private_route(lines, route)
 
-    if convention.call_selection_policies:
-        lines.extend(["", "### Call Selection Policies"])
-        for policy in convention.call_selection_policies:
+    if gadget.policy_functions:
+        lines.extend(["", "### Policy Functions"])
+        for policy_function in gadget.policy_functions:
+            source = Path(policy_function.source_path).name if policy_function.source_path else "unknown"
             lines.extend(
                 [
                     "",
-                    f"- `{policy.id}`",
-                    f"  - Algorithm: `{policy.algorithm}`",
-                    f"  - Scope: {_format_mapping(policy.scope)}",
-                    f"  - Tie breaker: `{policy.tie_breaker}`",
-                    f"  - Choices: {_format_list(policy.choices)}",
-                    f"  - Fallback: `{policy.fallback}`",
+                    f"- `{policy_function.id}`",
+                    "  - Algorithm: `python_bsl_function`",
+                    f"  - Source: `{source}`",
                 ]
             )
-            if policy.description:
-                lines.append(f"  - Notes: {policy.description.strip()}")
 
-    if convention.named_evaluators:
+    if gadget.evaluator_specs:
         lines.extend(["", "### Named Evaluators"])
-        for evaluator in convention.named_evaluators:
+        for evaluator in gadget.evaluator_specs:
             lines.extend(
                 [
                     "",
@@ -101,14 +108,15 @@ def _render_convention(lines: list[str], convention: Convention) -> None:
                 lines.append(f"  - System Notes: {evaluator.system_notes.strip()}")
 
 
-def _render_call_specification(lines: list[str], item: CallSpecification) -> None:
+def _render_call_specification(lines: list[str], item: CallSpec) -> None:
     lines.extend(
         [
             "",
             f"- `{item.id}`",
             f"  - Context: {_format_context(item.context)}",
-            f"  - Call: `{item.call}`",
+            f"  - Call: `{_format_call(item)}`",
             f"  - Call Act Types: {_format_list(item.call_act_types)}",
+            f"  - Capabilities: {_format_list(item.capabilities)}",
             f"  - Requires: {_format_mapping(item.requires)}",
             f"  - Meaning: {_format_mapping(item.meaning)}",
             f"  - Applicability: {_format_mapping(item.applicability)}",
@@ -122,24 +130,25 @@ def _render_call_specification(lines: list[str], item: CallSpecification) -> Non
         lines.append(f"  - System Notes: {item.system_notes.strip()}")
 
 
-def _render_bidding_plan(lines: list[str], plan: BiddingPlan) -> None:
+def _render_private_route(lines: list[str], route: PrivateRouteSpec) -> None:
     lines.extend(
         [
             "",
-            f"- `{plan.id}`",
-            f"  - Owner: `{plan.owner}`",
-            f"  - Goal: `{plan.goal}`",
-            f"  - Context: {_format_context(plan.context)}",
-            f"  - Entry call: `{plan.entry_call}`",
-            f"  - Entry candidate: `{str(plan.entry_candidate).lower()}`",
-            f"  - Entry score: `{plan.entry_score}`",
-            f"  - Preconditions: {_format_mapping(plan.preconditions)}",
-            f"  - Selection: {_format_mapping(plan.selection)}",
-            f"  - Workflow start: `{plan.start_node}`",
+            f"- `{route.id}`",
+            f"  - Owner: `{route.owner}`",
+            f"  - Goal: `{route.goal}`",
+            f"  - Context: {_format_context(route.context)}",
+            f"  - Entry call: `{route.entry_call}`",
+            f"  - Entry candidate: `{str(route.entry_candidate).lower()}`",
+            f"  - Entry score: `{route.entry_score}`",
+            f"  - Capabilities: {_format_list(route.capabilities)}",
+            f"  - Preconditions: {_format_mapping(route.preconditions)}",
+            f"  - Selection: {_format_mapping(route.selection)}",
+            f"  - Workflow start: `{route.start_node}`",
             "  - Workflow nodes:",
         ]
     )
-    for node_id, node in plan.workflow.get("nodes", {}).items():
+    for node_id, node in route.workflow.get("nodes", {}).items():
         lines.append(f"    - `{node_id}`: `{node.get('kind')}`")
         if "actor" in node:
             lines.append(f"      - Actor: `{node['actor']}`")
@@ -147,8 +156,14 @@ def _render_bidding_plan(lines: list[str], plan: BiddingPlan) -> None:
             lines.append(f"      - Policy: `{node['policy']}`")
         for branch in node.get("branches", []) or []:
             lines.append(f"      - Branch: when {_format_mapping(branch.get('when', {}))} goto `{branch.get('goto')}`")
-    if plan.description:
-        lines.append(f"  - Notes: {plan.description.strip()}")
+    if route.description:
+        lines.append(f"  - Notes: {route.description.strip()}")
+
+
+def _format_call(item: CallSpec) -> str:
+    if item.call is not None:
+        return item.call
+    return _format_mapping(item.call_template)
 
 
 def _format_context(context: dict[str, Any]) -> str:

@@ -1,9 +1,0 @@
-id: meow_texas_transfers_over_1n
-namespace: meow_2over1
-name: Meow Texas Transfers Over 1N
-version: 0.1.0
-description: >
-  Standalone Texas transfer Convention over 1N. Texas creates transfer and agreed
-  suit state; slam methods such as RKCB are separate Conventions.
-author:
-  name: Meow Li

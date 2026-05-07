@@ -1,0 +1,32 @@
+# BSL source for Partner bidding agreements.
+# Edit this file as the source of truth for this Gadget object set.
+
+Call(
+    id='cs_1',
+    context={'auction_pattern': '1NP', 'seat_positions': [1, 2, 3, 4]},
+    bid='3C',
+    requires={'state_exists': {'key': 'notrump_focus', 'status': 'active'}},
+    selection={'algorithm': 'weighted_score',
+     'criteria': [{'criterion_id': 'game_forcing_values',
+                   'evaluator': 'min_value',
+                   'input': 'self.hcp',
+                   'min': 10,
+                   'weight': 30},
+                  {'criterion_id': 'no_five_card_major',
+                   'evaluator': 'expression',
+                   'expr': {'op': 'and',
+                            'args': [{'op': 'lt',
+                                      'left': {'var': 'self.hearts.length'},
+                                      'right': {'const': 5}},
+                                     {'op': 'lt',
+                                      'left': {'var': 'self.spades.length'},
+                                      'right': {'const': 5}}]},
+                   'weight': 30}]},
+    meaning={'nature_labels': ['artificial', 'conventional'],
+     'call_act_types': ['inquiry', 'context_initiating', 'forcing'],
+     'action_type': 'puppet_stayman',
+     'alertable': True},
+    effects=[{'key': 'puppet_stayman', 'notrump_level': 1, 'status': 'pending'}],
+    description='Responder bids 3C as Puppet Stayman over 1N.',
+    system_notes='After 1N, 3C is Puppet Stayman.',
+)

@@ -3,10 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from .cards import Hand
-from .trace import SemanticTrace
+from .trace import AuctionTrace
 
 
-def evaluate(condition: dict[str, Any], hand: Hand, trace: SemanticTrace, environment: dict[str, Any] | None = None) -> bool:
+def evaluate(condition: dict[str, Any], hand: Hand, trace: AuctionTrace, environment: dict[str, Any] | None = None) -> bool:
     if not condition:
         return True
 
@@ -21,23 +21,18 @@ def evaluate(condition: dict[str, Any], hand: Hand, trace: SemanticTrace, enviro
     if "not" in condition:
         return not evaluate(condition["not"], hand, trace, environment)
 
-    if "fact_exists" in condition:
-        return trace.fact_exists(condition["fact_exists"])
-
     if "state_has" in condition:
         return trace.state_has(condition["state_has"])
 
     if "state_missing" in condition:
         return not trace.state_has(condition["state_missing"])
 
-    if "auction_state_exists" in condition:
-        return trace.auction_state_exists(condition["auction_state_exists"])
+    if "state_exists" in condition:
+        return trace.state_exists(condition["state_exists"])
 
-    if "auction_state_missing" in condition:
-        return not trace.auction_state_exists(condition["auction_state_missing"])
+    if "state_compare" in condition:
+        return trace.state_compare(condition["state_compare"])
 
-    if "auction_state_compare" in condition:
-        return trace.auction_state_compare(condition["auction_state_compare"])
 
     if "expr" in condition:
         return bool(evaluate_expression(condition["expr"], hand, trace, environment))
@@ -49,7 +44,7 @@ def evaluate(condition: dict[str, Any], hand: Hand, trace: SemanticTrace, enviro
     return True
 
 
-def _resolve_value(key: str, hand: Hand, trace: SemanticTrace, environment: dict[str, Any]) -> Any:
+def _resolve_value(key: str, hand: Hand, trace: AuctionTrace, environment: dict[str, Any]) -> Any:
     if key == "self.hcp":
         return hand.hcp
     if key == "self.balanced":
@@ -59,6 +54,8 @@ def _resolve_value(key: str, hand: Hand, trace: SemanticTrace, environment: dict
         return hand.length(suit)
     if key.startswith("env."):
         return environment.get(key.removeprefix("env."))
+    if key.startswith("candidate."):
+        return _resolve_mapping_path(environment.get("_candidate", {}), key.removeprefix("candidate."))
     raise ValueError(f"Unsupported condition key: {key}")
 
 
@@ -72,11 +69,23 @@ def _compare(actual: Any, expected: Any) -> bool:
             return False
         if "in" in expected and actual not in expected["in"]:
             return False
+        if "contains" in expected and expected["contains"] not in (actual or ()):
+            return False
         return True
     return actual == expected
 
 
-def evaluate_selection(selection: dict[str, Any], hand: Hand, trace: SemanticTrace, environment: dict[str, Any] | None = None) -> dict[str, Any]:
+def _resolve_mapping_path(data: Any, path: str) -> Any:
+    value = data
+    for part in path.split("."):
+        if isinstance(value, dict):
+            value = value.get(part)
+            continue
+        return None
+    return value
+
+
+def evaluate_selection(selection: dict[str, Any], hand: Hand, trace: AuctionTrace, environment: dict[str, Any] | None = None) -> dict[str, Any]:
     environment = environment or {}
     algorithm = selection.get("algorithm", "weighted_score")
     if algorithm != "weighted_score":
@@ -101,7 +110,7 @@ def evaluate_selection(selection: dict[str, Any], hand: Hand, trace: SemanticTra
     }
 
 
-def evaluate_criterion(criterion: dict[str, Any], hand: Hand, trace: SemanticTrace, environment: dict[str, Any]) -> dict[str, Any]:
+def evaluate_criterion(criterion: dict[str, Any], hand: Hand, trace: AuctionTrace, environment: dict[str, Any]) -> dict[str, Any]:
     evaluator = criterion["evaluator"]
     value = None
     passed = False
@@ -115,9 +124,9 @@ def evaluate_criterion(criterion: dict[str, Any], hand: Hand, trace: SemanticTra
     elif evaluator == "equals":
         value = _resolve_value(criterion["input"], hand, trace, environment)
         passed = value == criterion["value"]
-    elif evaluator == "fact_exists":
+    elif evaluator == "state_exists":
         value = criterion["query"]
-        passed = trace.fact_exists(criterion["query"])
+        passed = trace.state_exists(criterion["query"])
     elif evaluator == "expression":
         value = evaluate_expression(criterion["expr"], hand, trace, environment, criterion.get("params", {}))
         passed = bool(value)
@@ -144,7 +153,7 @@ def evaluate_criterion(criterion: dict[str, Any], hand: Hand, trace: SemanticTra
 def evaluate_expression(
     expr: Any,
     hand: Hand,
-    trace: SemanticTrace,
+    trace: AuctionTrace,
     environment: dict[str, Any],
     params: dict[str, Any] | None = None,
 ) -> Any:
@@ -202,22 +211,16 @@ def evaluate_expression(
         return _expression_hand(expr, hand, environment).king_count(
             excluded_suit=_expression_optional_suit(expr.get("excluded_suit"), hand, trace, environment, params)
         )
-    if op == "fact_exists":
-        return trace.fact_exists(expr["query"])
+    if op == "state_exists":
+        return trace.state_exists(expr["query"])
     if op == "state_has":
         return trace.state_has(expr["query"])
     if op == "state_missing":
         return not trace.state_has(expr["query"])
-    if op == "fact_attribute":
-        return _expression_fact_attribute(expr, trace)
-    if op == "auction_state_exists":
-        return trace.auction_state_exists(expr["query"])
-    if op == "auction_state_missing":
-        return not trace.auction_state_exists(expr["query"])
-    if op == "auction_state_compare":
-        return trace.auction_state_compare(expr)
-    if op == "auction_state_attribute":
-        return _expression_auction_state_attribute(expr, trace)
+    if op == "state_compare":
+        return trace.state_compare(expr)
+    if op == "state_attribute":
+        return _expression_state_attribute(expr, trace)
     raise ValueError(f"Unsupported expression operator: {op}")
 
 
@@ -234,6 +237,8 @@ def _resolve_expr_var(path: str, hand: Hand, environment: dict[str, Any]) -> Any
         return _partner_hand(environment).length(path.split(".")[1])
     if path.startswith("env."):
         return environment.get(path.removeprefix("env."))
+    if path.startswith("candidate."):
+        return _resolve_mapping_path(environment.get("_candidate", {}), path.removeprefix("candidate."))
     raise ValueError(f"Unsupported expression variable: {path}")
 
 
@@ -299,7 +304,7 @@ def _partner_hand(environment: dict[str, Any]) -> Hand:
     raise ValueError("Expression requires partner_hand in environment")
 
 
-def _expression_suit(value: Any, hand: Hand, trace: SemanticTrace, environment: dict[str, Any], params: dict[str, Any]) -> Any:
+def _expression_suit(value: Any, hand: Hand, trace: AuctionTrace, environment: dict[str, Any], params: dict[str, Any]) -> Any:
     if isinstance(value, dict):
         return evaluate_expression(value, hand, trace, environment, params)
     return value
@@ -308,7 +313,7 @@ def _expression_suit(value: Any, hand: Hand, trace: SemanticTrace, environment: 
 def _expression_optional_suit(
     value: Any,
     hand: Hand,
-    trace: SemanticTrace,
+    trace: AuctionTrace,
     environment: dict[str, Any],
     params: dict[str, Any],
 ) -> Any:
@@ -317,32 +322,15 @@ def _expression_optional_suit(
     return _expression_suit(value, hand, trace, environment, params)
 
 
-def _expression_fact_attribute(expr: dict[str, Any], trace: SemanticTrace) -> Any:
-    matches = trace.matching_facts(expr["query"])
+def _expression_state_attribute(expr: dict[str, Any], trace: AuctionTrace) -> Any:
+    matches = trace.matching_state(expr["query"])
     if not matches:
         if "default" in expr:
             return expr["default"]
-        raise ValueError(f"No semantic fact matches query: {expr['query']}")
-    fact = matches[-1] if expr.get("which", "last") == "last" else matches[0]
+        raise ValueError(f"No state record matches query: {expr['query']}")
+    record = matches[-1] if expr.get("which", "last") == "last" else matches[0]
     attribute = expr["attribute"]
-    if attribute == "fact_type":
-        return fact.fact_type
-    if attribute not in fact.attributes:
-        if "default" in expr:
-            return expr["default"]
-        raise ValueError(f"Semantic fact lacks attribute {attribute}: {fact.to_dict()}")
-    return fact.attributes[attribute]
-
-
-def _expression_auction_state_attribute(expr: dict[str, Any], trace: SemanticTrace) -> Any:
-    matches = trace.matching_auction_state(expr["query"])
-    if not matches:
-        if "default" in expr:
-            return expr["default"]
-        raise ValueError(f"No auction-state variable matches query: {expr['query']}")
-    variable = matches[-1] if expr.get("which", "last") == "last" else matches[0]
-    attribute = expr["attribute"]
-    value = variable.attribute(attribute)
+    value = record.attribute(attribute)
     if value is None and "default" in expr:
         return expr["default"]
     return value

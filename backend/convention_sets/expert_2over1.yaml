@@ -1,7 +1,0 @@
-id: expert_2over1
-name: Expert 2/1
-description: >
-  Prototype Convention Set for the current 2/1 and after-1N implementation.
-conventions:
-  - two_over_one
-  - four_way_jacoby_transfer

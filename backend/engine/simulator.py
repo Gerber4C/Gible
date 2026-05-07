@@ -6,7 +6,8 @@ from typing import Any
 from .auction import Auction
 from .calls import normalize_call
 from .cards import Hand
-from .convention import ConventionSet
+from .memory import SeatMemory
+from .model import PartnershipProfile
 from .explanation import explain
 from .legality import auction_is_complete
 from .selector import choose_bid
@@ -32,13 +33,14 @@ class SimulatedAuction:
     calls: tuple[str, ...]
     call_records: tuple[SimulatedCall, ...]
     diagnostics: tuple[str, ...]
+    private_memories: dict[str, Any]
 
     def compact_sequence(self) -> str:
         return "".join(self.calls)
 
 
 def simulate_auction(
-    convention_set: ConventionSet,
+    profile: PartnershipProfile,
     hands: dict[str, str | Hand],
     dealer: str = "n",
     vulnerability: str = "none",
@@ -52,6 +54,7 @@ def simulate_auction(
     active_environment = dict(environment or {})
     active_environment.setdefault("dealer", dealer)
     active_environment.setdefault("vulnerability", vulnerability)
+    private_memories: dict[str, SeatMemory] = {seat: SeatMemory() for seat in parsed_hands}
 
     while len(calls) < max_calls:
         auction = Auction(calls=tuple(calls), dealer=dealer, vulnerability=vulnerability)
@@ -71,7 +74,8 @@ def simulate_auction(
             "seat": actor,
             "partner_hand": partner_hand,
         }
-        selection = choose_bid(convention_set, auction, hand, selection_environment)
+        selection = choose_bid(profile, auction, hand, selection_environment, private_memories.get(actor))
+        private_memories[actor] = selection.private_memory
         explanation = explain(selection)
         call = normalize_call(explanation["call"])
         diagnostics.extend(explanation.get("diagnostics", []))
@@ -81,4 +85,9 @@ def simulate_auction(
     if len(calls) >= max_calls and not auction_is_complete(Auction(calls=tuple(calls), dealer=dealer, vulnerability=vulnerability)):
         diagnostics.append(f"Simulation stopped after max_calls={max_calls}")
 
-    return SimulatedAuction(calls=tuple(calls), call_records=tuple(records), diagnostics=tuple(diagnostics))
+    return SimulatedAuction(
+        calls=tuple(calls),
+        call_records=tuple(records),
+        diagnostics=tuple(diagnostics),
+        private_memories={seat: memory.to_dict() for seat, memory in private_memories.items()},
+    )

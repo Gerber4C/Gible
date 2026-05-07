@@ -4,6 +4,8 @@ Behavior tests are fixture-driven. Add bridge bidding examples to YAML files und
 
 `backend/tests/test_cases.md` is the human-readable translation of the fixture cases. Update it in the same checkpoint whenever a fixture case changes.
 
+Infrastructure tests for parsers, loaders, BSL compilation, generated notes, and object-model behavior live in `backend/tests/test_fixture_cases.py`. Add new Python test methods there only when the behavior being tested is code infrastructure rather than a bridge bidding example.
+
 ## Bidding Cases
 
 Add cases to `backend/tests/cases/bidding.yaml`.
@@ -13,7 +15,7 @@ Minimal shape:
 ```yaml
 cases:
   - name: short_unique_name
-    convention_set: meow_2over1
+    profile: meow_2over1
     auction: 1NP
     hand: S74HKJ832DA762CQ5
     environment:
@@ -27,15 +29,16 @@ cases:
 Optional expectations include:
 
 - `origin.object_id`
-- `origin.convention_id`
+- `origin.gadget_id`
 - `origin.qualified_id`
 - `public_meaning.alertable`
 - `compared_candidate_calls`
 - `diagnostics`
 - `diagnostics_include`
-- `selected_algorithm`
-- `semantic_fact_types`
-- `semantic_fact_origins`
+- `selected_source_kind`
+- `selected_private_route_origin`
+- `state_keys`
+- `state_origins`
 - `selected_criteria_include`
 
 ## Full-Auction Cases
@@ -47,7 +50,7 @@ Minimal shape:
 ```yaml
 cases:
   - name: complete_sequence_name
-    convention_set: meow_2over1
+    profile: meow_2over1
     hands:
       n: SAQJ76H82DQ82CAJ3
       s: SK98H74DKJ7CK9852
@@ -123,3 +126,5 @@ From the project root:
 ```text
 $env:PYTHONPATH='backend'; C:\Users\paw_l\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe -m unittest discover backend\tests
 ```
+
+

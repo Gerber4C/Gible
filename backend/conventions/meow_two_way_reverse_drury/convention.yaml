@@ -1,9 +1,0 @@
-id: meow_two_way_reverse_drury
-namespace: meow_2over1
-name: Meow Two-Way Reverse Drury
-version: 0.1.0
-description: >
-  Standalone two-way reverse Drury Convention by a passed hand after third- or
-  fourth-seat major openings.
-author:
-  name: Meow Li

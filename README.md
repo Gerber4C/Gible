@@ -1,22 +1,25 @@
 # Partner
 
-A bridge bot that plays your conventions.
+A bridge bot that plays your bridge agreements.
 
-Current release: `0.0.6`
+Current release: `0.0.7`
 
 This checkpoint includes:
 
 - compact bridge auction and hand parsing,
-- directory-based Conventions,
-- starter 2/1 and four-way Jacoby transfer Conventions,
-- first executable Meow 2/1 benchmark slice organized as standalone portable Conventions,
-- limited YAML expression evaluator and expression-type Named Evaluators,
-- basic auction legality filtering and same-call meaning diagnostics,
+- directory-based Gadgets,
+- an executable Meow 2/1 benchmark Partnership Profile,
+- Python-shaped BSL source files for static agreement objects,
+- restricted Python Policy Functions for whole-pool candidate selection,
+- reusable Frames and Private Routes for public context and same-seat route memory,
+- structured expression criteria and expression-type Named Evaluators,
+- basic auction legality filtering and same-call ambiguity diagnostics,
 - full-auction partnership simulation tests with automatic opponent passes,
-- fixture-driven backend tests,
-- software engineering documentation,
-- semantic ontology documentation,
-- IR/YAML language specification,
-- Bridge System Language roadmap,
-- Meow 2/1 benchmark documentation,
+- fixture-driven backend tests with a human-readable companion,
 - formal Markdown system-note generation.
+
+Documentation starts at:
+
+```text
+docs/00_documentation_map.md
+```
