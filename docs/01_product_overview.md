@@ -1,6 +1,6 @@
 # Partner Product Overview
 
-Platform Version: 0.0.7
+Platform Version: 0.0.8
 Author: Meow Li
 Copyright: Copyright by Meow Li 2026. All Rights Reserved.
 
@@ -24,6 +24,7 @@ The platform can:
 - Return both public meaning and internal training origin.
 - Generate Markdown system notes from the structured source.
 - Run fixture tests and full-auction simulations.
+- Serve a local browser workspace for profile editing, hand display, auction display, and bidding experiments.
 
 ## Layer 2: Deal And Auction Workspace
 
@@ -38,6 +39,8 @@ Users should be able to:
 - Ask the selected Partnership Profile for bidding hints.
 - Compare how different Partnership Profiles bid the same deal.
 - Use the platform for partnership training.
+
+The current browser prototype starts this layer locally. It is not a distributed product: it reads and writes files in the local repository through a local backend server.
 
 ## Layer 3: Tournament And Inter-User Platform
 

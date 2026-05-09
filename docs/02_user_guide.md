@@ -1,10 +1,44 @@
 # Partner User Guide
 
-Platform Version: 0.0.7
+Platform Version: 0.0.8
 Author: Meow Li
 Copyright: Copyright by Meow Li 2026. All Rights Reserved.
 
-This guide explains how to use the current backend prototype and how advanced users can start authoring Gadgets.
+This guide explains how to use the current local prototype and how advanced users can start authoring Gadgets.
+
+## Browser Workspace
+
+Start the local browser workspace from the repository root:
+
+```bat
+run_local.cmd
+```
+
+Keep that CMD window open while using Partner. It starts the backend on port `8765` and the frontend on port `5173`.
+
+Manual startup is also available:
+
+Backend:
+
+```powershell
+C:\Users\paw_l\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe backend\server.py
+```
+
+Frontend:
+
+```powershell
+C:\Users\paw_l\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe frontend\server.mjs
+```
+
+Open:
+
+```text
+http://127.0.0.1:5173
+```
+
+The browser workspace can list Partnership Profiles, open profile files, edit and save BSL/policy/test documents, display hands and auctions, ask for one bid, and simulate a partnership auction with controlled North/South hands.
+
+Frontend engineering details live in `docs/07_frontend_architecture.md`.
 
 ## Basic Notation
 
@@ -60,16 +94,21 @@ The response includes:
 A Partnership Profile is the selected bridge agreement package. Current profiles live in:
 
 ```text
-backend/profiles/<profile_id>/
+backend/partnership_profiles/<profile_id>/
   profile.bsl.py
+  gadgets/
+    <gadget_id>/
   policies/
     *.policy.py
+  tests/
+    cases/
+    test_cases.md
 ```
 
 The current main profile is:
 
 ```text
-backend/profiles/meow_2over1/profile.bsl.py
+backend/partnership_profiles/meow_2over1/profile.bsl.py
 ```
 
 It lists the Gadgets that make up the profile and loads profile-level Policy Functions.
@@ -79,9 +118,8 @@ It lists the Gadgets that make up the profile and loads profile-level Policy Fun
 Each Gadget lives in its own directory:
 
 ```text
-backend/gadgets/<gadget_id>/
+backend/partnership_profiles/<profile_id>/gadgets/<gadget_id>/
   gadget.bsl.py
-  *.bsl.py
   *.policy.py
 ```
 
@@ -93,35 +131,44 @@ A Gadget can define:
 - Named Evaluators.
 - Gadget-local Policy Functions.
 
-The current source style is Python-shaped BSL. It is parsed by the platform, not executed as normal Python.
+The current source style is class-authored Python BSL. Each Gadget is a class derived from `Gadget`; its `build()` method creates calls, frames, routes, and evaluators with simple field assignments.
 
 ## Minimal Call Specification Example
 
 ```python
-Call(
-    id='cs_1',
-    when=Auction('1NP'),
-    bid=Bid('2D'),
-    selection=Selection(criteria=[
-        Criterion('five_hearts', condition=self.hearts >= 5),
-    ]),
-    meaning=Meaning(
-        nature=['artificial', 'conventional'],
-        acts=['directive', 'context_initiating'],
-        action='transfer',
-        target_suit=H,
-        alertable=True,
-        acbl_explanation='hearts',
-    ),
-    effects=[
-        State('transfer', target_suit=H, status='pending'),
-    ],
-    description='Responder bids 2D as a transfer to hearts.',
-    system_notes='After 1N, 2D transfers to hearts.',
-)
+def cs_1_applies(ctx):
+    return ctx.hand.length('H') >= 5
+
+
+class ExampleTransferGadget(Gadget):
+    id = 'example_transfer'
+    namespace = 'meow_2over1'
+    name = 'Example Transfer'
+    version = '0.1.0'
+    author = Author('Meow Li')
+
+    def build(self):
+        call = self.call('cs_1')
+        call.when = '1NP'
+        call.bid = '2D'
+        call.applies = cs_1_applies
+
+        call.meaning.nature = ['artificial', 'conventional']
+        call.meaning.acts = ['directive', 'context_initiating']
+        call.meaning.action = 'transfer'
+        call.meaning.target_suit = 'H'
+        call.meaning.alertable = True
+        call.meaning.acbl_explanation = 'hearts'
+
+        effect = call.effect('transfer')
+        effect.target_suit = 'H'
+        effect.status = 'pending'
+
+        call.description = 'Responder bids 2D as a transfer to hearts.'
+        call.system_notes = 'After 1N, 2D transfers to hearts.'
 ```
 
-The call is eligible only when the auction context matches and the selection criteria pass. The public meaning says what the partnership agreement is. Effects create public state records used by later calls.
+The call is eligible only when the auction context matches and the Python `applies` function returns true. The public meaning says what the partnership agreement is. Effects create public state records used by later calls.
 
 ## Policy Functions
 
@@ -139,7 +186,7 @@ def meow_notrump_response_route(ctx, candidates):
         return candidates.get('2D')
     return candidates.first_available('3N', 'P')
 
-selection_policies = [meow_notrump_response_route]
+policy_functions = [meow_notrump_response_route]
 ```
 
 The function receives:
@@ -170,7 +217,7 @@ backend/
 The human-readable fixture companion is:
 
 ```text
-backend/tests/test_cases.md
+backend/partnership_profiles/meow_2over1/tests/test_cases.md
 ```
 
 When test fixtures change, update that document too.

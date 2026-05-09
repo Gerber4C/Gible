@@ -1,10 +1,10 @@
 # Engine Architecture
 
-Platform Version: 0.0.7
+Platform Version: 0.0.8
 Author: Meow Li
 Copyright: Copyright by Meow Li 2026. All Rights Reserved.
 
-This is the code-reading guide for engineers and AI agents.
+This is the backend code-reading guide for engineers and AI agents. Frontend implementation details live in `docs/07_frontend_architecture.md`.
 
 ## Runtime Flow
 
@@ -27,6 +27,13 @@ The bidding flow is:
   - `bid(request)`
   - `simulate(request)`
   - `system_notes(request)`
+
+`backend/server.py`
+
+- Localhost HTTP wrapper around `app.py`.
+- Lists Partnership Profiles and profile files.
+- Reads and writes editable profile files inside the selected profile directory.
+- Exposes bid, simulation, and generated system-note endpoints for the browser workspace.
 
 `backend/engine/auction.py`
 
@@ -58,25 +65,27 @@ The bidding flow is:
   - `PolicyFunction`
   - `EvaluatorSpec`
   - `RelaySpec`
-- `RoutePolicy` is no longer part of the current runtime.
 
 `backend/engine/bsl.py`
 
-- Restricted Python-shaped BSL compiler.
-- Uses `ast` parsing and a constructor whitelist.
-- Compiles source objects into dictionaries consumed by `model.py`.
+- Restricted Python-shaped BSL loader.
+- Rejects unsupported top-level syntax such as imports.
+- Executes source in a constrained namespace of authoring base classes and bridge helpers.
+- Expands source-level dialogue helpers, currently `self.puppet_stayman(...)`, into normal Call Specifications and state effects before runtime loading.
+- Collects class-authored `Profile` and `Gadget` objects, then materializes builders into runtime-object data.
 
 `backend/engine/loader.py`
 
-- Loads `profile.bsl.py`.
-- Loads each Gadget directory.
-- Loads `*.policy.py` files as restricted Policy Functions.
+- Loads `profile.bsl.py` from `backend/partnership_profiles/<profile_id>/`.
+- Loads profile-local Gadget directories from `backend/partnership_profiles/<profile_id>/gadgets/`.
+- Loads profile-level `*.policy.py` files from the profile root and `policies/`.
 - Loads profile-level Named Evaluators from profile BSL files.
 
 `backend/engine/policy_runtime.py`
 
 - Validates and executes restricted `*.policy.py` files.
 - Expects policy functions with signature `(ctx, candidates)`.
+- Reads the registered `policy_functions = [...]` list.
 - Exposes a limited safe builtin set.
 
 `backend/engine/replay.py`
@@ -113,18 +122,20 @@ The bidding flow is:
 - Resolves same-call meaning ambiguity.
 - Builds `BridgeContext`.
 - Runs Python Policy Functions.
-- Falls back to candidate score only when no policy function selects a candidate.
+- Falls back only when no policy function selects a candidate.
 
 `backend/engine/context.py`
 
 - `StateView`: queryable view over public state records, active Frames, and active Private Routes.
+- `PartnershipKnowledge`, `HandKnowledge`, `SuitKnowledge`, and `FitKnowledge`: typed convenience views over replayed range evidence, such as `ctx.knowledge.opener.S.length` and `ctx.knowledge.fit("S").min_total`.
 - `BridgeContext`: read-only decision context for policy functions.
 - `CallCandidate`: candidate call with public meaning, origin, score, capabilities, and Private Route origin.
 - `CandidatePool`: helpers such as `get()`, `first_available()`, `by_action_type()`, `by_target_suit()`, `by_capability()`, and `features()`.
 
 `backend/engine/evaluator.py`
 
-- Evaluates selection criteria, structured expressions, state queries, named evaluators, and partner-hand expressions during simulation.
+- Evaluates structured expressions still used by relative helpers and dynamic state materialization.
+- Named Evaluators in current BSL source are Python functions, not dictionary scoring records.
 
 `backend/engine/legality.py`
 
@@ -154,6 +165,38 @@ The bidding flow is:
 
 - Generates Markdown system notes from loaded runtime objects.
 
+## Source Layout
+
+Executable bridge agreement source is profile-owned:
+
+```text
+backend/partnership_profiles/meow_2over1/
+  profile.bsl.py
+  gadgets/
+  policies/
+  tests/
+```
+
+Engine code remains shared:
+
+```text
+backend/engine/
+```
+
+Test-only profiles live separately:
+
+```text
+backend/test_profiles/
+```
+
+The React browser workspace lives in:
+
+```text
+frontend/
+```
+
+See `docs/07_frontend_architecture.md` for frontend module ownership, UI state, editor behavior, and browser verification.
+
 ## Public State And Private Memory
 
 Public state is recovered by replaying the visible auction. It includes records such as:
@@ -161,9 +204,22 @@ Public state is recovered by replaying the visible auction. It includes records 
 - `notrump_focus`
 - `transfer`
 - `agreed_suit`
+- length evidence such as `opener.length.S`
+- fit evidence such as `partnership.fit.S` with `opener_min_length`, `responder_min_length`, `min_total`, and `pattern_floor`
 - `keycard_context`
 - `opener.hcp`
 - `opener.length.S`
+
+Policy functions may read the raw records with `ctx.state`, but bridge judgment should prefer the knowledge view when the question is about inferred hand information:
+
+```python
+ctx.knowledge.opener.S.length
+ctx.knowledge.responder.H.length
+ctx.knowledge.fit("S").min_total
+ctx.knowledge.opener.hcp
+```
+
+This keeps a 4-4 fit, 5-3 fit, 5-4 fit, and 4-3 fit distinct instead of collapsing them into a generic agreement flag.
 
 Private memory belongs to one controlled seat. If responder chose a `2D` transfer as a weak signoff route, responder can later remember that private route. Opener cannot read responder's private reason.
 
@@ -175,6 +231,6 @@ The current selection model is deliberately simple:
 2. Private Routes may add route-aware candidates.
 3. Same-call ambiguity is diagnosed unless one route candidate clearly implements the same public call.
 4. Policy Functions choose from the candidate pool.
-5. Score fallback is used only when no policy function applies.
+5. Fallback is used only when no policy function applies.
 
 This avoids hidden priority fields. Judgment belongs in Policy Functions, not inside one candidate.

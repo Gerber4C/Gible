@@ -1,14 +1,14 @@
 # Backend Test Workflow
 
-Behavior tests are fixture-driven. Add bridge bidding examples to YAML files under `backend/tests/cases/` instead of editing Python test methods.
+Behavior tests are fixture-driven. Add Meow 2/1 bridge bidding examples to YAML files under `backend/partnership_profiles/meow_2over1/tests/cases/` instead of editing Python test methods.
 
-`backend/tests/test_cases.md` is the human-readable translation of the fixture cases. Update it in the same checkpoint whenever a fixture case changes.
+`backend/partnership_profiles/meow_2over1/tests/test_cases.md` is the human-readable translation of the fixture cases. Update it in the same checkpoint whenever a fixture case changes.
 
 Infrastructure tests for parsers, loaders, BSL compilation, generated notes, and object-model behavior live in `backend/tests/test_fixture_cases.py`. Add new Python test methods there only when the behavior being tested is code infrastructure rather than a bridge bidding example.
 
 ## Bidding Cases
 
-Add cases to `backend/tests/cases/bidding.yaml`.
+Add cases to `backend/partnership_profiles/meow_2over1/tests/cases/bidding.yaml`.
 
 Minimal shape:
 
@@ -43,7 +43,7 @@ Optional expectations include:
 
 ## Full-Auction Cases
 
-Add complete partnership simulation cases to `backend/tests/cases/full_auctions.yaml`.
+Add complete partnership simulation cases to `backend/partnership_profiles/meow_2over1/tests/cases/full_auctions.yaml`.
 
 Minimal shape:
 
@@ -68,7 +68,7 @@ Opponents without supplied hands automatically pass. The expected auction should
 
 ## Hand Parser Cases
 
-Add compact-hand parser cases to `backend/tests/cases/hands.yaml`.
+Add compact-hand parser cases to `backend/partnership_profiles/meow_2over1/tests/cases/hands.yaml`.
 
 ```yaml
 valid:
@@ -87,7 +87,7 @@ Raw hand strings use suit markers `S H D C` and rank text after each marker. Sui
 
 ## Matcher Cases
 
-Add pattern-expansion cases to `backend/tests/cases/matcher.yaml`.
+Add pattern-expansion cases to `backend/partnership_profiles/meow_2over1/tests/cases/matcher.yaml`.
 
 ```yaml
 cases:
@@ -105,7 +105,7 @@ cases:
 
 ## Legality Cases
 
-Add auction-legality cases to `backend/tests/cases/legality.yaml`.
+Add auction-legality cases to `backend/partnership_profiles/meow_2over1/tests/cases/legality.yaml`.
 
 ```yaml
 cases:

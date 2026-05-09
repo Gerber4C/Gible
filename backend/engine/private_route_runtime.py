@@ -122,7 +122,7 @@ def _private_route_branch_matches(
         return normalize_call(predicate["value"]) == call
     if kind == "call_act_type_is":
         value = predicate["value"]
-        return value in call_specification.call_act_types or value in call_specification.meaning.get("call_act_types", [])
+        return value in call_specification.call_act_types or value in call_specification.meaning.to_dict().get("call_act_types", [])
     if kind == "state_has":
         return trace.state_has(predicate["query"])
     if kind == "state_missing":

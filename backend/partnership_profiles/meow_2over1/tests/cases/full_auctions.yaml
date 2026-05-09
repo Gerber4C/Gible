@@ -1,0 +1,377 @@
+﻿cases:
+  - name: meow_spade_help_suit_game_try_reaches_game
+    profile: meow_2over1
+    hands:
+      n: SAQJ76H82DQ82CAJ3
+      s: SK98H74DKJ7CK9852
+    environment:
+      dealer: n
+      vulnerability: none
+      scoring: IMP
+    expected:
+      auction: 1SP2SP3DP4SPPP
+      calls_by_our_side: [1S, 2S, 3D, 4S, P]
+      diagnostics: []
+
+  - name: meow_texas_rkcb_specific_king_reaches_grand
+    profile: meow_2over1
+    hands:
+      n: SA54HKQ2DK83CQJ76
+      s: SKQJT98HA43DA2CAK
+    environment:
+      dealer: n
+      vulnerability: none
+      scoring: IMP
+    expected:
+      auction: 1NP4HP4SP4NP5CP5NP6DP7SPPP
+      calls_by_our_side: [1N, 4H, 4S, 4N, 5C, 5N, 6D, 7S, P]
+      diagnostics: []
+
+  - name: meow_simple_raise_rkcb_specific_king_reaches_grand
+    profile: meow_2over1
+    hands:
+      n: SKQJT98HA43DA2CAK
+      s: SA54H872DK83CQ762
+    environment:
+      dealer: n
+      vulnerability: none
+      scoring: IMP
+    expected:
+      auction: 1SP2SP4NP5CP5NP6DP7SPPP
+      calls_by_our_side: [1S, 2S, 4N, 5C, 5N, 6D, 7S, P]
+      diagnostics: []
+
+  - name: meow_heart_any_help_game_try_reaches_game
+    profile: meow_2over1
+    hands:
+      n: SAQ2HAKJ74D82C983
+      s: SK72H987DQ76CA982
+    environment:
+      dealer: n
+      vulnerability: none
+      scoring: IMP
+    expected:
+      auction: 1HP2HP2SP2NP4HPPP
+      calls_by_our_side: [1H, 2H, 2S, 2N, 4H, P]
+      diagnostics: []
+
+  - name: meow_inverted_minor_invite_stops_in_two_notrump
+    profile: meow_2over1
+    hands:
+      n: SA72HK83DQ87CKJ62
+      s: S72H83DAQ7CKJ6542
+    environment:
+      dealer: n
+      vulnerability: none
+      scoring: IMP
+    expected:
+      auction: 1CP2CP2NPPP
+      calls_by_our_side: [1C, 2C, 2N, P]
+      diagnostics: []
+
+  - name: meow_forcing_notrump_sequence_stops_in_two_spades
+    profile: meow_2over1
+    hands:
+      n: SAKJ876H2D84CKQ32
+      s: S2H87DQJ65CKT9872
+    environment:
+      dealer: n
+      vulnerability: none
+      scoring: IMP
+    expected:
+      auction: 1SP1NP2SPPP
+      calls_by_our_side: [1S, 1N, 2S, P]
+      diagnostics: []
+
+  - name: meow_forcing_notrump_invite_is_accepted
+    profile: meow_2over1
+    hands:
+      n: SAKJ76H2DAQ4CK432
+      s: S2HA87DKQ65CQ9872
+    environment:
+      dealer: n
+      vulnerability: none
+      scoring: IMP
+    expected:
+      auction: 1SP1NP2CP2NP3NPPP
+      calls_by_our_side: [1S, 1N, 2C, 2N, 3N, P]
+      diagnostics: []
+
+  - name: meow_two_over_one_six_spade_rebid_places_three_notrump
+    profile: meow_2over1
+    hands:
+      n: SAKJ765H2DQ8CK432
+      s: S2HA87DAK65CQ9872
+    environment:
+      dealer: n
+      vulnerability: none
+      scoring: IMP
+    expected:
+      auction: 1SP2CP2SP3NPPP
+      calls_by_our_side: [1S, 2C, 2S, 3N, P]
+      diagnostics: []
+
+  - name: meow_two_over_one_six_spade_rebid_finds_game_fit
+    profile: meow_2over1
+    hands:
+      n: SAKJ765H2DQ8CK432
+      s: S82HA87DAK65CQ987
+    environment:
+      dealer: n
+      vulnerability: none
+      scoring: IMP
+    expected:
+      auction: 1SP2DP2SP4SPPP
+      calls_by_our_side: [1S, 2D, 2S, 4S, P]
+      diagnostics: []
+
+  - name: meow_crisscross_game_force_reaches_three_notrump
+    profile: meow_2over1
+    hands:
+      n: SA72HK83DQ87CKJ62
+      s: S72HK3DAQ7CKJ6542
+    environment:
+      dealer: n
+      vulnerability: none
+      scoring: IMP
+    expected:
+      auction: 1CP2DP3NPPP
+      calls_by_our_side: [1C, 2D, 3N, P]
+      diagnostics: []
+
+  - name: meow_crisscross_fallback_reaches_club_game
+    profile: meow_2over1
+    hands:
+      n: SA72HA83D87CKJ762
+      s: S72H3DAKQ72CAQT84
+    environment:
+      dealer: n
+      vulnerability: none
+      scoring: IMP
+    expected:
+      auction: 1CP2DP3CP5CPPP
+      calls_by_our_side: [1C, 2D, 3C, 5C, P]
+      diagnostics: []
+
+  - name: meow_xyz_two_notrump_relay_drops_in_three_clubs
+    profile: meow_2over1
+    hands:
+      n: SA72HK873D87CKQ64
+      s: S72H8DKQ76CJ87652
+    environment:
+      dealer: n
+      vulnerability: none
+      scoring: IMP
+    expected:
+      auction: 1CP1DP1HP2NP3CPPP
+      calls_by_our_side: [1C, 1D, 1H, 2N, 3C, P]
+      diagnostics: []
+
+  - name: meow_gambling_three_notrump_full_auction
+    profile: meow_2over1
+    hands:
+      n: S87H83D76CAKQJ987
+    environment:
+      dealer: n
+      vulnerability: none
+      scoring: IMP
+    expected:
+      auction: 3NPPP
+      calls_by_our_side: [3N]
+      diagnostics: []
+
+  - name: meow_direct_three_notrump_over_one_notrump_full_auction
+    profile: meow_2over1
+    hands:
+      n: SAQ7HKJ8DA762CQ54
+      s: SKQ7HQJ8DQ76CKJ54
+    environment:
+      dealer: n
+      vulnerability: none
+      scoring: IMP
+    expected:
+      auction: 1NP3NPPP
+      calls_by_our_side: [1N, 3N, P]
+      diagnostics: []
+
+  - name: meow_puppet_four_four_spade_fit_reaches_game
+    profile: meow_2over1
+    hands:
+      n: SAQ76HKJ8DA76CQ54
+      s: S9876H76DAJ4CKQ72
+    environment:
+      dealer: n
+      vulnerability: none
+      scoring: IMP
+    expected:
+      auction: 1NP3CP3DP3HP4SPPP
+      calls_by_our_side: [1N, 3C, 3D, 3H, 4S, P]
+      diagnostics: []
+
+  - name: meow_puppet_five_three_heart_fit_reaches_game
+    profile: meow_2over1
+    hands:
+      n: S82HAQJ87DA76CKQ5
+      s: S9876HQT2DAJ4CKQ7
+    environment:
+      dealer: n
+      vulnerability: none
+      scoring: IMP
+    expected:
+      auction: 1NP3CP3HP4HPPP
+      calls_by_our_side: [1N, 3C, 3H, 4H, P]
+      diagnostics: []
+
+  - name: meow_texas_heart_game_signoff_full_auction
+    profile: meow_2over1
+    hands:
+      n: SAQ7HKJ8DA762CQ54
+      s: S72HAQJ987D53CK42
+    environment:
+      dealer: n
+      vulnerability: none
+      scoring: IMP
+    expected:
+      auction: 1NP4DP4HPPP
+      calls_by_our_side: [1N, 4D, 4H, P]
+      diagnostics: []
+
+  - name: meow_two_notrump_puppet_four_four_spade_fit_reaches_game
+    profile: meow_2over1
+    hands:
+      n: SKQ76HKJ8DAQ6CKQ4
+      s: S9876H76DAJ4C8765
+    environment:
+      dealer: n
+      vulnerability: none
+      scoring: IMP
+    expected:
+      auction: 2NP3CP3DP3HP4SPPP
+      calls_by_our_side: [2N, 3C, 3D, 3H, 4S, P]
+      diagnostics: []
+
+  - name: meow_strong_two_club_second_negative_places_heart_game
+    profile: meow_2over1
+    hands:
+      n: SAKHAKJ987DKQ3CAQ
+      s: S876H32D8765C8765
+    environment:
+      dealer: n
+      vulnerability: none
+      scoring: IMP
+    expected:
+      auction: 2CP2DP2HP3CP4HPPP
+      calls_by_our_side: [2C, 2D, 2H, 3C, 4H, P]
+      diagnostics: []
+
+  - name: meow_weak_two_ogust_places_heart_game
+    profile: meow_2over1
+    hands:
+      n: S76HAQJ987D83C432
+      s: SAK3H54DAJ76CKQJ5
+    environment:
+      dealer: n
+      vulnerability: none
+      scoring: IMP
+    expected:
+      auction: 2HP2NP3DP4HPPP
+      calls_by_our_side: [2H, 2N, 3D, 4H, P]
+      diagnostics: []
+
+  - name: meow_weak_two_ogust_signs_off_after_minimum
+    profile: meow_2over1
+    hands:
+      n: S76HKJ9876DQ3C432
+      s: SAQ3H54DAJ76CK542
+    environment:
+      dealer: n
+      vulnerability: none
+      scoring: IMP
+    expected:
+      auction: 2HP2NP3CP3HPPP
+      calls_by_our_side: [2H, 2N, 3C, 3H, P]
+      diagnostics: []
+
+  - name: meow_bergen_limit_raise_accepts_game
+    profile: meow_2over1
+    hands:
+      n: S72HAKJ87DQ82CKJ3
+      s: S83HQ976DKJ7CA982
+    environment:
+      dealer: n
+      vulnerability: none
+      scoring: IMP
+    expected:
+      auction: 1HP3DP4HPPP
+      calls_by_our_side: [1H, 3D, 4H, P]
+      diagnostics: []
+
+  - name: meow_drury_declines_to_partscore
+    profile: meow_2over1
+    hands:
+      n: SKJ987H82DQ83CA42
+      s: S987H74DAJ7CKQ854
+    environment:
+      dealer: s
+      vulnerability: none
+      scoring: IMP
+    expected:
+      auction: PP1SP2CP2SPPP
+      calls_by_our_side: [P, 1S, 2C, 2S, P]
+      diagnostics: []
+
+  - name: meow_drury_accepts_game
+    profile: meow_2over1
+    hands:
+      n: SAK987H82DAQ3CJ42
+      s: SQT2H74DKJ7CKQ852
+    environment:
+      dealer: s
+      vulnerability: none
+      scoring: IMP
+    expected:
+      auction: PP1SP2CP4SPPP
+      calls_by_our_side: [P, 1S, 2C, 4S, P]
+      diagnostics: []
+
+  - name: meow_jacoby_shortness_places_game
+    profile: meow_2over1
+    hands:
+      n: SAKJ87H2DQ84CK432
+      s: SQ976H87DAK7CAQ82
+    environment:
+      dealer: n
+      vulnerability: none
+      scoring: IMP
+    expected:
+      auction: 1SP2NP3HP4SPPP
+      calls_by_our_side: [1S, 2N, 3H, 4S, P]
+      diagnostics: []
+
+  - name: meow_two_over_one_side_major_fit_reaches_game
+    profile: meow_2over1
+    hands:
+      n: SAQJ76HKJ82DK8C32
+      s: S2HAQ74DAQ76CKQ32
+    environment:
+      dealer: n
+      vulnerability: none
+      scoring: IMP
+    expected:
+      auction: 1SP2DP2HP4HPPP
+      calls_by_our_side: [1S, 2D, 2H, 4H, P]
+      diagnostics: []
+
+  - name: meow_two_over_one_side_minor_places_three_notrump
+    profile: meow_2over1
+    hands:
+      n: SQ2HAKJ76DKJ82C32
+      s: SA83H2DQ76CAQJ932
+    environment:
+      dealer: n
+      vulnerability: none
+      scoring: IMP
+    expected:
+      auction: 1HP2CP2DP3NPPP
+      calls_by_our_side: [1H, 2C, 2D, 3N, P]
+      diagnostics: []

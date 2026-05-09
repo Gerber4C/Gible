@@ -6,9 +6,9 @@ from .auction import Auction
 from .call_space import steps_after
 from .calls import normalize_call
 from .cards import Hand
-from .context import CallCandidate
-from .evaluator import evaluate, evaluate_selection
-from .legality import is_call_legal
+from .context import BridgeContext, CallCandidate
+from .evaluator import evaluate
+from .legality import is_call_legal, legal_calls
 from .matcher import matches_context, matches_pattern
 from .memory import SeatMemory
 from .model import CallSpec, PartnershipProfile
@@ -25,15 +25,13 @@ def generate_candidates(
 ) -> tuple[CallCandidate, ...]:
     call_specification_candidates = []
     for call_specification in profile.call_specifications:
-        if call_specification.default_policy or not call_specification.has_selection:
+        if call_specification.default_policy:
             continue
         if not matches_context(call_specification.context, auction):
             continue
-        if not evaluate(call_specification.requires, hand, trace, environment):
+        if not _condition_passes(call_specification.requires, auction, hand, trace, environment):
             continue
-        if not evaluate(call_specification.applicability, hand, trace, environment):
-            continue
-        if not evaluate(call_specification.selection.get("applicability", {}), hand, trace, environment):
+        if not _condition_passes(call_specification.applicability, auction, hand, trace, environment):
             continue
 
         candidate = _candidate(call_specification, auction, hand, trace, environment)
@@ -118,13 +116,11 @@ def _candidate(
     call = call_for_call_specification(call_specification, auction, trace)
     if call is None:
         return None
-    evaluation = evaluate_selection(call_specification.selection, hand, trace, environment)
-    if not evaluation["eligible"]:
-        return None
+    evaluation = {"score": 0, "criteria_results": (), "algorithm": "python_applies"}
     return CallCandidate(
         call=call,
         origin=call_specification.origin_dict(),
-        public_meaning=call_specification.meaning,
+        public_meaning=call_specification.meaning.to_dict(),
         source_kind="call_spec",
         source_id=call_specification.id,
         score=evaluation["score"],
@@ -133,6 +129,34 @@ def _candidate(
         capabilities=call_specification.capabilities,
         metadata={"selection_algorithm": evaluation["algorithm"]},
     )
+
+
+def _condition_passes(
+    condition,
+    auction: Auction,
+    hand: Hand,
+    trace: AuctionTrace,
+    environment: dict[str, Any],
+) -> bool:
+    if not condition:
+        return True
+    if callable(condition):
+        ctx = BridgeContext.from_trace(
+            phase="candidate",
+            auction=auction,
+            hand=hand,
+            environment=environment,
+            trace=trace,
+            legal_calls=legal_calls(auction),
+        )
+        return bool(condition(ctx))
+    return evaluate(condition, hand, trace, environment)
+
+
+def _meaning_dict(value: Any) -> dict[str, Any]:
+    if hasattr(value, "to_dict"):
+        return value.to_dict()
+    return dict(value or {})
 
 
 def _private_route_candidates(
@@ -181,7 +205,7 @@ def _active_private_route_candidate(
     if route is None:
         trace.warn(f"Active PrivateRoute state {state.route_id} no longer has a loaded route")
         return None
-    if not evaluate(route.preconditions, hand, trace, environment):
+    if not _condition_passes(route.preconditions, Auction(calls=()), hand, trace, environment):
         return None
     node = route.workflow.get("nodes", {}).get(state.current_node, {})
     if node.get("kind") != "make_call":
@@ -198,7 +222,7 @@ def _private_route_make_call_candidate(
     environment: dict[str, Any],
     call_specification_candidates: tuple[CallCandidate, ...],
 ) -> CallCandidate | None:
-    if node.get("requires") and not evaluate(node["requires"], hand, trace, environment):
+    if node.get("requires") and not _condition_passes(node["requires"], Auction(calls=()), hand, trace, environment):
         return None
     call = normalize_call(node["call"])
     implementation = _matching_candidate_for_call(call_specification_candidates, call)
@@ -231,14 +255,16 @@ def _implemented_private_route_candidate(
     return CallCandidate(
         call=call,
         origin=implementation.origin if implementation else private_route_origin,
-        public_meaning=node.get(
-            "meaning",
-            implementation.public_meaning if implementation else {
-                "nature_labels": ["private_route_continuation"],
-                "call_act_types": ["final_placement"],
-                "action_type": "private_route_make_call",
-                "alertable": False,
-            },
+        public_meaning=_meaning_dict(
+            node.get(
+                "meaning",
+                implementation.public_meaning if implementation else {
+                    "nature_labels": ["private_route_continuation"],
+                    "call_act_types": ["final_placement"],
+                    "action_type": "private_route_make_call",
+                    "alertable": False,
+                },
+            )
         ),
         source_kind=source_kind,
         source_id=f"{route.id}:{node_id}",
@@ -311,14 +337,11 @@ def _private_route_entry_candidate(
         return None
     if not matches_context(route.context, auction):
         return None
-    if not evaluate(route.preconditions, hand, trace, environment):
+    if not _condition_passes(route.preconditions, auction, hand, trace, environment):
         return None
     implementation = _matching_candidate_for_call(call_specification_candidates, route.entry_call)
     if implementation is None:
         trace.warn(f"PrivateRoute {route.origin_dict()['qualified_id']} cannot enter because {route.entry_call} has no eligible Call Specification")
-        return None
-    selection_result = _evaluate_private_route_selection(route, hand, trace, environment)
-    if not selection_result["eligible"]:
         return None
     return CallCandidate(
         call=route.entry_call,
@@ -326,8 +349,8 @@ def _private_route_entry_candidate(
         public_meaning=implementation.public_meaning,
         source_kind="private_route_entry",
         source_id=f"{route.id}:entry",
-        score=selection_result["score"],
-        criterion_results=tuple(selection_result["criteria_results"]),
+        score=route.entry_score,
+        criterion_results=_private_route_candidate_criterion_results(route, route.entry_score, implementation),
         private_route_origin=route.origin_dict(),
         implementation_origin=implementation.origin,
         capabilities=_merge_capabilities(route.capabilities, implementation.capabilities),
@@ -338,30 +361,6 @@ def _private_route_entry_candidate(
             "implemented_by_call_specification": implementation.origin,
         },
     )
-
-
-def _evaluate_private_route_selection(
-    route,
-    hand: Hand,
-    trace: AuctionTrace,
-    environment: dict[str, Any],
-) -> dict[str, Any]:
-    if route.selection:
-        return evaluate_selection(route.selection, hand, trace, environment)
-    return {
-        "eligible": True,
-        "score": route.entry_score,
-        "criteria_results": [
-            {
-                "criterion_id": "private_route_preconditions",
-                "evaluator": "condition",
-                "passed": True,
-                "required": True,
-                "value": route.preconditions,
-                "contribution": route.entry_score,
-            }
-        ],
-    }
 
 
 def _matching_candidate_for_call(candidates: tuple[CallCandidate, ...], call: str) -> CallCandidate | None:
@@ -402,7 +401,7 @@ def _candidate_from_default_call_specification(call_specification: CallSpec) -> 
     return CallCandidate(
         call=call_specification.call or "P",
         origin=call_specification.origin_dict(),
-        public_meaning=call_specification.meaning,
+        public_meaning=call_specification.meaning.to_dict(),
         source_kind="default_policy",
         source_id=call_specification.id,
         score=0,

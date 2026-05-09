@@ -118,9 +118,8 @@ def _render_call_specification(lines: list[str], item: CallSpec) -> None:
             f"  - Call Act Types: {_format_list(item.call_act_types)}",
             f"  - Capabilities: {_format_list(item.capabilities)}",
             f"  - Requires: {_format_mapping(item.requires)}",
-            f"  - Meaning: {_format_mapping(item.meaning)}",
+            f"  - Meaning: {_format_mapping(item.meaning.to_dict())}",
             f"  - Applicability: {_format_mapping(item.applicability)}",
-            f"  - Selection: {_format_mapping(item.selection)}",
             f"  - Effects: {_format_list(item.effects)}",
         ]
     )
@@ -143,7 +142,6 @@ def _render_private_route(lines: list[str], route: PrivateRouteSpec) -> None:
             f"  - Entry score: `{route.entry_score}`",
             f"  - Capabilities: {_format_list(route.capabilities)}",
             f"  - Preconditions: {_format_mapping(route.preconditions)}",
-            f"  - Selection: {_format_mapping(route.selection)}",
             f"  - Workflow start: `{route.start_node}`",
             "  - Workflow nodes:",
         ]
@@ -185,6 +183,10 @@ def _format_mapping(value: Any) -> str:
         return "[" + ", ".join(_format_mapping(item) for item in value) + "]"
     if isinstance(value, bool):
         return f"`{str(value).lower()}`"
+    if callable(value):
+        return f"`{getattr(value, '__name__', 'python_function')}`"
+    if hasattr(value, "to_dict"):
+        return _format_mapping(value.to_dict())
     if value == "":
         return '`""`'
     return f"`{value}`"

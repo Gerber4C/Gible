@@ -54,7 +54,8 @@ def load_policy_functions(paths: list[Path] | tuple[Path, ...], source: SourceIn
 
 
 def _execute_policy_module(path: Path) -> dict[str, Any]:
-    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    source = path.read_text(encoding="utf-8").lstrip("\ufeff")
+    tree = ast.parse(source, filename=str(path))
     _validate_policy_ast(tree, path)
     namespace: dict[str, Any] = {"__builtins__": SAFE_BUILTINS}
     exec(compile(tree, str(path), "exec"), namespace)
@@ -76,7 +77,7 @@ def _validate_policy_ast(tree: ast.Module, path: Path) -> None:
 
 
 def _module_policy_procedures(namespace: dict[str, Any], path: Path) -> tuple[Callable[..., Any], ...]:
-    declared = namespace.get("selection_policies")
+    declared = namespace.get("policy_functions")
     if declared is None:
         discovered = [
             value
@@ -85,11 +86,11 @@ def _module_policy_procedures(namespace: dict[str, Any], path: Path) -> tuple[Ca
         ]
         return tuple(discovered)
     if not isinstance(declared, (list, tuple)):
-        raise PolicyLoadError(f"{path}: selection_policies must be a list or tuple of functions")
+        raise PolicyLoadError(f"{path}: policy_functions must be a list or tuple of functions")
     procedures = []
     for item in declared:
         if not callable(item):
-            raise PolicyLoadError(f"{path}: selection_policies entries must be functions")
+            raise PolicyLoadError(f"{path}: policy_functions entries must be functions")
         procedures.append(item)
     return tuple(procedures)
 

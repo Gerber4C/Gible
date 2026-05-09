@@ -9,11 +9,13 @@ from .trace import AuctionTrace, StateRecord
 
 def apply_effect(
     trace: AuctionTrace,
-    effect: dict[str, Any],
+    effect: Any,
     origin: dict[str, Any],
     hand: Hand | None,
     environment: dict[str, Any],
 ) -> None:
+    if hasattr(effect, "to_dict"):
+        effect = effect.to_dict()
     materialized = _materialize_effect(effect, hand, trace, environment)
     if "state" in materialized:
         trace.add_state(StateRecord.from_dict(materialized["state"], origin))

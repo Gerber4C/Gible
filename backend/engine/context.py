@@ -198,6 +198,105 @@ class StateView:
 
 
 @dataclass(frozen=True)
+class SuitKnowledge:
+    state: StateView
+    owner: str
+    suit: str
+
+    @property
+    def length(self) -> RangeEstimate:
+        return self.state.estimate(f"{self.owner}.length.{self.suit}")
+
+
+@dataclass(frozen=True)
+class HandKnowledge:
+    state: StateView
+    owner: str
+
+    def suit(self, suit: str) -> SuitKnowledge:
+        return SuitKnowledge(self.state, self.owner, str(suit).upper())
+
+    @property
+    def S(self) -> SuitKnowledge:
+        return self.suit("S")
+
+    @property
+    def H(self) -> SuitKnowledge:
+        return self.suit("H")
+
+    @property
+    def D(self) -> SuitKnowledge:
+        return self.suit("D")
+
+    @property
+    def C(self) -> SuitKnowledge:
+        return self.suit("C")
+
+    @property
+    def hcp(self) -> RangeEstimate:
+        return self.state.estimate(f"{self.owner}.hcp")
+
+
+@dataclass(frozen=True)
+class FitKnowledge:
+    state: StateView
+    suit: str
+
+    @property
+    def records(self) -> tuple[Any, ...]:
+        return self.state.records_matching(f"partnership.fit.{self.suit}")
+
+    @property
+    def latest(self) -> Any | None:
+        return self.records[-1] if self.records else None
+
+    @property
+    def min_total(self) -> RangeEstimate:
+        evidence = tuple(record for record in self.records if record.attribute("min_total") is not None)
+        if not evidence:
+            return RangeEstimate(key=f"partnership.fit.{self.suit}.min_total")
+
+        values = [record.attribute("min_total") for record in evidence]
+        exact_values = {repr(value) for value in values}
+        return RangeEstimate(
+            key=f"partnership.fit.{self.suit}.min_total",
+            min_value=max(values),
+            value=values[-1] if len(exact_values) == 1 else UNDEFINED,
+            evidence=evidence,
+            conflicts=() if len(exact_values) <= 1 else ("multiple fit totals",),
+        )
+
+    @property
+    def pattern_floor(self) -> Any:
+        latest = self.latest
+        return latest.attribute("pattern_floor") if latest is not None else UNDEFINED
+
+
+@dataclass(frozen=True)
+class PartnershipKnowledge:
+    state: StateView
+
+    @property
+    def opener(self) -> HandKnowledge:
+        return HandKnowledge(self.state, "opener")
+
+    @property
+    def responder(self) -> HandKnowledge:
+        return HandKnowledge(self.state, "responder")
+
+    @property
+    def partner(self) -> HandKnowledge:
+        return HandKnowledge(self.state, "partner")
+
+    @property
+    def actor(self) -> HandKnowledge:
+        return HandKnowledge(self.state, "actor")
+
+    def fit(self, suit: str) -> FitKnowledge:
+        return FitKnowledge(self.state, str(suit).upper())
+
+
+@dataclass(frozen=True)
 class BridgeContext:
     phase: str
     auction: Auction
@@ -257,6 +356,10 @@ class BridgeContext:
         if self.candidates is None:
             return ()
         return self.candidates.by_obligation(self.frame_obligation)
+
+    @property
+    def knowledge(self) -> PartnershipKnowledge:
+        return PartnershipKnowledge(self.state)
 
 
 @dataclass(frozen=True)

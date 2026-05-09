@@ -5,6 +5,7 @@ from typing import Any
 from .auction import Auction
 from .candidate_generation import call_for_call_specification
 from .cards import Hand
+from .context import BridgeContext
 from .effects import apply_effect
 from .evaluator import evaluate
 from .frame_runtime import advance_frame_states, recover_frame_states
@@ -34,7 +35,7 @@ def replay_auction(
             if item.has_meaning
             and matches_context(item.context, prior_auction)
             and call_for_call_specification(item, prior_auction, trace) == call
-            and evaluate(item.requires, hand or Hand.from_dict({}), trace, active_environment)
+            and _condition_passes(item.requires, prior_auction, hand or Hand.from_dict({}), trace, active_environment)
         ]
         if not matches:
             trace.warn(f"Undefined prior call {call} at auction position {index + 1}")
@@ -50,7 +51,7 @@ def replay_auction(
                 "call": call,
                 "auction_pattern": pattern,
                 "origin": origin,
-                "public_meaning": call_specification.meaning,
+                "public_meaning": call_specification.meaning.to_dict(),
             }
         )
         advance_frame_states(trace, call_specification)
@@ -58,6 +59,21 @@ def replay_auction(
         recover_frame_states(profile, trace, call, prior_auction)
         recover_private_routes(profile, trace, call, prior_auction)
     return trace
+
+
+def _condition_passes(condition, auction: Auction, hand: Hand, trace: AuctionTrace, environment: dict) -> bool:
+    if not condition:
+        return True
+    if callable(condition):
+        ctx = BridgeContext.from_trace(
+            phase="replay",
+            auction=auction,
+            hand=hand,
+            environment=environment,
+            trace=trace,
+        )
+        return bool(condition(ctx))
+    return evaluate(condition, hand, trace, environment)
 
 
 def active_environment_for(profile: PartnershipProfile, environment: dict | None, auction: Auction | None = None) -> dict:
@@ -72,7 +88,9 @@ def active_environment_for(profile: PartnershipProfile, environment: dict | None
             _vulnerability_relation(active_environment["seat"], auction.vulnerability),
         )
     active_environment["_named_evaluators"] = {
-        evaluator.id: evaluator.definition for evaluator in profile.named_evaluators if evaluator.evaluator_type == "expression"
+        evaluator.id: evaluator.definition
+        for evaluator in profile.named_evaluators
+        if evaluator.evaluator_type in {"python_function", "expression"}
     }
     return active_environment
 

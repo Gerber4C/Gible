@@ -32,8 +32,9 @@ def advance_frame_states(trace: AuctionTrace, call_specification: CallSpec) -> N
     if not trace.frame_states:
         return
 
-    action_type = call_specification.meaning.get("action_type")
-    call_act_types = set(call_specification.call_act_types) | set(call_specification.meaning.get("call_act_types", []))
+    meaning = call_specification.meaning.to_dict()
+    action_type = meaning.get("action_type")
+    call_act_types = set(call_specification.call_act_types) | set(meaning.get("call_act_types", []))
     updated = []
     for frame in trace.frame_states:
         if frame.status != "active":

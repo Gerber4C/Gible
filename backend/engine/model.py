@@ -114,6 +114,83 @@ class SourceInfo:
 
 
 @dataclass(frozen=True)
+class CallMeaning:
+    action_type: str | None = None
+    target_suit: str | None = None
+    nature_labels: tuple[str, ...] = ()
+    call_act_types: tuple[str, ...] = ()
+    forcing_status: str | None = None
+    alertable: bool = False
+    acbl_explanation: str | None = None
+    details: dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_value(cls, value: Any) -> "CallMeaning":
+        if isinstance(value, cls):
+            return value
+        if value is None:
+            return cls()
+        if not isinstance(value, dict):
+            raise TypeError(f"Call meaning must be Meaning(...), dict, or None, not {type(value).__name__}")
+        known = {
+            "action_type",
+            "target_suit",
+            "nature_labels",
+            "call_act_types",
+            "forcing_status",
+            "alertable",
+            "acbl_explanation",
+        }
+        return cls(
+            action_type=value.get("action_type"),
+            target_suit=value.get("target_suit"),
+            nature_labels=_string_tuple(value.get("nature_labels", ())),
+            call_act_types=_string_tuple(value.get("call_act_types", ())),
+            forcing_status=value.get("forcing_status"),
+            alertable=bool(value.get("alertable", False)),
+            acbl_explanation=value.get("acbl_explanation"),
+            details={key: item for key, item in value.items() if key not in known},
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        result = dict(self.details)
+        if self.nature_labels:
+            result["nature_labels"] = list(self.nature_labels)
+        if self.call_act_types:
+            result["call_act_types"] = list(self.call_act_types)
+        if self.action_type is not None:
+            result["action_type"] = self.action_type
+        if self.target_suit is not None:
+            result["target_suit"] = self.target_suit
+        if self.forcing_status is not None:
+            result["forcing_status"] = self.forcing_status
+        result["alertable"] = self.alertable
+        if self.acbl_explanation is not None:
+            result["acbl_explanation"] = self.acbl_explanation
+        return result
+
+
+@dataclass(frozen=True)
+class StateEffect:
+    key: str
+    attributes: dict[str, Any] = field(default_factory=dict)
+    namespace: str = "public"
+    owner: str | None = None
+    visibility: str = "partnership"
+
+    def to_dict(self) -> dict[str, Any]:
+        result = {
+            "key": self.key,
+            "namespace": self.namespace,
+            "visibility": self.visibility,
+            **self.attributes,
+        }
+        if self.owner is not None:
+            result["owner"] = self.owner
+        return result
+
+
+@dataclass(frozen=True)
 class Gadget:
     id: str
     namespace: str
@@ -240,11 +317,10 @@ class CallSpec:
     call_template: dict[str, Any] = field(default_factory=dict)
     call_act_types: tuple[str, ...] = ()
     capabilities: tuple[str, ...] = ()
-    requires: dict[str, Any] = field(default_factory=dict)
-    applicability: dict[str, Any] = field(default_factory=dict)
-    selection: dict[str, Any] = field(default_factory=dict)
-    meaning: dict[str, Any] = field(default_factory=dict)
-    effects: tuple[dict[str, Any], ...] = ()
+    requires: Any = field(default_factory=dict)
+    applicability: Any = field(default_factory=dict)
+    meaning: CallMeaning = field(default_factory=CallMeaning)
+    effects: tuple[Any, ...] = ()
     default_policy: bool = False
     description: str | None = None
     system_notes: str | None = None
@@ -252,9 +328,9 @@ class CallSpec:
     @classmethod
     def from_dict(cls, data: dict[str, Any], source: SourceInfo, inherited_author: Author) -> "CallSpec":
         context = _normalize_context(data.get("context", {}) or {})
-        meaning = data.get("meaning", {}) or {}
-        call_act_types = tuple(data.get("call_act_types", meaning.get("call_act_types", [])) or [])
-        capabilities = _string_tuple(data.get("capabilities", meaning.get("capabilities", [])))
+        meaning = CallMeaning.from_value(data.get("meaning"))
+        call_act_types = tuple(data.get("call_act_types", meaning.call_act_types) or [])
+        capabilities = _string_tuple(data.get("capabilities", meaning.details.get("capabilities", [])))
         return cls(
             id=data["id"],
             context=context,
@@ -266,7 +342,6 @@ class CallSpec:
             capabilities=capabilities,
             requires=data.get("requires", {}) or {},
             applicability=data.get("applicability", {}) or {},
-            selection=data.get("selection", {}) or {},
             meaning=meaning,
             effects=tuple(data.get("effects", []) or []),
             default_policy=bool(data.get("default_policy", False)),
@@ -283,12 +358,8 @@ class CallSpec:
         return self.call is not None
 
     @property
-    def has_selection(self) -> bool:
-        return bool(self.selection)
-
-    @property
     def has_meaning(self) -> bool:
-        return bool(self.meaning)
+        return bool(self.meaning.to_dict())
 
     @property
     def qualified_id(self) -> str:
@@ -348,13 +419,12 @@ class PrivateRouteSpec:
     owner: str
     goal: str
     context: dict[str, Any]
-    preconditions: dict[str, Any]
+    preconditions: Any
     entry_call: str
     workflow: dict[str, Any]
     source: SourceInfo
     author: Author
     capabilities: tuple[str, ...] = ()
-    selection: dict[str, Any] = field(default_factory=dict)
     entry_candidate: bool = False
     entry_score: int = 100
     description: str | None = None
@@ -377,7 +447,6 @@ class PrivateRouteSpec:
             source=source,
             author=Author.from_dict(data.get("author")) if data.get("author") else inherited_author,
             capabilities=_string_tuple(data.get("capabilities", [])),
-            selection=data.get("selection", {}) or {},
             entry_candidate=bool(data.get("entry_candidate", False)),
             entry_score=int(data.get("entry_score", 100)),
             description=data.get("description"),
@@ -418,7 +487,7 @@ class EvaluatorSpec:
     evaluator_type: str
     source: SourceInfo
     author: Author
-    definition: dict[str, Any] = field(default_factory=dict)
+    definition: Any = None
     description: str | None = None
     system_notes: str | None = None
 
