@@ -57,13 +57,13 @@
 
 ## Chunk 2: External and workspace identity
 
-### Task 6: GitHub repository
+### Task 6: GitHub fork
 
 **Files:** local Git `origin` configuration only.
 
-- [ ] Check for authenticated GitHub management access. Rename `profthecopyright/Partner` to `profthecopyright/Gible` if available.
-- [ ] Set `origin` to the new URL only after the remote rename succeeds; verify `git ls-remote origin`.
-- [ ] If account access is absent, give exact web UI steps and leave `origin` at the valid old URL.
+- [x] Check authenticated GitHub management access: the available credential has no admin access to `profthecopyright/Partner`; the settings page is unavailable.
+- [ ] Await the owner's Gible fork URL. Set `origin` to that fork and `upstream` to `profthecopyright/Partner`; verify both with `git ls-remote`.
+- [ ] Until the fork exists, leave `origin` at the valid old URL and give the owner exact fork/rename instructions.
 
 ### Task 7: Public website prerequisites and cutover
 

@@ -19,9 +19,11 @@ preserve system names such as Daqiush 2/1 and Meow 2/1.
 2. Check launcher, backend, frontend, and browser tests. Do not rename bridge
    domain concepts, profile IDs, API routes, or private `partner_hand` data
    solely because they contain the word "partner".
-3. Rename the GitHub repository `profthecopyright/Partner` to
-   `profthecopyright/Gible` through an authenticated management surface, then
-   update and verify the local `origin` URL. Preserve the existing Git history.
+3. The owner will create and name a personal fork `Gible` because the current
+   GitHub session has no administrator access to `profthecopyright/Partner`.
+   Once its URL is supplied, set the fork as `origin`, retain the original as
+   `upstream`, and verify both remotes. Preserve the existing Git history and
+   uncommitted work.
 4. Rename the planned public hostname in the project documents to
    `gible.hogetsu.uk`. Before pointing public DNS at this app, provide a
    production frontend-to-backend API route and decide which profiles are
@@ -53,8 +55,8 @@ published. These are deployment prerequisites, not rename substitutions.
 - Fresh launch uses the Gible command and `GIBLE_PYTHON` / `GIBLE_NODE`;
   existing `run_local` and `PARTNER_*` flows still work.
 - Tests and smoke checks pass without changing the selected Daqiush profile.
-- `origin` resolves to the renamed GitHub repository after its management-side
-  rename.
+- `origin` resolves to the owner's Gible fork and `upstream` resolves to
+  `profthecopyright/Partner` after the fork URL is supplied.
 - After a secure public deployment is available, the public site is reachable
   over HTTPS at `gible.hogetsu.uk`, with the old address redirected or
   explicitly documented if redirect control is absent.
