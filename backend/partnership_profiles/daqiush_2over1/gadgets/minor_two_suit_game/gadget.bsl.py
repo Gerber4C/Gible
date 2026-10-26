@@ -15,6 +15,8 @@ def six_five_minor_choice(ctx):
 
 
 def six_five_after_diamond_transfer(ctx):
+    # Weak 6D-5C hands intentionally have no defined 3H convention here;
+    # they fall through to the existing transfer-stop/pass route.
     return (ctx.hand is not None and ctx.hand.length('D') == 6
             and ctx.hand.length('C') == 5)
 

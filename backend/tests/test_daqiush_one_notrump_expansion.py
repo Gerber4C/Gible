@@ -20,6 +20,10 @@ class DaqiushOneNotrumpExpansionTests(unittest.TestCase):
         self.assertEqual(self.bid('1NP', responder), '3N')
         self.assertEqual(self.bid('1NP3NP', 'SAJ65H96DAQ3CKQJ3'), 'P')
 
+    def test_direct_notrump_power_precedes_direct_long_minor_placement(self):
+        very_strong_long_diamond = 'SAKQHADAKQJT98C23'
+        self.assertEqual(self.bid('1NP', very_strong_long_diamond), '7N')
+
     def test_five_card_major_inquiry_keeps_4333_in_notrump_without_four_card_support(self):
         responder = 'SQ32HA64DKJ92C987'
         self.assertEqual(self.bid('1NP', responder), '3C')
@@ -153,7 +157,7 @@ class DaqiushOneNotrumpExpansionTests(unittest.TestCase):
 
     def test_weak_six_diamonds_five_clubs_with_heart_void_remains_blocked(self):
         responder = 'S32D987654CQJ432'
-        self.assertNotEqual(self.bid('1NP2NTP3DP', responder), '3H')
+        self.assertEqual(self.bid('1NP2NTP3DP', responder), 'P')
 
     def test_six_five_minor_choice_has_route_specific_opener_responses(self):
         self.assertEqual(

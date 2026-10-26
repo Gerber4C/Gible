@@ -350,18 +350,6 @@ class OneNotrumpInvitations(Gadget):
     author = Author('Daqiush')
 
     def build(self):
-        for suit in 'CD':
-            five_minor = self.call('direct_five_' + suit.lower() + '_long_suit')
-            five_minor.when = '1NP'
-            five_minor.bid = '5' + suit
-            five_minor.applies = lambda ctx, s=suit: direct_minor_game(ctx, s)
-            five_minor.meaning.action = 'long_minor_game'
-            five_minor.meaning.nature = ['natural']
-            five_minor.meaning.acts = ['signoff', 'final_placement']
-            five_minor.meaning.target_suit = suit
-            five_minor.meaning.purpose_completed = True
-            five_minor.description = 'Eight-card minor, or qualifying strong seven-card minor: place 5m directly.'
-
         for contract in ('5NT', '6NT', '7NT'):
             power = self.call('strong_notrump_' + contract.lower())
             power.when = '1NP'
@@ -374,6 +362,19 @@ class OneNotrumpInvitations(Gadget):
             if contract != '5NT':
                 power.meaning.purpose_completed = True
             power.description = 'Raw-HCP notrump slam placement; 5NT invites grand slam.'
+
+        for suit in 'CD':
+            five_minor = self.call('direct_five_' + suit.lower() + '_long_suit')
+            five_minor.when = '1NP'
+            five_minor.bid = '5' + suit
+            five_minor.applies = lambda ctx, s=suit: (
+                direct_notrump_power(ctx) is None and direct_minor_game(ctx, s))
+            five_minor.meaning.action = 'long_minor_game'
+            five_minor.meaning.nature = ['natural']
+            five_minor.meaning.acts = ['signoff', 'final_placement']
+            five_minor.meaning.target_suit = suit
+            five_minor.meaning.purpose_completed = True
+            five_minor.description = 'Eight-card minor, or qualifying strong seven-card minor: place 5m directly.'
 
         for contract, accepts in (('6NT', False), ('7NT', True)):
             answer = self.call('strong_notrump_five_nt_' + contract.lower())
