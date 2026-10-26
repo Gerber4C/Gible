@@ -375,3 +375,35 @@
       auction: 1HP2CP2DP3NPPP
       calls_by_our_side: [1H, 2C, 2D, 3N, P]
       diagnostics: []
+
+  - name: meow_spiral_missing_continuation_stops_in_agreed_spades
+    profile: meow_2over1
+    hands:
+      n: SKT95HATDAQ92C652
+      s: SAQ83H743DJ84CAJ8
+    environment:
+      dealer: n
+      vulnerability: none
+      scoring: IMP
+    expected:
+      auction: 1DP1SP2SP2NP3HP3SPPP
+      calls_by_our_side: [1D, 1S, 2S, 2N, 3H, 3S, P]
+      diagnostics:
+      - 'No matching Call Specification for auction: 1DP1SP2SP2NP3HP; defaulting to 3S'
+      - 'Undefined prior call 3S at auction position 11'
+      - 'No matching Call Specification for auction: 1DP1SP2SP2NP3HP3SP; defaulting to P'
+
+  - name: meow_spiral_four_card_fourteen_hcp_is_maximum
+    profile: meow_2over1
+    hands:
+      n: SKJT5HATDAQ92C652
+      s: SAQ83H743DJ84CAJ8
+    environment:
+      dealer: n
+      vulnerability: none
+      scoring: IMP
+    expected:
+      auction: 1DP1SP2SP2NP3SPPP
+      calls_by_our_side: [1D, 1S, 2S, 2N, 3S, P]
+      diagnostics:
+      - 'No matching Call Specification for auction: 1DP1SP2SP2NP3SP; defaulting to P'

@@ -255,6 +255,8 @@ The profile includes:
 
 Crisscross minor raises now include both the notrump-game route and a practical fallback route to five of the agreed minor when opener declines notrump.
 
+Spiral strength is relative to the preceding 12-14 HCP simple major raise: 12-13 HCP is minimum and 14 HCP is maximum. This applies after either minor opening, for either major, with three- or four-card support. Higher HCP values in an imported auction also classify as maximum. The current classification uses HCP only; it does not adjust for distribution, controls, or suit quality. Some continuations after the answer still use the engine fallback instead of a complete game-placement policy.
+
 ## Slam Tools
 
 Slam tools are standalone Gadgets and communicate through state such as `agreed_suit`, `notrump_focus`, `keycard_context`, and active Frames.
@@ -272,8 +274,8 @@ Control bidding is generated from a compact Python table across agreed suits, wi
 
 The benchmark is covered by:
 
-- 159 curated single-call bidding fixtures,
-- 27 full-auction simulations,
+- 177 curated single-call bidding fixtures,
+- 29 full-auction simulations,
 - parser, legality, and matcher fixtures,
 - infrastructure tests for Policy Functions, Private Route memory, Frames, and generated system notes.
 

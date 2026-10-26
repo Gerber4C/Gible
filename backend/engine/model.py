@@ -265,6 +265,12 @@ class PartnershipProfile:
     evaluator_specs: tuple["EvaluatorSpec", ...] = ()
     description: str | None = None
     system_notes: str | None = None
+    axioms: dict[str, Any] = field(default_factory=dict)
+    missing_call_behavior: str = 'fallback'
+
+    def __post_init__(self) -> None:
+        if self.missing_call_behavior not in ('fallback', 'block'):
+            raise ValueError('missing_call_behavior must be fallback or block')
 
     @property
     def source_info(self) -> SourceInfo:
@@ -319,11 +325,14 @@ class CallSpec:
     capabilities: tuple[str, ...] = ()
     requires: Any = field(default_factory=dict)
     applicability: Any = field(default_factory=dict)
+    private_purpose: Any = None
     meaning: CallMeaning = field(default_factory=CallMeaning)
     effects: tuple[Any, ...] = ()
     default_policy: bool = False
     description: str | None = None
     system_notes: str | None = None
+    source_paths: tuple[str, ...] = ()
+    priority: int = 0
 
     @classmethod
     def from_dict(cls, data: dict[str, Any], source: SourceInfo, inherited_author: Author) -> "CallSpec":
@@ -342,11 +351,13 @@ class CallSpec:
             capabilities=capabilities,
             requires=data.get("requires", {}) or {},
             applicability=data.get("applicability", {}) or {},
+            private_purpose=data.get("private_purpose"),
             meaning=meaning,
             effects=tuple(data.get("effects", []) or []),
             default_policy=bool(data.get("default_policy", False)),
             description=data.get("description"),
             system_notes=data.get("system_notes"),
+            priority=int(data.get("priority", 0)),
         )
 
     @property
@@ -366,7 +377,10 @@ class CallSpec:
         return self.source.origin_dict("call_spec", self.id)["qualified_id"]
 
     def origin_dict(self) -> dict[str, Any]:
-        return self.source.origin_dict("call_spec", self.id)
+        origin = self.source.origin_dict("call_spec", self.id)
+        if self.source_paths:
+            origin['source_paths'] = list(self.source_paths)
+        return origin
 
 
 @dataclass(frozen=True)

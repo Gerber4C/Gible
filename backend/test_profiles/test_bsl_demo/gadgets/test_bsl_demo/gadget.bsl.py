@@ -3,7 +3,7 @@ Gadget(
     namespace="test",
     name="Test BSL Demo",
     version="0.1.0",
-    author=Author("Partner Prototype"),
+    author=Author("Gible Prototype"),
     description="Small gadget authored in restricted Python-shaped BSL.",
     system_notes="Demo gadget used to validate dataclass-style BSL loading.",
 )

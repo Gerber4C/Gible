@@ -117,6 +117,15 @@ The bidding flow is:
 - Applies legality filtering.
 - Handles relative-call templates through `call_space.py`.
 
+`backend/engine/axioms.py`
+
+Mandatory constraints run in `axioms.py` before Policy and again on its result.
+`axiom_facts.py` extracts seat-scoped public evidence; `axiom_validation.py`
+checks authored definitions; `hand_quality.py` implements Kaplan–Rubens.
+The selector applies the same constraints to fallback candidates. An empty
+compliant pool produces a blocked decision with no call; the simulator keeps
+the preceding history and returns the structured failure. See `11_axioms.md`.
+
 `backend/engine/decision.py`
 
 - Resolves same-call meaning ambiguity.
@@ -231,6 +240,67 @@ The current selection model is deliberately simple:
 2. Private Routes may add route-aware candidates.
 3. Same-call ambiguity is diagnosed unless one route candidate clearly implements the same public call.
 4. Policy Functions choose from the candidate pool.
-5. Fallback is used only when no policy function applies.
+5. If candidates exist but no Policy Function selects one, the existing score ordering is used.
+6. If no eligible candidates exist, use the profile's default candidate. Before a default Pass, try the cheapest legal bid in the latest public `agreed_suit`.
 
-This avoids hidden priority fields. Judgment belongs in Policy Functions, not inside one candidate.
+The agreed-trump fallback does not raise a contract already held by our side
+in that denomination, including a doubled contract. If no suit is agreed,
+the auction is complete, or no legal return exists, retain the original
+fallback. Explicit candidates and non-Pass profile defaults take precedence.
+This is a minimum-contract heuristic, not a strength or trick evaluator.
+
+Its source is `heuristic_fallback`, its meaning action is
+`fallback_return_to_agreed_trump`, and its metadata includes the agreement
+evidence. Missing-rule diagnostics are retained. Replaying a heuristic bid
+may still report an undefined prior call because it is not a new authored
+Call Specification; this keeps profile coverage gaps visible.
+
+Authored bidding judgment belongs in Policy Functions. The engine heuristic
+only supplies this limited recovery when authored candidates are absent.
+
+## Simulation Scope
+
+`public_evidence.py` replays only authored public meanings, then binds their
+declared evidence to the seat that made each call. `deal_sampler.py` keeps the
+acting hand fixed and rejects hypothetical full deals that contradict those
+promises. `dds_adapter.py` converts each accepted deal to PBN for official
+`dds3` or the optional endplay DDS wheel; `contract_evaluation.py` counts each
+explicit target's make/fail result separately. `/api/analysis/contracts` returns
+only counts, rates, seed, and public evidence labels. It rejects concealed
+hands and caller-supplied meaning objects. This path is analysis-only and does
+not feed a candidate to the bidding selector.
+
+`simulate_auction` plays supplied hands through the bidding engine, passing
+for seats without supplied hands. The runner retains the hands and supplies only
+the acting seat's hand to each decision. It does not inject `partner_hand`.
+Normal bidding and replay also remove that key from caller-supplied environments
+before conditions, effects, evaluators, and policies run. Public environment
+settings and public partner evidence in state/knowledge remain available.
+
+Legacy expressions `partner.hcp`, `partner.<suit>.length`, and operations with
+`hand: partner` raise an explicit hidden-hand error. They must be replaced with
+inference from public auction evidence, not given a fabricated zero or empty hand.
+This is not inference or sampling, and is not a sandbox against arbitrary authored
+Python code or other caller-provided custom data. A comprehensive permitted-view
+interface remains future work.
+
+The Table's random-deal generator shuffles all 52 cards without auction
+constraints. There is currently no sampler that generates possible partner
+hands consistent with public bidding evidence, and no Monte Carlo contract
+evaluation or double-dummy solver integration.
+
+### Direction after the 2026-10-22 product update
+
+The identified `partner_hand` path has been removed from normal bidding. No
+separate oracle mode has been added. The broader seat-information boundary still
+needs explicit interfaces before multi-user practice or statistical simulation.
+
+Future responsibilities include permitted seat views, per-partnership profile
+bindings, public explanations for mixed-profile replay, evidence-constrained deal
+sampling, bounded continuation evaluation, and a replaceable contract evaluator
+(initially DDS, later contract-specific completion probabilities). Private memory remains seat-owned;
+full deals remain with the table/evaluation controller. See
+[Product Vision](12_product_vision.md) for the proposed boundaries and
+[Roadmap](08_roadmap_todo.md) for milestones. The local and cloud execution
+locations should share decision interfaces without making profile upload a
+prerequisite for all use.

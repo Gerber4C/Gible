@@ -1,59 +1,49 @@
 @echo off
-setlocal
+setlocal DisableDelayedExpansion
+set "GIBLE_ARGS=%*"
+set "GIBLE_FOUND="
+set "GIBLE_EXIT=1"
 
-cd /d "%~dp0"
+if defined GIBLE_PYTHON goto custom_gible_python
+if defined PARTNER_PYTHON goto custom_python
+if exist "%~dp0.venv\Scripts\python.exe" call :try_python "%~dp0.venv\Scripts\python.exe"
+if defined GIBLE_FOUND goto done
+if exist "%~dp0venv\Scripts\python.exe" call :try_python "%~dp0venv\Scripts\python.exe"
+if defined GIBLE_FOUND goto done
+call :try_python py -3
+if defined GIBLE_FOUND goto done
+call :try_python python
+if defined GIBLE_FOUND goto done
+call :try_python python3
+if defined GIBLE_FOUND goto done
+echo Python 3.10 or newer was not found.
+echo Install Python from https://www.python.org/downloads/ and enable Add Python to PATH.
+echo Or set GIBLE_PYTHON to the full path of your python.exe.
+goto done
 
-set "PYTHON_EXE=C:\Users\paw_l\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe"
-set "NODE_EXE=C:\Users\paw_l\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe"
-set "BACKEND_URL=http://127.0.0.1:8765/api/profiles"
-set "FRONTEND_URL=http://127.0.0.1:5173"
+:custom_gible_python
+call :try_python "%GIBLE_PYTHON%"
+if defined GIBLE_FOUND goto done
+echo GIBLE_PYTHON must point to a working Python 3.10 or newer executable.
+goto done
 
-if not exist "%PYTHON_EXE%" (
-  echo Python runtime was not found:
-  echo %PYTHON_EXE%
-  exit /b 1
-)
+:custom_python
+call :try_python "%PARTNER_PYTHON%"
+if defined GIBLE_FOUND goto done
+echo PARTNER_PYTHON must point to a working Python 3.10 or newer executable.
+goto done
 
-if not exist "%NODE_EXE%" (
-  echo Node runtime was not found:
-  echo %NODE_EXE%
-  exit /b 1
-)
+:try_python
+%* -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" >nul 2>nul
+if errorlevel 1 exit /b 1
+set "GIBLE_FOUND=1"
+%* "%~dp0run_local.py" %GIBLE_ARGS%
+set "GIBLE_EXIT=%ERRORLEVEL%"
+exit /b 0
 
-if /I "%~1"=="--check" (
-  echo Runtime paths are available.
-  exit /b 0
-)
-
-echo Starting Partner local workspace...
+:done
+if "%GIBLE_EXIT%"=="0" exit /b 0
+if /I "%~1"=="--check" exit /b %GIBLE_EXIT%
 echo.
-
-powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Invoke-WebRequest -Uri '%BACKEND_URL%' -UseBasicParsing -TimeoutSec 2 | Out-Null; exit 0 } catch { exit 1 }" >nul 2>nul
-if errorlevel 1 (
-  echo Starting backend at http://127.0.0.1:8765
-  start "Partner Backend" /B "%PYTHON_EXE%" backend\server.py
-) else (
-  echo Backend is already running at http://127.0.0.1:8765
-)
-
-timeout /t 1 /nobreak >nul
-
-powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Invoke-WebRequest -Uri '%FRONTEND_URL%' -UseBasicParsing -TimeoutSec 2 | Out-Null; exit 0 } catch { exit 1 }" >nul 2>nul
-if errorlevel 1 (
-  echo Starting frontend at http://127.0.0.1:5173
-  start "Partner Frontend" /B "%NODE_EXE%" frontend\server.mjs
-) else (
-  echo Frontend is already running at http://127.0.0.1:5173
-)
-
-echo.
-echo Open this in your browser:
-echo %FRONTEND_URL%
-echo.
-echo Keep this CMD window open while using Partner.
-echo Close the window when you are done.
-echo.
-
-:keep_alive
-timeout /t 3600 /nobreak >nul
-goto keep_alive
+pause
+exit /b %GIBLE_EXIT%

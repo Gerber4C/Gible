@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gible · 1NT 可疑牌例复采样</title>
+<style>
+:root{color-scheme:light;--ink:#18352e;--muted:#61746a;--green:#126b58;--green-dark:#0c493d;--green-light:#e5f2e9;--paper:#fffefa;--canvas:#edf2ed;--line:#d1ddd3;--rust:#a8522f;--rust-light:#fff0e7;--blue:#315b83}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--canvas);color:var(--ink);font:15px/1.6 "Segoe UI","Microsoft YaHei",sans-serif}
+button,input,select,textarea{font:inherit}
+button{cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:3px solid #63ad95;outline-offset:2px}
+.topline{height:5px;background:linear-gradient(90deg,#105845 0 64%,#c27c4b 64% 82%,#dfbd7d 82%)}
+.wrap{max-width:1510px;margin:auto;padding:0 28px}
+.hero{padding:32px 0 27px;background:var(--paper);border-bottom:1px solid var(--line)}
+.eyebrow{text-transform:uppercase;letter-spacing:.16em;font-size:11px;font-weight:800;color:var(--green)}
+h1,h2,h3{font-family:Georgia,"Microsoft YaHei",serif;line-height:1.25}
+h1{font-size:clamp(29px,3vw,43px);margin:7px 0 8px;letter-spacing:-.025em}
+.hero p{margin:0;color:var(--muted);max-width:920px}
+.hero-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:17px}
+.hero-meta span{background:#eef5ef;color:var(--green-dark);border:1px solid #d6e6d9;border-radius:999px;padding:3px 11px;font-size:12px;font-weight:700}
+.dashboard{padding-top:25px}
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.metric{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:17px 20px;box-shadow:0 2px 4px #173c2408}
+.metric strong{display:block;font:700 29px/1.1 Georgia,serif;color:var(--green-dark);margin-bottom:6px}
+.metric span{color:var(--muted);font-size:13px}
+.metric.warn strong{color:var(--rust)}
+.method{margin:15px 0 0;background:#f8fbf7;border:1px solid var(--line);border-radius:8px;color:var(--muted)}
+.method summary{padding:11px 15px;cursor:pointer;color:var(--green-dark);font-weight:700}
+.method p{padding:0 15px 13px;margin:0;font-size:13px;max-width:1100px}
+.review-utilities{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:14px;padding:13px 16px;background:#e6eee8;border:1px solid #bed1c2;border-radius:9px}
+.review-utilities strong{margin-right:auto;color:var(--green-dark)}
+.review-utilities button,.review-import-label,.review-nav button{border:1px solid #a4c2ae;background:white;color:var(--green-dark);border-radius:6px;padding:6px 11px;font-weight:700;font-size:12px}
+.review-utilities button:hover,.review-import-label:hover,.review-nav button:hover{background:#f2f8f3}
+.review-import-label{cursor:pointer}.review-import-label input{display:none}
+.save-state{width:100%;color:var(--muted);font-size:12px}
+.workspace{display:grid;grid-template-columns:292px minmax(0,1fr);gap:20px;align-items:start;padding-top:23px;padding-bottom:60px}
+.sidebar,.detail{background:var(--paper);border:1px solid var(--line);border-radius:12px;box-shadow:0 3px 15px #11372b0a}
+.sidebar{position:sticky;top:16px;overflow:hidden}
+.side-head{padding:19px 18px 15px;border-bottom:1px solid var(--line)}
+.side-head h2{font-size:21px;margin:0 0 12px}
+.search{display:block;width:100%;border:1px solid #bfcfc4;border-radius:7px;padding:9px 12px;background:white;color:var(--ink)}
+.filter{width:100%;margin-top:8px;border:1px solid #bfcfc4;border-radius:7px;padding:8px 10px;background:white;color:var(--ink)}
+.side-count{padding:9px 18px;color:var(--muted);font-size:12px}
+.group-list{max-height:calc(100vh - 250px);min-height:220px;overflow-y:auto;overscroll-behavior:contain;padding:0 8px 10px}
+.group-item{width:100%;text-align:left;display:grid;grid-template-columns:1fr auto;gap:3px 6px;background:transparent;border:1px solid transparent;border-radius:8px;padding:9px 10px;color:var(--ink);margin:2px 0}
+.group-item:hover{background:#f1f7f1}
+.group-item.active{background:var(--green-light);border-color:#a3c8b1}
+.group-item strong{font-size:14px}
+.group-item small{grid-column:1;color:var(--muted);font-size:11px}
+.group-item .mini{font-size:11px;font-weight:700;align-self:start;white-space:nowrap}
+.mini.persist{color:var(--rust)}.mini.clear{color:var(--green)}.mini.mixed{color:var(--blue)}
+.review-mini{font-size:11px;color:#765228;font-weight:750}
+.empty-list{padding:20px 12px;color:var(--muted);font-size:13px}
+.detail{min-height:520px;padding:26px 30px}
+.detail-top{display:flex;align-items:flex-start;justify-content:space-between;gap:15px}
+.detail h2{font-size:30px;margin:4px 0 5px}
+.detail-sub{color:var(--muted);font-size:13px}
+.status{display:inline-block;font-weight:750;font-size:12px;padding:5px 10px;border-radius:100px;white-space:nowrap}
+.status.persist{color:#8a421f;background:var(--rust-light)}
+.status.clear{color:#11604b;background:#dff2e6}
+.status.mixed{color:#315b83;background:#e7eff7}
+.summary-strip{display:flex;flex-wrap:wrap;gap:8px;margin:19px 0}
+.summary-strip span{border:1px solid var(--line);background:#f6faf6;border-radius:6px;padding:6px 10px;font-size:12px;color:var(--muted)}
+.summary-strip b{color:var(--ink)}
+.constraints{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.constraint{background:#f7faf6;border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.constraint b{display:block;color:var(--green-dark);margin-bottom:4px}
+.constraint span{color:var(--muted);font-size:12px}
+.review-panel{border:1px solid #c3d4bd;background:linear-gradient(140deg,#f7fbf5,#fffdf6);border-radius:10px;padding:18px 20px;margin-top:22px}
+.review-head{display:flex;justify-content:space-between;align-items:start;gap:12px;flex-wrap:wrap}
+.review-head h3{font-size:21px;margin:1px 0 4px}.review-head p{margin:0;color:var(--muted);font-size:12px}
+.review-nav{display:flex;gap:6px;flex-wrap:wrap}.review-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+.review-field{display:flex;flex-direction:column;gap:5px;color:var(--green-dark);font-size:12px;font-weight:750}
+.review-field.wide{grid-column:1/-1}
+.review-field input,.review-field select,.review-field textarea{width:100%;border:1px solid #bacdbb;border-radius:6px;background:white;color:var(--ink);padding:8px 10px;font-weight:400;font-size:14px}
+.review-field textarea{min-height:75px;resize:vertical;line-height:1.55}
+.review-field textarea.proposal{min-height:108px}
+.review-decision{display:flex;gap:6px;flex-wrap:wrap;margin-top:15px;align-items:center}
+.review-decision span{font-size:12px;color:var(--muted);font-weight:750;margin-right:3px}
+.review-decision button{border:1px solid #abc6ae;border-radius:999px;background:#fff;padding:5px 12px;color:var(--ink);font-size:12px;font-weight:700}
+.review-decision button.active{background:var(--green);border-color:var(--green);color:white}
+.review-decision button[data-decision="rejected"].active{background:#86513e;border-color:#86513e}
+.review-source{font-size:12px;color:var(--muted);margin-top:11px}
+.section-title{font-size:20px;margin:28px 0 7px}
+.section-lead{color:var(--muted);font-size:13px;margin:0 0 12px}
+.warning-card{border:1px solid var(--line);border-radius:9px;padding:14px 16px;margin:9px 0;background:#fff}
+.warning-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.warning-head strong{font-size:14px}
+.warning-head small{color:var(--muted)}
+.rates{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:13px}
+.rate-label{display:flex;justify-content:space-between;color:var(--muted);font-size:12px}
+.rate-label b{font-size:16px;color:var(--ink)}
+.track{height:9px;background:#e8eee8;border-radius:50px;overflow:hidden;margin-top:5px}
+.track i{display:block;height:100%;background:#9aac9e;border-radius:50px}
+.track.fresh i{background:var(--green)}
+.card-foot{margin-top:10px;font-size:12px;color:var(--muted)}
+.contract-pills{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.contract-pills span{border:1px solid #bed6c7;background:#ecf5ef;color:var(--green-dark);padding:3px 8px;border-radius:5px;font-size:12px;font-weight:700}
+.deal-toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 9px}
+.deal-toolbar label{font-size:13px;color:var(--muted);cursor:pointer}
+.deal-list{display:grid;gap:8px}
+.deal{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff}
+.deal[open]{border-color:#88b69a;box-shadow:0 4px 13px #144c2b0d}
+.deal summary{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:11px 13px;cursor:pointer;list-style:none}
+.deal summary::-webkit-details-marker{display:none}
+.deal summary::before{content:"+";display:grid;place-items:center;width:19px;height:19px;border:1px solid #a8c8b2;border-radius:5px;color:var(--green);font-weight:800}
+.deal[open] summary::before{content:"−"}
+.deal-id{font-family:Consolas,monospace;font-size:12px;font-weight:800;color:var(--green-dark);min-width:78px}
+.deal-info{font-size:12px;color:var(--muted);flex:1}
+.deal-result{border-radius:5px;background:#eaf4ec;color:var(--green-dark);padding:2px 8px;font-size:12px;font-weight:800}
+.deal-result.blocked{background:var(--rust-light);color:var(--rust)}
+.deal-body{border-top:1px solid var(--line);padding:14px 16px 17px;background:#fbfdfa}
+.hands{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.hand{border:1px solid #d9e5da;border-radius:8px;background:white;padding:12px}
+.hand strong{display:block;margin-bottom:5px}
+.suit-row{display:grid;grid-template-columns:22px 1fr;gap:8px;font:16px/1.5 Consolas,monospace}
+.suit-row .red{color:#b9494c}.suit-row .black{color:#352d66}
+.auction{display:flex;flex-wrap:wrap;gap:5px;margin-top:12px}
+.bid{display:inline-flex;align-items:center;gap:5px;border:1px solid #d9e3d9;border-radius:5px;background:white;padding:3px 7px;font-weight:700}
+.bid small{font-size:10px;color:var(--muted);font-weight:500}
+.bid.pass{color:#6c806d}.bid.red{color:#b04546}.bid.black{color:#332e69}.bid.minor{color:#aa661d}
+.diagnostic{margin-top:12px;background:var(--rust-light);border-left:3px solid var(--rust);padding:9px 11px;color:#774121;font-size:12px}
+.minor-note{margin-top:8px;color:var(--muted);font-size:12px}
+.no-deals{color:var(--muted);padding:17px;background:#f7faf6;border-radius:7px}
+@media(max-width:1000px){.workspace{grid-template-columns:235px minmax(0,1fr);gap:12px}.detail{padding:21px}.wrap{padding-left:15px;padding-right:15px}}
+@media(max-width:740px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.workspace{display:block}.sidebar{position:static;margin-bottom:12px}.group-list{min-height:0;max-height:240px}.detail{min-height:0;padding:18px}.rates,.hands,.constraints,.review-grid{grid-template-columns:1fr}.hero{padding:24px 0}.metric{padding:13px}.deal-info{flex-basis:100%;order:3}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<div class="topline"></div>
+<header class="hero"><div class="wrap">
+  <div class="eyebrow">Gible / Daqiush 2/1 / 1NT coverage</div>
+  <h1>可疑牌例 · 复采样报告</h1>
+  <p>固定南北牌型与点力范围，重新发牌、自动叫牌，再用 DDS 检查原警报是否重现。</p>
+  <div class="hero-meta" id="hero-meta"></div>
+</div></header>
+<main>
+  <div class="wrap dashboard">
+    <div class="metrics" id="metrics"></div>
+    <details class="method"><summary>怎样阅读这些概率与样本？</summary><p>每组新增 20 对不同的南北牌，每对牌随机补全两次东西牌，因此概率分母通常为 40 个 DDS 牌局，但独立的南北样本只有 20 对。每手牌的四门长度与原组一致；将原牌和新牌合在一起看，北家、南家的 HCP 与 K–R 各自都是最高分减最低分不超过 2，且北家实际选择开叫 1NT。“原概率／新概率”固定原来的定约和庄位比较；下方新牌的自动叫牌结果是另一项观察。DDS 是双明手筛查，不能直接当作实战完成率。原警报阈值：定约失败率大于 50%；未叫到可成的局、小满贯或大满贯，大于 30%。</p></details>
+    <div class="review-utilities" aria-label="建议审核工具">
+      <strong>体系修改意见 · 审核草稿</strong>
+      <button id="review-export" type="button">导出审核 JSON</button>
+      <label class="review-import-label" for="review-import">导入审核 JSON<input id="review-import" type="file" accept=".json,application/json"></label>
+      <span class="save-state" id="review-save-state" role="status">修改自动暂存于当前浏览器；请导出 JSON 留档。</span>
+    </div>
+  </div>
+  <div class="wrap workspace">
+    <aside class="sidebar" aria-label="牌例组导航">
+      <div class="side-head"><h2>牌例组</h2>
+        <input class="search" id="group-search" type="search" placeholder="搜索 G031 或 #219" aria-label="搜索组号或原牌例编号">
+        <select class="filter" id="status-filter" aria-label="筛选牌例组">
+          <option value="all">全部类别</option><option value="persist">警报仍在</option>
+          <option value="mixed">部分仍在</option><option value="clear">均未复现</option>
+          <option value="blocked">有叫牌阻塞</option>
+        </select>
+      </div>
+      <div class="side-count" id="group-count"></div>
+      <nav class="group-list" id="group-list" aria-label="牌例组列表"></nav>
+    </aside>
+    <section class="detail" id="group-detail" aria-live="polite"></section>
+  </div>
+</main>
+<script id="report-data" type="application/json">__SUSPICIOUS_RESAMPLE_JSON__</script>
+<script>
+(function(){
+  "use strict";
+  const report=JSON.parse(document.getElementById("report-data").textContent);
+  const groups=report.groups;
+  const list=document.getElementById("group-list");
+  const detail=document.getElementById("group-detail");
+  const search=document.getElementById("group-search");
+  const filter=document.getElementById("status-filter");
+  const count=document.getElementById("group-count");
+  const saveState=document.getElementById("review-save-state");
+  const reviewKey="gible-resample-review:"+report.reviews.report_signature;
+  const reviewKinds={change:"建议改叫",keep:"保留现状",investigate:"先核实规则"};
+  const reviewDecisions={pending:"待审核",approved:"同意",needs_changes:"需修改",rejected:"不采纳"};
+  const implementationNames={not_started:"尚未处理",partial:"部分实现",complete:"已经实现",accepted_no_change:"接受现状"};
+  let reviews=JSON.parse(JSON.stringify(report.reviews));
+  try{const cached=JSON.parse(localStorage.getItem(reviewKey)||"null");if(validReview(cached))reviews=cached;}catch(_error){}
+  let selected=groups.find(g=>"#"+g.id===location.hash)||groups[0];
+  const flagNames={contract_failure:"原定约宕牌",wrong_game:"打错局",missed_game:"可能漏叫进局",missed_small_slam:"可能漏叫小满贯",missed_grand_slam:"可能漏叫大满贯"};
+  function e(x){return String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+  function pct(x){return x==null?"—":Math.round(x*100)+"%";}
+  function status(g){const old=g.source_checks.reduce((n,c)=>n+c.original_flags.length,0);const now=g.source_checks.reduce((n,c)=>n+c.retained_flags.length,0);return now===0?"clear":now===old?"persist":"mixed";}
+  function statusText(s){return {persist:"警报仍在",clear:"未复现",mixed:"部分仍在"}[s];}
+  function validReview(data){
+    if(!data||data.schema_version!==1||data.report_signature!==report.reviews.report_signature||
+       !data.groups||typeof data.groups!=="object"||Array.isArray(data.groups))return false;
+    const known=new Set(groups.map(g=>g.id));
+    return Object.entries(data.groups).every(([id,r])=>known.has(id)&&r&&typeof r==="object"&&
+      ["title","diagnosis","target_auction","proposed_call","proposal","reviewer_note"].every(k=>r[k]===undefined||typeof r[k]==="string")&&
+      (r.basis===undefined||Array.isArray(r.basis)&&r.basis.every(x=>typeof x==="string"))&&
+      (r.kind===undefined||Object.hasOwn(reviewKinds,r.kind))&&
+      (r.decision===undefined||Object.hasOwn(reviewDecisions,r.decision))&&
+      (r.implementation===undefined||Object.hasOwn(implementationNames,r.implementation))&&
+      (r.kind!=="change"||Boolean(r.proposed_call)));
+  }
+  function reviewFor(id){return Object.assign({title:"",diagnosis:"",kind:"investigate",target_auction:"",proposed_call:"",proposal:"",basis:[],decision:"pending",implementation:"not_started",reviewer_note:""},reviews.groups[id]||{});}
+  function persistReview(){
+    try{localStorage.setItem(reviewKey,JSON.stringify(reviews));saveState.textContent="已暂存于当前浏览器；导出 JSON 可供后续扫描或代码修改使用。";}
+    catch(_error){saveState.textContent="当前浏览器不能暂存；请立即导出审核 JSON。";}
+  }
+  function range(x){return e((x||[]).join("–"));}
+  function shape(x){return e((x||[]).join("-"));}
+  function htmlSuit(s){return {S:"♠",H:"♥",D:"♦",C:"♣",N:"NT"}[s]||e(s);}
+  function callHtml(call,seat){
+    const m=/^([1-7])([SHDCN])$/.exec(call);
+    const kind=m?(m[2]==="H"||m[2]==="D"?"red":m[2]==="S"?"black":"minor"):"pass";
+    const label=m?m[1]+htmlSuit(m[2]):call==="P"?"Pass":e(call);
+    return '<span class="bid '+kind+'"><small>'+["北","东","南","西"][seat%4]+'</small>'+label+'</span>';
+  }
+  function handHtml(compact,label){
+    const m=/^S(.*?)H(.*?)D(.*?)C(.*)$/.exec(compact||"");
+    if(!m)return '<div class="hand"><strong>'+e(label)+'</strong>'+e(compact)+'</div>';
+    const syms=["♠","♥","♦","♣"];
+    return '<div class="hand"><strong>'+e(label)+'</strong>'+m.slice(1).map((r,i)=>
+      '<div class="suit-row"><span class="'+(i===1||i===2?"red":"black")+'">'+syms[i]+'</span><span>'+e(r||"—")+'</span></div>').join("")+'</div>';
+  }
+  function renderMetrics(){
+    const s=report.summary;
+    const all=groups.filter(g=>status(g)==="persist").length,clear=groups.filter(g=>status(g)==="clear").length;
+    document.getElementById("metrics").innerHTML=[
+      [s.resampled_groups,"已复采样类别",""],[all,"原警报全部仍在","warn"],
+      [clear,"原警报均未复现",""],[s.blocked,"新牌叫牌阻塞","warn"]
+    ].map(x=>'<div class="metric '+x[2]+'"><strong>'+e(x[0])+'</strong><span>'+x[1]+'</span></div>').join("");
+    document.getElementById("hero-meta").innerHTML=
+      '<span>原始种子 '+e(report.source_seed)+'</span><span>新种子 '+e(report.seed)+
+      '</span><span>'+e(s.pairs)+' 对南北牌</span><span>'+e(s.dds_boards)+' 个 DDS 牌局</span>';
+  }
+  function renderList(){
+    const q=search.value.trim().toLowerCase().replace(/^#/,"");
+    const f=filter.value;
+    const shown=groups.filter(g=>(!q||g.id.toLowerCase().includes(q)||g.source_ids.some(id=>String(id).includes(q)))&&
+      (f==="all"||f==="blocked"&&g.summary.blocked>0||status(g)===f));
+    count.textContent="显示 "+shown.length+" / "+groups.length+" 组";
+    list.innerHTML=shown.length?shown.map(g=>{
+      const s=status(g), old=g.source_checks.reduce((n,c)=>n+c.original_flags.length,0),
+      now=g.source_checks.reduce((n,c)=>n+c.retained_flags.length,0);
+      return '<button type="button" class="group-item '+(selected&&g.id===selected.id?"active":"")+
+        '" data-group="'+e(g.id)+'" aria-current="'+(selected&&g.id===selected.id?"true":"false")+'">'+
+        '<strong>'+e(g.id)+'</strong><span class="mini '+s+'">'+statusText(s)+'</span>'+
+        '<small>原牌 #'+g.source_ids.map(e).join("、")+" · 警报 "+now+"/"+old+
+        (g.summary.blocked?" · 阻塞 "+e(g.summary.blocked):"")+" · "+
+        '<span class="review-mini">'+e(reviewDecisions[reviewFor(g.id).decision])+'</span></small></button>';
+    }).join(""):'<div class="empty-list">没有符合条件的牌例组。</div>';
+  }
+  function warningHtml(check,flag,g){
+    const old=check.original_rates[flag],now=check.new_rates[flag],persist=check.retained_flags.includes(flag);
+    const oldN=check.original_boards??"—",newN=check.new_boards??g.summary.dds_boards;
+    const bar=v=>Math.max(0,Math.min(100,Math.round((v||0)*100)));
+    return '<article class="warning-card"><div class="warning-head"><strong>#'+e(check.source_id)+' · '+
+      e(flagNames[flag]||flag)+'</strong><span class="status '+(persist?"persist":"clear")+'">'+
+      (persist?"仍超过阈值":"新样本未复现")+'</span></div>'+
+      '<div class="card-foot">原进程 '+e(check.auction)+' · 定约 '+e(check.contract)+
+      ' · 庄位 '+(check.declarer==="n"?"北":"南")+'</div>'+
+      '<div class="rates"><div><div class="rate-label"><span>原概率 · '+e(oldN)+' 牌局</span><b>'+pct(old)+'</b></div>'+
+      '<div class="track"><i style="width:'+bar(old)+'%"></i></div></div>'+
+      '<div><div class="rate-label"><span>新概率 · '+e(newN)+' 牌局</span><b>'+pct(now)+'</b></div>'+
+      '<div class="track fresh"><i style="width:'+bar(now)+'%"></i></div></div></div></article>';
+  }
+  function dealHtml(d){
+    const blocked=d.status==="blocked";
+    const failure=d.chosen_contract_rates&&d.chosen_contract_rates.contract_failure;
+    const wrong=d.chosen_contract_rates&&d.chosen_contract_rates.wrong_game;
+    const alternatives=Object.entries(d.chosen_contract_rates?.alternative_game_rates||{})
+      .filter(([,rate])=>rate>0).map(([contract,rate])=>e(contract)+" "+pct(rate)).join("、");
+    const diag=blocked&&d.blocked&&d.blocked.diagnostics?d.blocked.diagnostics.join("；"):"";
+    return '<details class="deal" data-blocked="'+blocked+'"><summary>'+
+      '<span class="deal-id">'+e(d.id)+'</span><span class="deal-info">北 '+e(d.north_hcp)+
+      ' HCP / K–R '+e(d.north_kr)+' · 南 '+e(d.south_hcp)+' HCP / K–R '+e(d.south_kr)+'</span>'+
+      '<span class="deal-result '+(blocked?"blocked":"")+'">'+(blocked?"阻塞":e(d.contract||d.status))+'</span></summary>'+
+      '<div class="deal-body"><div class="hands">'+handHtml(d.hands.n,"北家")+handHtml(d.hands.s,"南家")+'</div>'+
+      '<div class="auction" aria-label="叫牌进程">'+d.calls.map((c,i)=>callHtml(c,i)).join("")+'</div>'+
+      (blocked?'<div class="diagnostic"><b>停在这里：</b>'+e(diag||"未找到可用叫品")+'</div>':
+      '<div class="minor-note">所选定约在本副牌的 DDS 补样中宕牌：'+pct(failure)+
+      (wrong==null?'':' · 打错局：'+pct(wrong)+(alternatives?'（替代局：'+alternatives+'）':''))+
+      '</div>')+'</div></details>';
+  }
+  function renderDeals(g){
+    const blockedOnly=document.getElementById("blocked-only").checked;
+    const deals=g.deals.filter(d=>!blockedOnly||d.status==="blocked");
+    document.getElementById("deal-count").textContent="显示 "+deals.length+" / "+g.deals.length+" 副";
+    document.getElementById("deal-list").innerHTML=deals.length?deals.map(dealHtml).join(""):
+      '<div class="no-deals">这一组没有阻塞牌。</div>';
+  }
+  function reviewHtml(g){
+    const r=reviewFor(g.id);
+    const options=(items,value)=>Object.entries(items).map(([key,label])=>
+      '<option value="'+key+'"'+(key===value?' selected':'')+'>'+e(label)+'</option>').join("");
+    return '<section class="review-panel" aria-label="本组修改意见">'+
+      '<div class="review-head"><div><div class="eyebrow">SYSTEM REVIEW</div><h3>这组牌建议怎么叫</h3>'+ 
+      '<p>建议是审核草稿；只有审核后另行修改体系代码，才会改变机器人叫牌。</p></div>'+ 
+      '<div class="review-nav"><button type="button" data-review-nav="previous">上一组</button>'+ 
+      '<button type="button" data-review-nav="next">下一组</button>'+ 
+      '<button type="button" data-review-nav="pending">下一待审核</button></div></div>'+ 
+      '<div class="review-grid">'+
+      '<label class="review-field wide">建议标题<input id="review-title" data-review-field="title" value="'+e(r.title)+'"></label>'+ 
+      '<label class="review-field">建议性质<select id="review-kind" data-review-field="kind">'+options(reviewKinds,r.kind)+'</select></label>'+ 
+      '<label class="review-field">实现情况<select id="review-implementation" data-review-field="implementation">'+options(implementationNames,r.implementation)+'</select></label>'+ 
+      '<label class="review-field">决策前的叫牌进程<input id="review-auction" data-review-field="target_auction" value="'+e(r.target_auction)+'" placeholder="如 1NT–2♣–2♠"></label>'+ 
+      '<label class="review-field">建议下一口<input id="review-call" data-review-field="proposed_call" value="'+e(r.proposed_call)+'" placeholder="没有依据时留空"></label>'+ 
+      '<label class="review-field wide">目前问题<textarea id="review-diagnosis" data-review-field="diagnosis">'+e(r.diagnosis)+'</textarea></label>'+ 
+      '<label class="review-field wide">依据体系的具体修改建议<textarea class="proposal" id="review-proposal" data-review-field="proposal">'+e(r.proposal)+'</textarea></label>'+ 
+      '<label class="review-field wide">体系依据（每行一条）<textarea id="review-basis" data-review-field="basis">'+e(r.basis.join("\n"))+'</textarea></label>'+ 
+      '<label class="review-field wide">审核备注<textarea id="review-note" data-review-field="reviewer_note" placeholder="可直接改建议，也可在这里说明原因">'+e(r.reviewer_note)+'</textarea></label></div>'+ 
+      '<div class="review-decision"><span>审核结论</span>'+Object.entries(reviewDecisions).map(([key,label])=>
+        '<button type="button" data-decision="'+key+'" class="'+(r.decision===key?'active':'')+'" aria-pressed="'+(r.decision===key)+'">'+e(label)+'</button>').join("")+'</div>'+ 
+      '<div class="review-source">“建议下一口”为空表示现有体系材料不足以指定叫品；不自动改写叫牌规则。</div></section>';
+  }
+  function renderGroup(){
+    if(!selected){detail.innerHTML='<p>报告中没有牌例组。</p>';return;}
+    const g=selected,s=status(g),sum=g.summary;
+    const n=g.constraints.north, south=g.constraints.south;
+    const contracts=Object.entries(g.contracts).map(([c,num])=>'<span>'+e(c)+' × '+e(num)+'</span>').join("")||'<span>无完成定约</span>';
+    detail.innerHTML='<div class="detail-top"><div><div class="eyebrow">CLASS '+e(g.id)+'</div>'+
+      '<h2>'+e(g.id)+' · 原牌 #'+g.source_ids.map(e).join("、")+'</h2>'+
+      '<div class="detail-sub">相同四门牌型；连同原牌在内，每家 HCP 与 K–R 的最高分减最低分均不超过 2。</div></div>'+
+      '<span class="status '+s+'">'+statusText(s)+'</span></div>'+
+      '<div class="summary-strip"><span><b>'+e(sum.pairs)+'</b> 对新南北牌</span>'+
+      '<span><b>'+e(sum.dds_boards)+'</b> 个 DDS 牌局</span>'+
+      '<span><b>'+e(sum.complete)+'</b> 次叫完</span>'+
+      '<span><b>'+e(sum.blocked)+'</b> 次阻塞</span></div>'+
+      '<div class="constraints"><div class="constraint"><b>北家 · 1NT 开叫</b>'+
+      '<span>♠ ♥ ♦ ♣ 长度 '+shape(n.shape)+'<br>HCP '+range(n.hcp)+' · K–R '+range(n.kr)+'</span></div>'+
+      '<div class="constraint"><b>南家 · 应叫</b><span>♠ ♥ ♦ ♣ 长度 '+shape(south.shape)+
+      '<br>HCP '+range(south.hcp)+' · K–R '+range(south.kr)+'</span></div></div>'+
+      reviewHtml(g)+
+      (g.sampling_warning?'<div class="diagnostic">'+e(g.sampling_warning)+'</div>':"")+
+      '<h3 class="section-title">原警报复核</h3><p class="section-lead">在新牌上仍按原来的定约和庄位计算，比较警报概率是否超过同一阈值。</p>'+
+      g.source_checks.flatMap(c=>c.original_flags.map(f=>warningHtml(c,f,g))).join("")+
+      '<h3 class="section-title">新牌自动叫牌</h3><p class="section-lead">完成后的定约分布：</p>'+
+      '<div class="contract-pills">'+contracts+'</div>'+
+      '<div class="deal-toolbar"><span class="detail-sub" id="deal-count"></span>'+
+      '<label><input id="blocked-only" type="checkbox"> 只看阻塞牌</label></div>'+
+      '<div class="deal-list" id="deal-list"></div>';
+    document.getElementById("blocked-only").addEventListener("change",()=>renderDeals(g));
+    renderDeals(g);
+    renderList();
+  }
+  function select(id,push){
+    const g=groups.find(item=>item.id===id);if(!g)return;
+    selected=g;renderGroup();
+    if(push&&location.hash!=="#"+id)history.pushState(null,"","#"+id);
+    if(window.innerWidth<740)detail.scrollIntoView({behavior:"smooth",block:"start"});
+  }
+  list.addEventListener("click",event=>{const b=event.target.closest("[data-group]");if(b)select(b.dataset.group,true);});
+  detail.addEventListener("input",event=>{
+    const field=event.target.dataset.reviewField;if(!field||!selected)return;
+    const value=field==="basis"?event.target.value.split("\n").map(x=>x.trim()).filter(Boolean):event.target.value;
+    reviews.groups[selected.id]=reviewFor(selected.id);
+    reviews.groups[selected.id][field]=value;
+    persistReview();
+  });
+  detail.addEventListener("change",event=>{
+    if(!event.target.matches("select[data-review-field]")||!selected)return;
+    reviews.groups[selected.id]=reviewFor(selected.id);
+    reviews.groups[selected.id][event.target.dataset.reviewField]=event.target.value;
+    persistReview();renderGroup();
+  });
+  detail.addEventListener("click",event=>{
+    const decision=event.target.closest("[data-decision]");
+    if(decision&&selected){reviews.groups[selected.id]=reviewFor(selected.id);reviews.groups[selected.id].decision=decision.dataset.decision;persistReview();renderGroup();return;}
+    const nav=event.target.closest("[data-review-nav]");if(!nav||!selected)return;
+    let index=groups.findIndex(g=>g.id===selected.id),next=index;
+    if(nav.dataset.reviewNav==="previous")next=(index-1+groups.length)%groups.length;
+    else if(nav.dataset.reviewNav==="next")next=(index+1)%groups.length;
+    else for(let offset=1;offset<=groups.length;offset++){
+      const candidate=(index+offset)%groups.length;
+      if(reviewFor(groups[candidate].id).decision==="pending"){next=candidate;break;}
+    }
+    select(groups[next].id,true);
+  });
+  document.getElementById("review-export").addEventListener("click",()=>{
+    const invalid=groups.find(g=>{const r=reviewFor(g.id);return r.kind==="change"&&!r.proposed_call.trim();});
+    if(invalid){saveState.textContent=invalid.id+" 标为建议改叫，却未填写建议下一口。请填写或改为先核实规则。";return;}
+    const blob=new Blob([JSON.stringify(reviews,null,2)+"\n"],{type:"application/json"});
+    const url=URL.createObjectURL(blob),anchor=document.createElement("a");
+    anchor.href=url;anchor.download="gible-review-"+report.reviews.report_signature+".json";
+    document.body.appendChild(anchor);anchor.click();anchor.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    saveState.textContent="审核 JSON 已下载。";
+  });
+  document.getElementById("review-import").addEventListener("change",async event=>{
+    const file=event.target.files[0];if(!file)return;
+    try{const candidate=JSON.parse(await file.text());
+      if(!validReview(candidate))throw new Error("文件与当前报告不匹配，或字段有误");
+      reviews=candidate;persistReview();renderGroup();saveState.textContent="审核 JSON 已导入。";
+    }catch(error){saveState.textContent="导入失败："+error.message;}
+    event.target.value="";
+  });
+  search.addEventListener("input",renderList);
+  filter.addEventListener("change",renderList);
+  window.addEventListener("hashchange",()=>select(location.hash.slice(1),false));
+  renderMetrics();renderGroup();
+})();
+</script>
+</body>
+</html>

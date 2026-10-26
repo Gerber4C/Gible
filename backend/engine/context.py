@@ -91,7 +91,7 @@ class StateView:
     @classmethod
     def from_trace(cls, trace: Any) -> "StateView":
         return cls(
-            records=tuple(getattr(trace, "state_records", ())),
+            records=tuple(getattr(trace, "current_state_records", getattr(trace, "state_records", ()))),
             frame_states=tuple(getattr(trace, "frame_states", ())),
             private_route_states=tuple(getattr(trace, "private_route_states", ())),
         )
@@ -336,6 +336,20 @@ class BridgeContext:
         )
 
     @property
+    def hand_quality(self) -> dict | None:
+        """Actor's pure K-R and quality evidence; unavailable without their hand."""
+        from .hand_quality import assess_quality
+
+        return assess_quality(self.hand) if self.hand is not None else None
+
+    @property
+    def honor_texture(self) -> dict | None:
+        """Actor's honor holdings and the separately named HCP discount model."""
+        from .honor_quality import assess_honor_texture
+
+        return assess_honor_texture(self.hand) if self.hand is not None else None
+
+    @property
     def private_routes(self) -> tuple[Any, ...]:
         return self.state.private_route_states
 
@@ -397,6 +411,7 @@ class CallCandidate:
     implementation_origin: dict[str, Any] | None = None
     capabilities: tuple[str, ...] = ()
     metadata: dict[str, Any] = field(default_factory=dict)
+    private_purpose: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)

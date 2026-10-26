@@ -8,8 +8,8 @@ This document is generated from the fixture files in `backend/partnership_profil
 
 ## Summary
 
-- Single-call bidding cases: 159
-- Full-auction simulations: 27
+- Single-call bidding cases: 177
+- Full-auction simulations: 29
 - Valid hand parser cases: 3
 - Invalid hand parser cases: 7
 - Legality cases: 5
@@ -710,8 +710,10 @@ This document is generated from the fixture files in `backend/partnership_profil
 - Auction: `1SP2SP5NP`
 - Hand: `SKQJT98HA43DA2CAK` -> ? KQJT98  ? A43  ? A2  ? AK
 - Environment: dealer=n, vulnerability=none, scoring=IMP
-- Expected call: `P`
-- Expected diagnostics include: `['Illegal candidate 4N', 'defaulting to P']`
+- Expected call: `6S`
+- Expected diagnostics include: `['Illegal candidate 4N', 'defaulting to 6S']`
+
+- The illegal 4NT candidate is still filtered. With spades agreed and 5NT already bid, 6♠ is now the cheapest legal return.
 
 ### `meow_minor_response_bypasses_diamonds_for_hearts`
 
@@ -1407,7 +1409,7 @@ This document is generated from the fixture files in `backend/partnership_profil
 - Auction: ``
 - Hand: `SAQ7HKJ8DKJ6CQ542` -> ? AQ7  ? KJ8  ? KJ6  ? Q542
 - Environment: dealer=n, vulnerability=none, scoring=IMP
-- Expected call: `4N`
+- Expected call: blocked (`null`)
 - Expected diagnostics include: `['Ambiguous meaning for call 4N']`
 
 ### `meow_strong_two_club_very_strong_unbalanced_opens_two_club`
@@ -1623,6 +1625,134 @@ This document is generated from the fixture files in `backend/partnership_profil
 - Expected public meaning: `{'action_type': 'rebid_preempt_suit', 'target_suit': 'H'}`
 - Expected policy: `{'object_id': 'meow_new_suit_forcing_rebid', 'algorithm': 'python_bsl_function'}`
 - Expected diagnostics: `[]`
+
+### `meow_spiral_missing_continuation_returns_to_agreed_spades`
+
+- Auction: `1DP1SP2SP2NP3HP`
+- Hand: ♠ AQ83 ♥ 743 ♦ J84 ♣ AJ8
+- Expected call: `3S`, with `fallback_return_to_agreed_trump`, target S, level 3.
+- Expected source: `heuristic_fallback`.
+- Expected diagnostics include `No matching Call Specification` and `defaulting to 3S`.
+- Returning to the agreed suit is a fallback; it does not claim that the missing Spiral continuation was implemented.
+
+### `meow_fallback_does_not_raise_an_existing_agreed_trump_contract`
+
+- Auction: `1DP1SP2SP2NP3HP3SP`
+- Hand: ♠ KJT5 ♥ AT ♦ AQ92 ♣ 652
+- Expected call: `P`, with `fallback_pass` and a `defaulting to P` diagnostic.
+- The partnership is already in spades, so the fallback must not raise itself to 4♠.
+
+### `meow_spiral_1c_h_3_card_13_hcp`
+
+- Auction: `1CP1HP2HP2NP`
+- Hand: `SAT9HKT5D652CAQ92`
+- Expected call: `3C`, minimum with 3-card H support.
+- Expected diagnostics: `[]`.
+
+### `meow_spiral_1c_h_3_card_14_hcp`
+
+- Auction: `1CP1HP2HP2NP`
+- Hand: `SAT9HKJ5D652CAQ92`
+- Expected call: `3D`, maximum with 3-card H support.
+- Expected diagnostics: `[]`.
+
+### `meow_spiral_1c_h_4_card_13_hcp`
+
+- Auction: `1CP1HP2HP2NP`
+- Hand: `SATHKT95D652CAQ92`
+- Expected call: `3H`, minimum with 4-card H support.
+- Expected diagnostics: `[]`.
+
+### `meow_spiral_1c_h_4_card_14_hcp`
+
+- Auction: `1CP1HP2HP2NP`
+- Hand: `SATHKJT5D652CAQ92`
+- Expected call: `3S`, maximum with 4-card H support.
+- Expected diagnostics: `[]`.
+
+### `meow_spiral_1c_s_3_card_13_hcp`
+
+- Auction: `1CP1SP2SP2NP`
+- Hand: `SKT5HAT9D652CAQ92`
+- Expected call: `3C`, minimum with 3-card S support.
+- Expected diagnostics: `[]`.
+
+### `meow_spiral_1c_s_3_card_14_hcp`
+
+- Auction: `1CP1SP2SP2NP`
+- Hand: `SKJ5HAT9D652CAQ92`
+- Expected call: `3D`, maximum with 3-card S support.
+- Expected diagnostics: `[]`.
+
+### `meow_spiral_1c_s_4_card_13_hcp`
+
+- Auction: `1CP1SP2SP2NP`
+- Hand: `SKT95HATD652CAQ92`
+- Expected call: `3H`, minimum with 4-card S support.
+- Expected diagnostics: `[]`.
+
+### `meow_spiral_1c_s_4_card_14_hcp`
+
+- Auction: `1CP1SP2SP2NP`
+- Hand: `SKJT5HATD652CAQ92`
+- Expected call: `3S`, maximum with 4-card S support.
+- Expected diagnostics: `[]`.
+
+### `meow_spiral_1d_h_3_card_13_hcp`
+
+- Auction: `1DP1HP2HP2NP`
+- Hand: `SAT9HKT5DAQ92C652`
+- Expected call: `3C`, minimum with 3-card H support.
+- Expected diagnostics: `[]`.
+
+### `meow_spiral_1d_h_3_card_14_hcp`
+
+- Auction: `1DP1HP2HP2NP`
+- Hand: `SAT9HKJ5DAQ92C652`
+- Expected call: `3D`, maximum with 3-card H support.
+- Expected diagnostics: `[]`.
+
+### `meow_spiral_1d_h_4_card_13_hcp`
+
+- Auction: `1DP1HP2HP2NP`
+- Hand: `SATHKT95DAQ92C652`
+- Expected call: `3H`, minimum with 4-card H support.
+- Expected diagnostics: `[]`.
+
+### `meow_spiral_1d_h_4_card_14_hcp`
+
+- Auction: `1DP1HP2HP2NP`
+- Hand: `SATHKJT5DAQ92C652`
+- Expected call: `3S`, maximum with 4-card H support.
+- Expected diagnostics: `[]`.
+
+### `meow_spiral_1d_s_3_card_13_hcp`
+
+- Auction: `1DP1SP2SP2NP`
+- Hand: `SKT5HAT9DAQ92C652`
+- Expected call: `3C`, minimum with 3-card S support.
+- Expected diagnostics: `[]`.
+
+### `meow_spiral_1d_s_3_card_14_hcp`
+
+- Auction: `1DP1SP2SP2NP`
+- Hand: `SKJ5HAT9DAQ92C652`
+- Expected call: `3D`, maximum with 3-card S support.
+- Expected diagnostics: `[]`.
+
+### `meow_spiral_1d_s_4_card_13_hcp`
+
+- Auction: `1DP1SP2SP2NP`
+- Hand: `SKT95HATDAQ92C652`
+- Expected call: `3H`, minimum with 4-card S support.
+- Expected diagnostics: `[]`.
+
+### `meow_spiral_1d_s_4_card_14_hcp`
+
+- Auction: `1DP1SP2SP2NP`
+- Hand: `SKJT5HATDAQ92C652`
+- Expected call: `3S`, maximum with 4-card S support.
+- Expected diagnostics: `[]`.
 
 ## Full-Auction Simulations
 
@@ -1867,6 +1997,26 @@ This document is generated from the fixture files in `backend/partnership_profil
 - Expected auction: `1HP2CP2DP3NPPP`
 - Expected controlled calls: `['1H', '2C', '2D', '3N', 'P']`
 - Expected diagnostics: `[]`
+
+### `meow_spiral_missing_continuation_stops_in_agreed_spades`
+
+- North: ♠ KT95 ♥ AT ♦ AQ92 ♣ 652 (13 HCP).
+- South: ♠ AQ83 ♥ 743 ♦ J84 ♣ AJ8 (12 HCP).
+- Environment: dealer=n, vulnerability=none, scoring=IMP; opponents pass.
+- Expected auction: `1DP1SP2SP2NP3HP3SPPP`.
+- Partnership calls: `1D, 1S, 2S, 2N, 3H, 3S, P`.
+- Expected diagnostics: missing continuation defaults to 3S; replay reports undefined prior 3S at position 11; next missing continuation defaults to P.
+- This regression checks that the heuristic returns to the known 4-4 spade fit and stops without repeatedly raising it. Undefined-rule diagnostics remain visible in the result.
+
+### `meow_spiral_four_card_fourteen_hcp_is_maximum`
+
+- North: ♠ KJT5 ♥ AT ♦ AQ92 ♣ 652 (14 HCP).
+- South: ♠ AQ83 ♥ 743 ♦ J84 ♣ AJ8 (12 HCP).
+- Environment: dealer=n, vulnerability=none, scoring=IMP; opponents pass.
+- Expected auction: `1DP1SP2SP2NP3SPPP`.
+- Partnership calls: `1D, 1S, 2S, 2N, 3S, P`.
+- North answers 3S: maximum with four-card spade support within the preceding 12-14 HCP raise.
+- Expected diagnostic: missing continuation at `1DP1SP2SP2NP3SP` defaults to P. This checks strength classification, not a complete game-placement policy.
 
 ## Hand Parser Cases
 

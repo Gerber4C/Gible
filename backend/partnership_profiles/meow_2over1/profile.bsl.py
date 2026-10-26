@@ -1,4 +1,4 @@
-# Partner Python-BSL source.
+# Gible Python-BSL source.
 # This file defines the active Partnership Profile.
 
 class Meow2over1Profile(Profile):

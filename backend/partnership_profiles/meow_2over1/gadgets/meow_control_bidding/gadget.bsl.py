@@ -1,4 +1,4 @@
-# Partner Python-BSL source.
+# Gible Python-BSL source.
 # This file defines one class-authored Gadget.
 
 def control_context(agreed_suit):

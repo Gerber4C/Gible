@@ -3,6 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from .legality import SIDE_BY_SEAT
+from .trump_state import TrumpState, promote, transition
+
 
 @dataclass(frozen=True)
 class StateRecord:
@@ -111,15 +114,64 @@ class AuctionTrace:
     frame_states: list[FrameState] = field(default_factory=list)
     private_route_states: list[PrivateRouteState] = field(default_factory=list)
     diagnostics: list[str] = field(default_factory=list)
+    axioms: dict[str, Any] = field(default_factory=dict)
+    trump_states: dict[str, TrumpState] = field(default_factory=dict)
+    perspective_side: str | None = None
+    active_seat: str | None = None
+
+    def trump_state(self, side: str) -> TrumpState:
+        return self.trump_states.get(side, TrumpState())
+
+    def promote_for_call(self, seat: str) -> None:
+        side = SIDE_BY_SEAT[seat]
+        self.trump_states[side] = promote(self.trump_state(side), seat)
+
+    @property
+    def current_state_records(self) -> tuple[StateRecord, ...]:
+        records: list[StateRecord] = []
+        last_event: dict[str, int] = {}
+        for index, record in enumerate(self.state_records):
+            if record.key in ('trump_state', 'agreed_suit') and record.owner in self.trump_states:
+                last_event[record.owner] = index
+        for index, record in enumerate(self.state_records):
+            if record.key not in ('trump_state', 'agreed_suit'):
+                records.append(record)
+                continue
+            side = record.owner
+            if side not in self.trump_states:
+                if self.perspective_side is None:
+                    records.append(record)
+                continue
+            if index != last_event[side] or (self.perspective_side is not None and side != self.perspective_side):
+                continue
+            state = self.trump_state(side)
+            if state.status == 'unset':
+                continue
+            if record.key == 'trump_state':
+                records.append(StateRecord('trump_state',
+                                           {'status': state.status, **(state.attributes or {}), 'suit': state.suit},
+                                           state.origin or {}, owner=side))
+            if state.status == 'agreed':
+                records.append(StateRecord('agreed_suit', {**(state.attributes or {}), 'suit': state.suit},
+                                           state.origin or {}, owner=side))
+        return tuple(records)
 
     def add_state(self, record: StateRecord) -> None:
+        if (record.key in ('trump_state', 'agreed_suit') and record.namespace == 'public'
+                and record.visibility != 'private' and self.active_seat is not None):
+            side = SIDE_BY_SEAT[self.active_seat]
+            self.trump_states[side] = transition(self.trump_state(side),
+                                                  {'key': record.key, **record.attributes},
+                                                  self.active_seat, record.origin)
+            record = StateRecord(record.key, record.attributes, record.origin,
+                                 record.namespace, side, record.visibility)
         self.state_records.append(record)
 
     def state_exists(self, query: dict[str, Any]) -> bool:
-        return any(record.matches(query) for record in self.state_records)
+        return any(record.matches(query) for record in self.current_state_records)
 
     def matching_state(self, query: dict[str, Any]) -> list[StateRecord]:
-        return [record for record in self.state_records if record.matches(query)]
+        return [record for record in self.current_state_records if record.matches(query)]
 
     def state_compare(self, query: dict[str, Any]) -> bool:
         lookup = dict(query.get("query", {}))

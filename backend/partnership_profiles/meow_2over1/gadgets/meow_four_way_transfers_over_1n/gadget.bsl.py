@@ -1,4 +1,4 @@
-# Partner Python-BSL source.
+# Gible Python-BSL source.
 # This file defines one class-authored Gadget.
 
 def eval_minor_honor_third(ctx, target_suit):

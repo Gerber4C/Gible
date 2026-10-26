@@ -120,8 +120,31 @@ export function logicHint(record) {
   }
   if (policy.object_id) lines.push(`Policy: ${policy.object_id}`);
   if (compared.length > 1) lines.push(`Compared: ${compared.join(", ")}`);
+  lines.push(...axiomSummary(explanation.axioms));
   if (diagnostics.length) lines.push(`Diagnostics: ${diagnostics.join("; ")}`);
   return lines.join("\n");
+}
+
+export function axiomSummary(axioms) {
+  if (!axioms) return [];
+  const lines = [];
+  const obligations = (axioms.obligations ?? []).map((item) => humanize(item.kind)).filter(Boolean);
+  lines.push(`Axioms: ${obligations.length ? obligations.join(", ") : "no active obligations"}`);
+  for (const error of axioms.errors ?? []) {
+    lines.push(`Axiom error: ${[error.code, error.message].filter(Boolean).join(" — ")}`);
+    if (error.origin?.qualified_id) lines.push(`Rule: ${error.origin.qualified_id}`);
+    if (error.origin?.source_paths?.length) lines.push(`Source: ${error.origin.source_paths.join(", ")}`);
+  }
+  if (axioms.quality) {
+    const quality = axioms.quality;
+    const details = [typeof quality.good === "boolean" ? (quality.good ? "good" : "needs review") : "",
+      typeof quality.kr_points === "number" ? `K–R ${quality.kr_points}` : "",
+      typeof quality.hcp === "number" ? `HCP ${quality.hcp}` : "",
+      typeof quality.score === "number" ? `quality difference ${quality.score}` : ""].filter(Boolean);
+    if (details.length) lines.push(`Axiom quality: ${details.join(", ")}`);
+  }
+  if (axioms.rejected?.length) lines.push(`Axioms rejected ${axioms.rejected.length} candidate(s).`);
+  return lines;
 }
 
 function estimateHcp(hand) {

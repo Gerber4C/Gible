@@ -4,6 +4,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from .bsl import load_bsl_files
+from .axiom_validation import validate_profile_axioms
 from .model import Author, EvaluatorSpec, Gadget, PartnershipProfile
 from .policy_runtime import load_policy_functions
 
@@ -37,7 +38,7 @@ def load_profile(profile_id: str, base_dir: Path | None = None) -> PartnershipPr
     )
     policy_functions = load_policy_functions(_profile_policy_paths(profile_dir), profile_source)
 
-    return PartnershipProfile(
+    profile = PartnershipProfile(
         id=data["id"],
         name=data.get("name", data["id"]),
         version=data.get("version", "0.1.0"),
@@ -45,9 +46,13 @@ def load_profile(profile_id: str, base_dir: Path | None = None) -> PartnershipPr
         gadgets=gadgets,
         policy_functions=policy_functions,
         evaluator_specs=profile_evaluators,
+        axioms=data.get("axioms", {}),
+        missing_call_behavior=data.get('missing_call_behavior', 'fallback'),
         description=data.get("description"),
         system_notes=data.get("system_notes"),
     )
+    validate_profile_axioms(profile)
+    return profile
 
 
 def _profile_paths(base_dir: Path, profile_id: str) -> tuple[Path, Path]:
@@ -97,7 +102,7 @@ def _load_bsl_gadget(paths: list[Path]) -> Gadget:
     module_data = load_bsl_files(paths)
     if module_data.gadget_metadata is None:
         raise ValueError(f"BSL gadget directory must contain Gadget(...): {paths[0].parent}")
-    return Gadget.from_parts(
+    gadget = Gadget.from_parts(
         module_data.gadget_metadata,
         module_data.call_specs,
         frame_data=module_data.frame_specs,
@@ -105,3 +110,5 @@ def _load_bsl_gadget(paths: list[Path]) -> Gadget:
         evaluator_data=module_data.evaluator_specs,
         relay_data=module_data.relay_specs,
     )
+    return replace(gadget, call_specs=tuple(replace(spec, source_paths=tuple(str(p.resolve()) for p in paths))
+                                           for spec in gadget.call_specs))

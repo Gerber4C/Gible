@@ -1,4 +1,4 @@
-# Partner Python-BSL source.
+# Gible Python-BSL source.
 # This file defines one class-authored Gadget.
 
 def sp_1_applies(ctx):
@@ -9,42 +9,44 @@ def sp_3_applies(ctx):
     return (ctx.hand.hcp >= 11)
 def sp_4_applies(ctx):
     return (ctx.hand.hcp >= 11)
+# The preceding simple major raise is 12-14 HCP: 12-13 is minimum,
+# 14 is maximum. Higher values in an imported auction remain maximum.
 def sp_5_applies(ctx):
-    return (12 <= ctx.hand.hcp <= 14 and ctx.hand.length('H') == 3)
+    return (12 <= ctx.hand.hcp <= 13 and ctx.hand.length('H') == 3)
 def sp_6_applies(ctx):
-    return (ctx.hand.hcp >= 15 and ctx.hand.length('H') == 3)
+    return (ctx.hand.hcp >= 14 and ctx.hand.length('H') == 3)
 def sp_7_applies(ctx):
-    return (12 <= ctx.hand.hcp <= 14 and ctx.hand.length('H') >= 4)
+    return (12 <= ctx.hand.hcp <= 13 and ctx.hand.length('H') >= 4)
 def sp_8_applies(ctx):
-    return (ctx.hand.hcp >= 15 and ctx.hand.length('H') >= 4)
+    return (ctx.hand.hcp >= 14 and ctx.hand.length('H') >= 4)
 def sp_9_applies(ctx):
-    return (12 <= ctx.hand.hcp <= 14 and ctx.hand.length('S') == 3)
+    return (12 <= ctx.hand.hcp <= 13 and ctx.hand.length('S') == 3)
 def sp_10_applies(ctx):
-    return (ctx.hand.hcp >= 15 and ctx.hand.length('S') == 3)
+    return (ctx.hand.hcp >= 14 and ctx.hand.length('S') == 3)
 def sp_11_applies(ctx):
-    return (12 <= ctx.hand.hcp <= 14 and ctx.hand.length('S') >= 4)
+    return (12 <= ctx.hand.hcp <= 13 and ctx.hand.length('S') >= 4)
 def sp_12_applies(ctx):
-    return (ctx.hand.hcp >= 15 and ctx.hand.length('S') >= 4)
+    return (ctx.hand.hcp >= 14 and ctx.hand.length('S') >= 4)
 def sp_13_applies(ctx):
     return (ctx.hand.hcp >= 13 and ctx.hand.length('H') >= 5)
 def sp_14_applies(ctx):
     return (ctx.hand.hcp >= 13 and ctx.hand.length('S') >= 5)
 def sp_15_applies(ctx):
-    return (12 <= ctx.hand.hcp <= 14 and ctx.hand.length('H') == 3)
+    return (12 <= ctx.hand.hcp <= 13 and ctx.hand.length('H') == 3)
 def sp_16_applies(ctx):
-    return (ctx.hand.hcp >= 15 and ctx.hand.length('H') == 3)
+    return (ctx.hand.hcp >= 14 and ctx.hand.length('H') == 3)
 def sp_17_applies(ctx):
-    return (12 <= ctx.hand.hcp <= 14 and ctx.hand.length('H') >= 4)
+    return (12 <= ctx.hand.hcp <= 13 and ctx.hand.length('H') >= 4)
 def sp_18_applies(ctx):
-    return (ctx.hand.hcp >= 15 and ctx.hand.length('H') >= 4)
+    return (ctx.hand.hcp >= 14 and ctx.hand.length('H') >= 4)
 def sp_19_applies(ctx):
-    return (12 <= ctx.hand.hcp <= 14 and ctx.hand.length('S') == 3)
+    return (12 <= ctx.hand.hcp <= 13 and ctx.hand.length('S') == 3)
 def sp_20_applies(ctx):
-    return (ctx.hand.hcp >= 15 and ctx.hand.length('S') == 3)
+    return (ctx.hand.hcp >= 14 and ctx.hand.length('S') == 3)
 def sp_21_applies(ctx):
-    return (12 <= ctx.hand.hcp <= 14 and ctx.hand.length('S') >= 4)
+    return (12 <= ctx.hand.hcp <= 13 and ctx.hand.length('S') >= 4)
 def sp_22_applies(ctx):
-    return (ctx.hand.hcp >= 15 and ctx.hand.length('S') >= 4)
+    return (ctx.hand.hcp >= 14 and ctx.hand.length('S') >= 4)
 
 class MeowSpiral3344Gadget(Gadget):
     id = 'meow_spiral_3344'
@@ -52,7 +54,7 @@ class MeowSpiral3344Gadget(Gadget):
     name = 'Meow Spiral 3344'
     version = '0.1.0'
     description = 'Rodwell-style 3344 inquiry after opener raises responder major in a one-minor auction.'
-    system_notes = 'After 1m-P-1M-P-2M-P, 2N asks whether opener has three or four-card support and minimum or maximum values. Responses are 3C=min with three, 3D=max with three, 3H=min with four, 3S=max with four.'
+    system_notes = 'After 1m-P-1M-P-2M-P, 2N asks whether opener has three or four-card support and minimum or maximum values. The preceding simple raise shows 12-14 HCP, so minimum is 12-13 HCP and maximum starts at 14 HCP. Responses are 3C=min with three, 3D=max with three, 3H=min with four, 3S=max with four.'
     author = Author('Meow Li')
 
     def build(self):

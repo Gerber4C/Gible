@@ -29,19 +29,19 @@ The frontend never writes project files directly. It calls the backend file API,
 From the repository root, the normal startup command is:
 
 ```bat
-run_local.cmd
+gible.cmd
 ```
 
-That command starts both local servers in one CMD window. Keep the window open while using the browser workspace.
+That command starts both local servers and opens the browser when they are ready. Keep the window open while using the browser workspace; press Enter or Ctrl+C to stop services started here. See the root README for prerequisites, runtime discovery, and macOS/Linux startup.
 
 Manual startup is also available:
 
 ```powershell
-C:\Users\paw_l\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe backend\server.py
+python backend\server.py
 ```
 
 ```powershell
-C:\Users\paw_l\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe frontend\server.mjs
+node frontend\server.mjs
 ```
 
 ## Frontend File Layout
@@ -55,7 +55,7 @@ frontend/
     App.js
     main.js
     api/
-      partnerApi.js
+      gibleApi.js
     components/
       BridgeTools.js
       CodeEditor.js
@@ -102,7 +102,7 @@ frontend/
 - Coordinates API calls.
 - Handles save, discard, reload, create, delete, auction stepping, and full-auction reveal.
 
-`frontend/src/api/partnerApi.js`
+`frontend/src/api/gibleApi.js`
 
 - Defines the frontend API client.
 - Uses `http://127.0.0.1:8765` as the backend base URL.
@@ -138,7 +138,8 @@ frontend/
 `frontend/src/components/BridgeTools.js`
 
 - Provides the table workspace.
-- Displays North and South hands as large overlapping card faces with the hand metadata and hand-string editor to the side of the cards.
+- Displays North and South hands as overlapping card faces with four suit inputs beside them. Narrow layouts prioritize the inputs.
+- Supports boundary Left/Right Arrow navigation, inline errors, random full deals, and showing/hiding editable East/West holdings.
 - Displays the auction in a bridge-table layout with North/East/South/West columns.
 - Builds a full partnership auction through the backend and reveals calls through a player workflow.
 - Shows a hover/focus tooltip for every displayed call, using backend provenance from the auction record.
@@ -164,6 +165,12 @@ frontend/
 `frontend/src/lib/bridge.js`
 
 - Formats bridge hands, suits, auction calls, and public meaning snippets for display.
+
+`frontend/src/lib/deal.js`
+
+- Owns suit-field normalization, compact backend serialization, full-deal validation, a legal example deal, and shuffled 52-card deals.
+- Validates all four seats regardless of visibility, including card ownership across seats.
+- Keeps raw edits separate from normalized holdings so invalid characters remain visible and editable.
 
 `frontend/src/lib/files.js`
 
@@ -203,18 +210,25 @@ The Table workspace is for bridge interaction.
 
 It has:
 
-- North hand editor,
-- South hand editor,
+- North/South editors with four suit inputs each,
+- random 52-card dealing and a toggle for editable East/West hands,
+- per-hand and full-deal validation that blocks invalid auction requests,
 - compact dealer and vulnerability controls in the player strip,
 - recorder-style auction controls for first, back, next/play, and full auction,
 - bridge-style auction table,
 - hover/focus call explanations showing meaning, origin, selected policy, compared candidates, and diagnostics when available.
 
-The table should feel like a bridge workspace, not a debug console. Single-call "use this seat" controls do not belong on this screen; the visible workflow is auction playback and its explanation trail. Avoid separate reset/refresh controls unless they represent genuinely different user intentions. Dealer, vulnerability, and hand changes immediately clear stale visible calls, show a centered server-waiting state, and refresh an already-loaded auction after a short debounce.
+The table should feel like a bridge workspace, not a debug console. Single-call "use this seat" controls do not belong on this screen; the visible workflow is auction playback and its explanation trail. Dealer, vulnerability, and hand changes clear stale calls and refresh a previously requested auction after a short debounce once the complete deal is valid. Invalid input clears playback and blocks requests. Random dealing starts a fresh auction; request identifiers prevent old responses from restoring stale calls. East/West visibility is independent of bidding mode and never submits opponents' hands to the simulator.
 
 The center auction area should dominate the table view. The left sidebar is retractable so the bidding table can use more horizontal space during auction playback. Do not duplicate the auction as both a table and a linear string.
 
 ## Backend API Used By Frontend
+
+The Table's optional Contract analysis panel sends an explicit target list,
+the current North/South actor hand, and the visible auction to
+`POST /api/analysis/contracts`. `src/lib/contractAnalysis.js` builds the request
+without table-known concealed hands. The response is labeled analysis-only and
+is cleared when the deal or auction changes; it does not advance the auction.
 
 The frontend currently uses:
 
@@ -228,7 +242,7 @@ POST   /api/bid
 POST   /api/simulate
 ```
 
-API request construction lives in `partnerApi.js`. UI components should call exported API helpers, not `fetch()` directly.
+API request construction lives in `gibleApi.js`. UI components should call exported API helpers, not `fetch()` directly.
 
 ## Editing Model
 
@@ -269,7 +283,7 @@ Frontend work should follow these rules:
 8. Avoid dumping debug arrays into user-facing bridge views.
 9. Keep player buttons icon-like and compact; use titles/ARIA labels for explanation instead of large visible text.
 10. Keep frontend-only parsing conservative. If uncertain, preserve source and show it as a code block.
-11. Do not allow the whole page to scroll. Use contained scroll regions for the file tree, structured editor body, code editor, and auction table only.
+11. Do not allow the whole page to scroll. Use contained scroll regions for the file tree, structured editor body, code editor, and auction table. Narrow windows allow vertical scrolling within the four-hand table workspace.
 12. Use bridge display colors for non-input calls and suits: clubs green, diamonds orange, hearts red, spades dark purple, double red, and redouble purple.
 13. In the table workspace, show vulnerability through full auction header backgrounds, matching hand metadata backgrounds, vulnerable seat titles, and the compact vulnerability selector. Do not tint bid cells themselves just because that seat is vulnerable. Non-vulnerable state must remain visibly green, not nearly white; vulnerable red should stay clearly red while remaining lighter and less warning-like.
 14. Hand displays should look like bridge-platform card faces, not plain debug strings; card ranks and suit symbols should be large enough to read at normal desktop zoom, including the small corner suit symbols. Suit cards may use a very subtle suit-tinted background, but the card must remain mostly white and each card must have a visible border. Keep the hand-string input compact but readable, and visually secondary to the cards. Metadata belongs beside the cards, not in a tall header above them.
@@ -283,18 +297,32 @@ Frontend work should follow these rules:
 
 ## Verification
 
+From the repository root, run `node --test frontend/tests/*.test.js` for deal
+normalization, serialization, invalid ranks, duplicates, card counts, and
+random-deal integrity, and completing E/W from valid N/S hands while replacing
+invalid opponents. These use Node's built-in test runner.
+
+With both local servers running and Playwright installed, run
+`node frontend/tests/table.browser.cjs`. This exercises real inputs, keyboard
+navigation, validation, visibility, random dealing, E/W completion, backend auction requests,
+stale-response rejection, and layout at 1440px and 1024px. Set
+`GIBLE_BROWSER=msedge` to use an installed Edge browser; the older
+`PARTNER_BROWSER` name remains accepted. Otherwise it uses
+Playwright's Chromium. `PLAYWRIGHT_MODULE` can point to an existing Playwright
+package directory, and `TABLE_SCREENSHOT_DIR` enables screenshots.
+
 Frontend syntax checks:
 
 ```powershell
-C:\Users\paw_l\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe --check frontend\src\App.js
-C:\Users\paw_l\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe --check frontend\src\components\BridgeTools.js
-C:\Users\paw_l\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe --check frontend\src\components\StructuredEditor.js
-C:\Users\paw_l\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe --check frontend\src\lib\bsl.js
+node --check frontend\src\App.js
+node --check frontend\src\components\BridgeTools.js
+node --check frontend\src\components\StructuredEditor.js
+node --check frontend\src\lib\bsl.js
 ```
 
 Manual browser verification:
 
-1. Start `run_local.cmd`.
+1. Start `gible.cmd`.
 2. Open `http://127.0.0.1:5173`.
 3. Confirm the profile selector loads `meow_2over1`.
 4. Open a Gadget file in guide mode.

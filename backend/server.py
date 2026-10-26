@@ -5,22 +5,25 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
-from app import bid, simulate, system_notes
+from app import bid, contract_analysis, route_analysis, simulate, system_notes, training_deal
+from engine.axiom_validation import AxiomDefinitionError
+from engine.iv_scanner import ScannerJobs, list_reports, read_report
 
 
 BACKEND_DIR = Path(__file__).resolve().parent
 PROFILE_ROOT = BACKEND_DIR / "partnership_profiles"
 ALLOWED_FILE_SUFFIXES = {".py", ".yaml", ".yml", ".md", ".txt", ".json"}
+SCANNER_JOBS = ScannerJobs()
 
 
 def run(host: str = "127.0.0.1", port: int = 8765) -> None:
-    server = ThreadingHTTPServer((host, port), PartnerRequestHandler)
-    print(f"Partner backend listening at http://{host}:{port}")
+    server = ThreadingHTTPServer((host, port), GibleRequestHandler)
+    print(f"Gible backend listening at http://{host}:{port}")
     server.serve_forever()
 
 
-class PartnerRequestHandler(BaseHTTPRequestHandler):
-    server_version = "PartnerLocalHTTP/0.1"
+class GibleRequestHandler(BaseHTTPRequestHandler):
+    server_version = "GibleLocalHTTP/0.1"
 
     def do_OPTIONS(self) -> None:
         self._send_empty(204)
@@ -28,6 +31,16 @@ class PartnerRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         try:
+            if parsed.path == '/api/scanner/reports':
+                self._send_json({'reports': list_reports()})
+                return
+            if parsed.path == '/api/scanner/runs/current':
+                self._send_json({'run': SCANNER_JOBS.status()})
+                return
+            if parsed.path.startswith('/api/scanner/reports/'):
+                report_id = unquote(parsed.path.removeprefix('/api/scanner/reports/'))
+                self._send_json(read_report(report_id))
+                return
             if parsed.path == "/api/profiles":
                 self._send_json({"profiles": _profile_summaries()})
                 return
@@ -46,6 +59,12 @@ class PartnerRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(system_notes({"profile": {"id": profile_id}}))
                 return
             self._send_json({"error": "not_found", "path": parsed.path}, status=404)
+        except AxiomDefinitionError as exc:
+            self._send_json({"error": "axiom_definition", "message": str(exc), "errors": exc.errors}, status=422)
+        except ValueError as exc:
+            self._send_json({'error': 'validation_error', 'message': str(exc)}, status=422)
+        except FileNotFoundError as exc:
+            self._send_json({'error': 'not_found', 'message': str(exc)}, status=404)
         except Exception as exc:
             self._send_json({"error": exc.__class__.__name__, "message": str(exc)}, status=500)
 
@@ -59,11 +78,28 @@ class PartnerRequestHandler(BaseHTTPRequestHandler):
             if parsed.path == "/api/simulate":
                 self._send_json(simulate(payload))
                 return
+            if parsed.path == '/api/training/deal':
+                self._send_json(training_deal(payload))
+                return
+            if parsed.path == '/api/analysis/contracts':
+                self._send_json(contract_analysis(payload))
+                return
+            if parsed.path == '/api/analysis/routes':
+                self._send_json(route_analysis(payload))
+                return
+            if parsed.path == '/api/scanner/runs':
+                self._send_json({'run': SCANNER_JOBS.start(payload)}, status=202)
+                return
             if parsed.path.startswith("/api/profiles/") and parsed.path.endswith("/file"):
                 profile_id = _path_part(parsed.path, 2)
                 self._send_json(_write_profile_file(profile_id, payload))
                 return
             self._send_json({"error": "not_found", "path": parsed.path}, status=404)
+        except AxiomDefinitionError as exc:
+            self._send_json({"error": "axiom_definition", "message": str(exc), "errors": exc.errors}, status=422)
+        except ValueError as exc:
+            error = 'invalid_training_request' if parsed.path == '/api/training/deal' else 'validation_error'
+            self._send_json({'error': error, 'message': str(exc)}, status=422)
         except Exception as exc:
             self._send_json({"error": exc.__class__.__name__, "message": str(exc)}, status=500)
 

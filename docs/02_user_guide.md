@@ -1,4 +1,4 @@
-# Partner User Guide
+# Gible User Guide
 
 Platform Version: 0.0.8
 Author: Meow Li
@@ -11,23 +11,23 @@ This guide explains how to use the current local prototype and how advanced user
 Start the local browser workspace from the repository root:
 
 ```bat
-run_local.cmd
+gible.cmd
 ```
 
-Keep that CMD window open while using Partner. It starts the backend on port `8765` and the frontend on port `5173`.
+Keep that CMD window open while using Gible. Press Enter or Ctrl+C to stop services started by this launcher. See the root README for prerequisites, runtime discovery, and macOS/Linux startup. It starts the backend on port `8765` and the frontend on port `5173`.
 
 Manual startup is also available:
 
 Backend:
 
 ```powershell
-C:\Users\paw_l\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe backend\server.py
+python backend\server.py
 ```
 
 Frontend:
 
 ```powershell
-C:\Users\paw_l\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe frontend\server.mjs
+node frontend\server.mjs
 ```
 
 Open:
@@ -40,7 +40,61 @@ The browser workspace can list Partnership Profiles, open profile files, edit an
 
 Frontend engineering details live in `docs/07_frontend_architecture.md`.
 
+## Table: Entering And Dealing Hands
+
+Each visible hand has four separate inputs, ordered spades, hearts, diamonds,
+clubs. Enter ranks only: `AKQJT98765432`. Lowercase, spaces, and `10` for ten
+are accepted and normalized when leaving the field. Leave a field blank or
+enter `-` for a void. Unknown-card placeholders such as `X` are not accepted
+in the concrete four-hand deal editor.
+
+At the left edge, Left Arrow moves to the previous suit's end; at the right
+edge, Right Arrow moves to the next suit's beginning. Ordinary movement and
+text selection remain unchanged. The first and last suits do not wrap.
+Tab and Shift+Tab also work normally.
+
+Validation checks invalid ranks, repeated cards within a hand, cards shared
+by different seats, and exactly 13 cards per seat. Errors appear beside the
+hand and invalid suit fields are highlighted. Playback is disabled until all
+four hands are valid, including hidden East/West hands. Correcting the hands
+refreshes a previously requested auction automatically.
+
+**Random deal** replaces all four hands with a shuffled 52-card deck, deals
+13 unique cards per seat, sorts each suit, and clears the previous auction.
+Dealer and vulnerability stay as selected. **Show E/W hands** and **Hide E/W
+hands** reveal or conceal editable opponents' holdings without changing them.
+Narrow windows allow vertical scrolling within the table area.
+
+**Fill E/W hands** keeps North and South unchanged and randomly distributes
+the remaining 26 cards to East and West, 13 each. Click again to generate
+another distribution. North and South must each contain 13 valid cards with
+no duplicates between them. Existing East/West cards are replaced, even if
+empty or invalid. Their visibility, dealer, and vulnerability are preserved.
+
+The current auction remains North/South partnership practice; East and West
+automatically pass. Revealing their cards does not change the bidding mode.
+
 ## Basic Notation
+
+The Table also has an optional **Contract analysis** panel. Step to a North or
+South turn, enter explicit targets such as `4HN, 6HN` (four/six hearts by
+North), and choose **Analyze**. The result shows how often each target was
+made in sampled deals consistent with the visible auction. This is a review
+tool; it does not choose the next bid. The panel requires an optional DDS
+solver installation described in the repository README. If a public call has
+no coded sampling meaning, analysis reports that gap rather than silently
+ignoring the call.
+
+At the first response to 1NT, **Compare bidding routes** accepts one to three
+first calls, such as `4C, 2D`. The routes use the same sampled possible deals;
+each later partnership call sees only that bidder's hand and the public auction.
+The report separates completed auctions, made/failed final contracts, and
+blocked or unavailable continuations. East and West pass in this first
+experiment. A fixed seed reproduces the report. A route with no authored
+continuation is marked unavailable or blocked; it is not scored as a failure.
+This report does not choose a bid. Daqiush's game-only South African Texas
+branch can finish, while Jacoby remains unavailable until its selection and
+continuations are authored.
 
 Calls use compact notation:
 
@@ -205,7 +259,7 @@ The platform can generate Markdown notes from loaded runtime objects. Text from 
 Run:
 
 ```powershell
-C:\Users\paw_l\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe -m unittest tests.test_fixture_cases -q
+python -m unittest tests.test_fixture_cases -q
 ```
 
 from:

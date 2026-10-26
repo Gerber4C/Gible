@@ -6,6 +6,9 @@ from pathlib import Path
 from typing import Any
 
 from .evaluator import evaluate_expression
+from .short_suit_valuation import splinter_adjusted_hcp
+from .hand_quality import (minor_game_control_points, shapely_effective_points,
+                           shapely_combined_effective_points, shapely_description_proxy)
 from .model import Author as RuntimeAuthor
 from .model import CallMeaning, StateEffect
 
@@ -493,9 +496,11 @@ class CallBuilder:
         self.capabilities: tuple[str, ...] = ()
         self.requires: Any = None
         self.applies: Any = None
+        self.private_purpose: Any = None
         self.meaning = MeaningBuilder()
         self.effects: list[Any] = []
         self.default_policy = False
+        self.priority = 0
         self.description: str | None = None
         self.system_notes: str | None = None
         self.author: Any = None
@@ -529,6 +534,7 @@ class CallBuilder:
             "meaning": _materialize_meaning(self.meaning),
             "effects": tuple(_materialize_effect(effect) for effect in self.effects),
             "default_policy": self.default_policy,
+            "priority": self.priority,
         }
         if self.call_template:
             data["call_template"] = self.call_template
@@ -536,6 +542,8 @@ class CallBuilder:
             data["requires"] = _condition_from_authoring(self.requires)
         if self.applies is not None:
             data["applicability"] = _condition_from_authoring(self.applies)
+        if self.private_purpose is not None:
+            data["private_purpose"] = self.private_purpose
         if self.description is not None:
             data["description"] = self.description
         if self.system_notes is not None:
@@ -722,7 +730,7 @@ def _class_metadata(cls: type, kind: str) -> dict[str, Any]:
         data["namespace"] = getattr(cls, "namespace", object_id)
     if hasattr(cls, "gadgets"):
         data["gadgets"] = [_gadget_reference(item) for item in getattr(cls, "gadgets")]
-    for key in ("description", "system_notes"):
+    for key in ("description", "system_notes", "axioms", "missing_call_behavior"):
         if getattr(cls, key, None) is not None:
             data[key] = getattr(cls, key)
     return data
@@ -1123,7 +1131,7 @@ def _base_namespace(collector: _Collector) -> dict[str, Any]:
             "sum": sum,
             "tuple": tuple,
         },
-        "__name__": "partner_bsl",
+        "__name__": "gible_bsl",
         "Author": Author,
         "Profile": Profile,
         "Gadget": Gadget,
@@ -1158,6 +1166,10 @@ def _base_namespace(collector: _Collector) -> dict[str, Any]:
         "state_exists": state_exists,
         "state_missing": state_missing,
         "state_attribute": state_attribute,
+        "splinter_adjusted_hcp": splinter_adjusted_hcp,
+        "minor_game_control_points": minor_game_control_points,
+        "shapely_effective_points": shapely_effective_points,
+        "shapely_combined_effective_points": shapely_combined_effective_points,
         "S": "S",
         "H": "H",
         "D": "D",

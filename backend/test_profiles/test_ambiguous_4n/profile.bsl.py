@@ -1,4 +1,4 @@
-# BSL source for Partner bidding agreements.
+# BSL source for Gible bidding agreements.
 # Edit this file as the source of truth for this Partnership Profile.
 
 Profile(

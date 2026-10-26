@@ -1,0 +1,1333 @@
+{
+  "schema_version": 1,
+  "report_signature": "a22163d59b5ee620d5b9",
+  "groups": {
+    "G001": {
+      "title": "G001 · ♠配合且单缺，先探贯",
+      "diagnosis": "原进程的叫法未充分表达这类牌，或仍需复核其依据。",
+      "kind": "change",
+      "target_auction": "1NT–2♣–2♠",
+      "proposed_call": "3♥",
+      "proposal": "4♠直接封局改为3♥（另一高花，显示♠配合及单缺）；开叫人3NT问单缺，随后4♣/4♦/4♥分别答同名。答完单缺之后的决定仍待补。",
+      "basis": [
+        "Daqiush §1NT：2♣问高花；找到高花配合后，3oM=带单缺探贯，4♦=无单缺探贯。",
+        "新睿 1N_P_2C#：斯台曼可用于寻找高花配合；与 Daqiush 冲突时以 Daqiush 为准。"
+      ],
+      "decision": "approved",
+      "implementation": "partial",
+      "reviewer_note": "答完单缺后，根据一般的“去掉同伴单缺花色废点后剩几个有效点”决定进不进满贯。这类属于原则，以后可以直接填写。"
+    },
+    "G002": {
+      "title": "G002 · ♠配合无单缺，4♦探贯",
+      "diagnosis": "原进程的叫法未充分表达这类牌，或仍需复核其依据。",
+      "kind": "change",
+      "target_auction": "1NT–2♣–2♠",
+      "proposed_call": "4♦",
+      "proposal": "4♠直接封局改为4♦；开叫人4♠拒绝、4NT按♠问关键张。关键张0/3歧义分支仍可能阻塞。",
+      "basis": [
+        "Daqiush §1NT：2♣问高花；找到高花配合后，3oM=带单缺探贯，4♦=无单缺探贯。",
+        "新睿 1N_P_2C#：斯台曼可用于寻找高花配合；与 Daqiush 冲突时以 Daqiush 为准。"
+      ],
+      "decision": "approved",
+      "implementation": "partial",
+      "reviewer_note": "默认同伴3关键张，除非自己3关键张"
+    },
+    "G003": {
+      "title": "G003 · 德克萨斯后有探贯目的",
+      "diagnosis": "原进程的叫法未充分表达这类牌，或仍需复核其依据。",
+      "kind": "change",
+      "target_auction": "1NT–4♣–4♦/4♥",
+      "proposed_call": "4NT",
+      "proposal": "已归类为探贯的六张♥牌在南非德克萨斯答叫后，以♥定将立即4NT问关键张；只打4♥的牌仍按原目的止叫。",
+      "basis": [
+        "Daqiush：南非德克萨斯只用于只打4M或关键张合适打6M；关键张问叫4NT。"
+      ],
+      "decision": "approved",
+      "implementation": "partial",
+      "reviewer_note": ""
+    },
+    "G004": {
+      "title": "G004 · 弱♣牌转移后止叫",
+      "diagnosis": "原进程的叫法未充分表达这类牌，或仍需复核其依据。",
+      "kind": "keep",
+      "target_auction": "1NT–2♠–3♣",
+      "proposed_call": "Pass",
+      "proposal": "保留弱牌转移至3♣后止叫；不因这组的 DDS 宕牌率改成另一口未经定义的叫品。",
+      "basis": [
+        "Daqiush §1NT：2♠转移♣、2NT转移♦（保6）；弱牌可停3m，畸形牌可邀请5m。",
+        "新睿 1N_P_2S#提供弱♣转移的基础；其2NT含义不同，不覆盖 Daqiush。",
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "complete",
+      "reviewer_note": ""
+    },
+    "G005": {
+      "title": "G005 · 弱♥牌处理接受",
+      "diagnosis": "原进程的叫法未充分表达这类牌，或仍需复核其依据。",
+      "kind": "keep",
+      "target_auction": "1NT–2♦–2♥/超转",
+      "proposed_call": "Pass／重转移",
+      "proposal": "用户已接受这组处理。普通接受后停在2♥；超转后按已定义的重转移完成弱牌止叫。",
+      "basis": [
+        "Daqiush §1NT：2♦/2♥雅可比转移；超转表及“超转后所有探贯牌立即4NT”。",
+        "新睿 1N_P_2D#、1N_P_2H#：分别转移♥、♠。"
+      ],
+      "decision": "approved",
+      "implementation": "accepted_no_change",
+      "reviewer_note": ""
+    },
+    "G006": {
+      "title": "G006 · 六♥五♦显示第二套",
+      "diagnosis": "原进程的叫法未充分表达这类牌，或仍需复核其依据。",
+      "kind": "change",
+      "target_auction": "1NT–2♦–2♥",
+      "proposed_call": "3♦",
+      "proposal": "调整后仍有足够实力的6♥5♦牌自然再叫3♦，不能当成单套♥；同伴极配并示强时再模拟探贯。去掉废点仅余4–6点的相同牌型则走德克萨斯后止叫。",
+      "basis": [
+        "Daqiush：雅可比后3m自然显示第二套；用户对G006的明确裁定。"
+      ],
+      "decision": "approved",
+      "implementation": "partial",
+      "reviewer_note": ""
+    },
+    "G007": {
+      "title": "G007 · 七张套与四张高花比较",
+      "diagnosis": "原进程的叫法未充分表达这类牌，或仍需复核其依据。",
+      "kind": "change",
+      "target_auction": "1NT–2♣–2♠",
+      "proposed_call": "3♣／3♥（模拟择一）",
+      "proposal": "对7♣4♠同一公共信息下补发开叫人牌，用 DDS 比较6♣和6♠：若长♣占优叫3♣自然出套，否则3♥表示♠配合单缺。后续满贯进程仍待补。",
+      "basis": [
+        "Daqiush：1NT–2♣–2M后3m自然；3oM为配合单缺探贯。",
+        "跨体系原则：7–4牌若七张套显著更适合作将牌，可忽略四张套。"
+      ],
+      "decision": "approved",
+      "implementation": "partial",
+      "reviewer_note": ""
+    },
+    "G008": {
+      "title": "G008 · 强♣套兼♠配合单缺",
+      "diagnosis": "原进程的叫法未充分表达这类牌，或仍需复核其依据。",
+      "kind": "change",
+      "target_auction": "1NT–2♣–2♠",
+      "proposed_call": "3♥",
+      "proposal": "按G001先以3♥显示♠配合和单缺；开叫人3NT询问后同名答单缺。强♣套是否优先自然3♣可另用模拟比较，不直接封4♠。",
+      "basis": [
+        "Daqiush §1NT：2♣问高花；找到高花配合后，3oM=带单缺探贯，4♦=无单缺探贯。",
+        "新睿 1N_P_2C#：斯台曼可用于寻找高花配合；与 Daqiush 冲突时以 Daqiush 为准。"
+      ],
+      "decision": "approved",
+      "implementation": "partial",
+      "reviewer_note": ""
+    },
+    "G009": {
+      "title": "G009 · ♥配合无单缺探贯",
+      "diagnosis": "原进程的叫法未充分表达这类牌，或仍需复核其依据。",
+      "kind": "change",
+      "target_auction": "1NT–2♣–2♥",
+      "proposed_call": "4♦",
+      "proposal": "按G001的配合探贯原则处理，但这组南家2–4–4–3没有单缺，因此具体下一口是4♦，不是3♠；开叫人4♥拒绝、4NT问♥关键张。",
+      "basis": [
+        "Daqiush §1NT：2♣问高花；找到高花配合后，3oM=带单缺探贯，4♦=无单缺探贯。",
+        "新睿 1N_P_2C#：斯台曼可用于寻找高花配合；与 Daqiush 冲突时以 Daqiush 为准。"
+      ],
+      "decision": "approved",
+      "implementation": "partial",
+      "reviewer_note": ""
+    },
+    "G010": {
+      "title": "G010 · 七张♦转移后接受结果",
+      "diagnosis": "原进程的叫法未充分表达这类牌，或仍需复核其依据。",
+      "kind": "keep",
+      "target_auction": "1NT–2NT–3♣/3♦",
+      "proposed_call": "3♦／Pass",
+      "proposal": "用户接受这组弱♦转移及止叫，不根据漏局的 DDS 提示强行抬至5♦。",
+      "basis": [
+        "Daqiush §1NT：2♠转移♣、2NT转移♦（保6）；弱牌可停3m，畸形牌可邀请5m。",
+        "新睿 1N_P_2S#提供弱♣转移的基础；其2NT含义不同，不覆盖 Daqiush。",
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "needs_changes",
+      "implementation": "accepted_no_change",
+      "reviewer_note": "进不进5D，用模拟处理一下（所有畸形，或有配合的满贯进程，都用模拟）"
+    },
+    "G011": {
+      "title": "G011 · 弱均型面对1NT接受Pass",
+      "diagnosis": "原进程的叫法未充分表达这类牌，或仍需复核其依据。",
+      "kind": "keep",
+      "target_auction": "1NT",
+      "proposed_call": "Pass",
+      "proposal": "用户接受这组弱均型止叫1NT；单副牌的宕牌概率不推出另一口有体系依据的叫品。",
+      "basis": [
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "accepted_no_change",
+      "reviewer_note": ""
+    },
+    "G012": {
+      "title": "G012 · ♠超转后探贯牌直接问关键张",
+      "diagnosis": "原进程的叫法未充分表达这类牌，或仍需复核其依据。",
+      "kind": "change",
+      "target_auction": "1NT–2♥–3♣",
+      "proposed_call": "4NT",
+      "proposal": "3♣按已确认超转表表示♣双张、♠至少四张且绝对高限。把经模拟归类为探贯的五张♠牌由4♠封局改叫4NT；普通进局牌仍叫4♠。需补五张套探贯分类，不能让每副同牌型都问A。",
+      "basis": [
+        "Daqiush §1NT：2♦/2♥雅可比转移；超转表及“超转后所有探贯牌立即4NT”。",
+        "新睿 1N_P_2D#、1N_P_2H#：分别转移♥、♠。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G013": {
+      "title": "G013 · 单缺已答，补探贯收束",
+      "diagnosis": "当前代码已先叫3♥并答出♣单缺，但开叫人在4♣之后阻塞。",
+      "kind": "change",
+      "target_auction": "1NT–2♣–2♠–3♥–3NT–4♣",
+      "proposed_call": "4NT（控制与模拟支持）／4♠（否则）",
+      "proposal": "先按♣单缺重估开叫人的废点和剩余控制；若公共信息下的发牌模拟支持探贯，4NT以已定♠问关键张；若缺控制或不足则4♠止叫。不能仅按原始HCP自动问A。",
+      "basis": [
+        "Daqiush §1NT：2♣问高花；找到高花配合后，3oM=带单缺探贯，4♦=无单缺探贯。",
+        "新睿 1N_P_2C#：斯台曼可用于寻找高花配合；与 Daqiush 冲突时以 Daqiush 为准。"
+      ],
+      "decision": "needs_changes",
+      "implementation": "partial",
+      "reviewer_note": "实力未知是否充足时，扣叫邀请，扣叫过程中发现缺控制则止叫。实力充足时，直接4NT，不再核查控制。实力一定不充足时，直接4S。以上均为去掉C废点。"
+    },
+    "G014": {
+      "title": "G014 · 单缺已答，补探贯收束",
+      "diagnosis": "当前代码已先叫3♥并答出♣单缺，但开叫人在4♣之后阻塞。",
+      "kind": "change",
+      "target_auction": "1NT–2♣–2♠–3♥–3NT–4♣",
+      "proposed_call": "4NT（控制与模拟支持）／4♠（否则）",
+      "proposal": "先按♣单缺重估开叫人的废点和剩余控制；若公共信息下的发牌模拟支持探贯，4NT以已定♠问关键张；若缺控制或不足则4♠止叫。不能仅按原始HCP自动问A。",
+      "basis": [
+        "Daqiush §1NT：2♣问高花；找到高花配合后，3oM=带单缺探贯，4♦=无单缺探贯。",
+        "新睿 1N_P_2C#：斯台曼可用于寻找高花配合；与 Daqiush 冲突时以 Daqiush 为准。"
+      ],
+      "decision": "pending",
+      "implementation": "partial",
+      "reviewer_note": "同上"
+    },
+    "G015": {
+      "title": "G015 · 先显示七张♣再比较四张♠",
+      "diagnosis": "原进程的叫法未充分表达这类牌，或仍需复核其依据。",
+      "kind": "change",
+      "target_auction": "1NT–2♣–2♥",
+      "proposed_call": "3♣",
+      "proposal": "♥未配，应叫人先自然3♣显示七张套；开叫人若有四张♠，按既定优先级先叫3♠。随后比较♣与♠将牌的模拟成功率；不能直接3NT后被抬至4♠封局。",
+      "basis": [
+        "Daqiush §1NT：2♣问高花；找到高花配合后，3oM=带单缺探贯，4♦=无单缺探贯。",
+        "Daqiush：2♥后3m自然，开叫人再出3♠的优先级高于支持m。",
+        "跨体系7–4长套优先比较原则。"
+      ],
+      "decision": "needs_changes",
+      "implementation": "not_started",
+      "reviewer_note": "跨体系7–4长套优先比较原则改为仅限于两套都是低花或都是高花，因此不适用。7~8有效点先斯台曼，若未配，5m封局。"
+    },
+    "G016": {
+      "title": "G016 · 五张♠问叫后八张配合探贯",
+      "diagnosis": "原进程的叫法未充分表达这类牌，或仍需复核其依据。",
+      "kind": "change",
+      "target_auction": "1NT–3♣–3♠",
+      "proposed_call": "4NT",
+      "proposal": "3♣问出开叫人五张♠，应叫人三张♠已形成八张配合；若模拟判为探贯，先在状态中定♠将牌，再4NT问关键张；普通进局牌仍4♠。",
+      "basis": [
+        "Daqiush：3♣问五张高花，逼局。",
+        "Daqiush 定将状态：已定将后4NT问该花色关键张。"
+      ],
+      "decision": "rejected",
+      "implementation": "not_started",
+      "reviewer_note": "应叫人3张♠️不是公共信息，定将未形成。人为约定4H表示S发起定将、探贯以上。后续自己想。"
+    },
+    "G017": {
+      "title": "G017 · 弱五张♠四张♥按长套转移",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP2HP3CP3HP3SPPP",
+      "proposed_call": "2♥",
+      "proposal": "弱5♠4♥先转♠，普通接受后Pass；新样本已避开旧进程中无谓的三阶竞争。",
+      "basis": [
+        "Daqiush §1NT：2♦/2♥雅可比转移；超转表及“超转后所有探贯牌立即4NT”。",
+        "新睿 1N_P_2D#、1N_P_2H#：分别转移♥、♠。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G018": {
+      "title": "G018 · 普通六张♣弱牌不强邀3NT",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP2SP2NP3CPPP",
+      "proposed_call": "2♠",
+      "proposal": "♣套没有两张A/K/Q，不符合已采用的“好低花套邀请3NT”初值；仍转移至3♣止叫。",
+      "basis": [
+        "Daqiush §1NT：2♠转移♣、2NT转移♦（保6）；弱牌可停3m，畸形牌可邀请5m。",
+        "新睿 1N_P_2S#提供弱♣转移的基础；其2NT含义不同，不覆盖 Daqiush。",
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "needs_changes",
+      "implementation": "not_started",
+      "reviewer_note": "HCP6-8，有牌型，不能强硬归为全弱牌。8HCP肯定是邀请，7也考虑。1NT-2C-2H-2S后开叫人好15点（KR15.5以上），4张S要加一下。“好低花套邀请3NT”可低至6点。"
+    },
+    "G019": {
+      "title": "G019 · 宕牌警报先不推翻体系叫法",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NPPP",
+      "proposed_call": "Pass",
+      "proposal": "当前首口 Pass 有既定止叫或转移依据；复采样 DDS 宕牌率偏高，先用同一南北牌的真实防守/做庄模拟比较替代路线，避免把双明手率写成绝对叫牌规则。",
+      "basis": [
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": "很多类似的牌都是这样，南家没有大牌点也没有牌型，北开叫1NT已是在劫难逃"
+    },
+    "G020": {
+      "title": "G020 · 弱♥先转移并止叫",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP2DP2HPPP",
+      "proposed_call": "2♦",
+      "proposal": "保留2♦雅可比转移至♥，弱牌停在2♥；双明手偶然出现的局不足以强迫弱牌跳局。",
+      "basis": [
+        "Daqiush §1NT：2♦/2♥雅可比转移；超转表及“超转后所有探贯牌立即4NT”。",
+        "新睿 1N_P_2D#、1N_P_2H#：分别转移♥、♠。",
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": "人家说的是宕牌，你怎么说局？"
+    },
+    "G021": {
+      "title": "G021 · 弱♥先转移并止叫",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP2DP2HPPP",
+      "proposed_call": "2♦",
+      "proposal": "保留2♦雅可比转移至♥，弱牌停在2♥；双明手偶然出现的局不足以强迫弱牌跳局。",
+      "basis": [
+        "Daqiush §1NT：2♦/2♥雅可比转移；超转表及“超转后所有探贯牌立即4NT”。",
+        "新睿 1N_P_2D#、1N_P_2H#：分别转移♥、♠。",
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "rejected",
+      "implementation": "not_started",
+      "reviewer_note": "牌型太好，根据KR点数酌情德克萨斯或止叫。提示：超级畸形牌没有邀请的必要"
+    },
+    "G022": {
+      "title": "G022 · 4♦探贯被拒后强牌仍可继续",
+      "diagnosis": "当前代码已走4♦无单缺探贯，但开叫人4♠拒绝后应叫人一律Pass。",
+      "kind": "change",
+      "target_auction": "1NT–2♣–2♠–4♦–4♠",
+      "proposed_call": "4NT（仍有探贯实力且模拟支持时）",
+      "proposal": "应叫人若凭自己的更高实力及开叫人已保证的范围仍值得探贯，4♠拒绝后可以4NT以♠问关键张；其余Pass。选择条件由模拟确定，不能把33 HCP的6NT原则直接套在有将满贯。",
+      "basis": [
+        "Daqiush §1NT：2♣问高花；找到高花配合后，3oM=带单缺探贯，4♦=无单缺探贯。",
+        "新睿 1N_P_2C#：斯台曼可用于寻找高花配合；与 Daqiush 冲突时以 Daqiush 为准。"
+      ],
+      "decision": "approved",
+      "implementation": "partial",
+      "reviewer_note": ""
+    },
+    "G023": {
+      "title": "G023 · 七张♦四张♣先转♦",
+      "diagnosis": "原进程的叫法未充分表达这类牌，或仍需复核其依据。",
+      "kind": "change",
+      "target_auction": "1NT",
+      "proposed_call": "2NT",
+      "proposal": "应叫人主套为七张♦，不宜把这手当作无特征斯台曼邀请。先2NT转♦；若按畸形牌/控制质量达到5♦邀请要求，普通接受后4♦，否则停3♦。",
+      "basis": [
+        "Daqiush §1NT：2♠转移♣、2NT转移♦（保6）；弱牌可停3m，畸形牌可邀请5m。",
+        "新睿 1N_P_2S#提供弱♣转移的基础；其2NT含义不同，不覆盖 Daqiush。",
+        "Daqiush：七张以上低花有独立的畸形5m邀请，开叫人按边花控制质量接受。"
+      ],
+      "decision": "rejected",
+      "implementation": "not_started",
+      "reviewer_note": "牌太强，无需邀请，直接5D"
+    },
+    "G024": {
+      "title": "G024 · 弱♠先转移并止叫",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP2HP3CP3HP3SPPP",
+      "proposed_call": "2♥",
+      "proposal": "保留2♥雅可比转移至♠，弱牌停在2♠；双明手偶然出现的局或满贯不足以强迫弱牌跳局。",
+      "basis": [
+        "Daqiush §1NT：2♦/2♥雅可比转移；超转表及“超转后所有探贯牌立即4NT”。",
+        "新睿 1N_P_2D#、1N_P_2H#：分别转移♥、♠。",
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G025": {
+      "title": "G025 · 宕牌警报先不推翻体系叫法",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NPPP",
+      "proposed_call": "Pass",
+      "proposal": "当前首口 Pass 有既定止叫或转移依据；复采样 DDS 宕牌率偏高，先用同一南北牌的真实防守/做庄模拟比较替代路线，避免把双明手率写成绝对叫牌规则。",
+      "basis": [
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G026": {
+      "title": "G026 · 宕牌警报先不推翻体系叫法",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NPPP",
+      "proposed_call": "Pass",
+      "proposal": "当前首口 Pass 有既定止叫或转移依据；复采样 DDS 宕牌率偏高，先用同一南北牌的真实防守/做庄模拟比较替代路线，避免把双明手率写成绝对叫牌规则。",
+      "basis": [
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G027": {
+      "title": "G027 · ♣长套4♣邀请按控制接受",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP2SP2NP3CPPP",
+      "proposed_call": "2♠→4♣",
+      "proposal": "先2♠转♣，七张以上♣达到畸形邀请条件时再4♣邀请5♣；开叫人依据将牌原点和边花控制决定是否加5♣。",
+      "basis": [
+        "Daqiush §1NT：2♠转移♣、2NT转移♦（保6）；弱牌可停3m，畸形牌可邀请5m。",
+        "新睿 1N_P_2S#提供弱♣转移的基础；其2NT含义不同，不覆盖 Daqiush。",
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "rejected",
+      "implementation": "not_started",
+      "reviewer_note": "牌型太好，无需邀请，直接进局5C"
+    },
+    "G028": {
+      "title": "G028 · 宕牌警报先不推翻体系叫法",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NPPP",
+      "proposed_call": "Pass",
+      "proposal": "当前首口 Pass 有既定止叫或转移依据；复采样 DDS 宕牌率偏高，先用同一南北牌的真实防守/做庄模拟比较替代路线，避免把双明手率写成绝对叫牌规则。",
+      "basis": [
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G029": {
+      "title": "G029 · 宕牌警报先不推翻体系叫法",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP2HP2SPPP",
+      "proposed_call": "2H",
+      "proposal": "当前首口 2H 有既定止叫或转移依据；复采样 DDS 宕牌率偏高，先用同一南北牌的真实防守/做庄模拟比较替代路线，避免把双明手率写成绝对叫牌规则。",
+      "basis": [
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G030": {
+      "title": "G030 · 弱♠先转移并止叫",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP2HP3CP3HP3SPPP",
+      "proposed_call": "2♥",
+      "proposal": "保留2♥雅可比转移至♠，弱牌停在2♠；双明手偶然出现的局或满贯不足以强迫弱牌跳局。",
+      "basis": [
+        "Daqiush §1NT：2♦/2♥雅可比转移；超转表及“超转后所有探贯牌立即4NT”。",
+        "新睿 1N_P_2D#、1N_P_2H#：分别转移♥、♠。",
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "rejected",
+      "implementation": "not_started",
+      "reviewer_note": "同伴超转目的就是帮助弱牌进局。弱牌模拟一下，够进局就进（获得进局计划）：先转移回3M，然后加进4。"
+    },
+    "G031": {
+      "title": "G031 · 四四高花的八点边界分流",
+      "diagnosis": "原进程的叫法未充分表达这类牌，或仍需复核其依据。",
+      "kind": "change",
+      "target_auction": "1NT",
+      "proposed_call": "Pass／2♣",
+      "proposal": "无♣单缺/缺门，不套用垃圾斯台曼。按已确认“很差的8点不邀请、普通8点可邀请”：差牌Pass，达到邀请质量则2♣，若未找到配合再2NT。需按这一组牌例校准相对KR边界。",
+      "basis": [
+        "Daqiush §1NT：2♣问高花；找到高花配合后，3oM=带单缺探贯，4♦=无单缺探贯。",
+        "新睿 1N_P_2C#：斯台曼可用于寻找高花配合；与 Daqiush 冲突时以 Daqiush 为准。",
+        "用户确认：很差8点止叫，极好9点直接进局。"
+      ],
+      "decision": "needs_changes",
+      "implementation": "not_started",
+      "reviewer_note": "KR低到6.5，或者8点的4333，不邀请。其余8点邀请。"
+    },
+    "G032": {
+      "title": "G032 · 4♦探贯被拒后强牌仍可继续",
+      "diagnosis": "当前代码已走4♦无单缺探贯，但开叫人4♠拒绝后应叫人一律Pass。",
+      "kind": "change",
+      "target_auction": "1NT–2♣–2♠–4♦–4♠",
+      "proposed_call": "4NT（仍有探贯实力且模拟支持时）",
+      "proposal": "应叫人若凭自己的更高实力及开叫人已保证的范围仍值得探贯，4♠拒绝后可以4NT以♠问关键张；其余Pass。选择条件由模拟确定，不能把33 HCP的6NT原则直接套在有将满贯。",
+      "basis": [
+        "Daqiush §1NT：2♣问高花；找到高花配合后，3oM=带单缺探贯，4♦=无单缺探贯。",
+        "新睿 1N_P_2C#：斯台曼可用于寻找高花配合；与 Daqiush 冲突时以 Daqiush 为准。"
+      ],
+      "decision": "approved",
+      "implementation": "partial",
+      "reviewer_note": ""
+    },
+    "G033": {
+      "title": "G033 · ♣长套4♣邀请按控制接受",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP2SP2NP4CP5CPPP",
+      "proposed_call": "2♠→4♣",
+      "proposal": "先2♠转♣，七张以上♣达到畸形邀请条件时再4♣邀请5♣；开叫人依据将牌原点和边花控制决定是否加5♣。",
+      "basis": [
+        "Daqiush §1NT：2♠转移♣、2NT转移♦（保6）；弱牌可停3m，畸形牌可邀请5m。",
+        "新睿 1N_P_2S#提供弱♣转移的基础；其2NT含义不同，不覆盖 Daqiush。",
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "needs_changes",
+      "implementation": "not_started",
+      "reviewer_note": "AKQJ:9\nAKQ:8.4\nAKJ:7.3\nAQJ:5.8\nKQJ:4.7\nAK:7\nAQ:5.5\nAJ:4.4(>=3)/4.1(2)\nKQ:4.4(>=3)/4.1(2)\nKJ:3.1(>=3)/2.9(2)\nQJ:1.5(>=3)/0.4(2)\nA:4\nK:2.6(>=2)/1.5(1)\nQ:1.3(>=3)/1(2)/0.3(1)\nJ:0.5(>=3)/0.2(2)/0.1(1)\n\n调整后仍有开1NT点力则接受"
+    },
+    "G034": {
+      "title": "G034 · 弱♥先转移并止叫",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP2DP2HPPP",
+      "proposed_call": "2♦",
+      "proposal": "保留2♦雅可比转移至♥，弱牌停在2♥；双明手偶然出现的局不足以强迫弱牌跳局。",
+      "basis": [
+        "Daqiush §1NT：2♦/2♥雅可比转移；超转表及“超转后所有探贯牌立即4NT”。",
+        "新睿 1N_P_2D#、1N_P_2H#：分别转移♥、♠。",
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "needs_changes",
+      "implementation": "not_started",
+      "reviewer_note": "采用畸形牌有效点机制算点：达到7有效点就假装自己是6个H邀请；达到9有效点就走两套逼局"
+    },
+    "G035": {
+      "title": "G035 · 宕牌警报先不推翻体系叫法",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP2NP3DPPP",
+      "proposed_call": "2NT",
+      "proposal": "当前首口 2NT 有既定止叫或转移依据；复采样 DDS 宕牌率偏高，先用同一南北牌的真实防守/做庄模拟比较替代路线，避免把双明手率写成绝对叫牌规则。",
+      "basis": [
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G036": {
+      "title": "G036 · 弱七张♣牌先转♣",
+      "diagnosis": "原进程的叫法未充分表达这类牌，或仍需复核其依据。",
+      "kind": "change",
+      "target_auction": "1NT",
+      "proposed_call": "2♠",
+      "proposal": "7♣4♠的弱牌先2♠转♣；仅在长♣质量不占优、并且♠配合路线经模拟更好时改走斯台曼。不要把弱牌的偶然DDS成局率写成无条件4♠。",
+      "basis": [
+        "Daqiush §1NT：2♠转移♣、2NT转移♦（保6）；弱牌可停3m，畸形牌可邀请5m。",
+        "新睿 1N_P_2S#提供弱♣转移的基础；其2NT含义不同，不覆盖 Daqiush。",
+        "跨体系7–4长套优先比较原则。"
+      ],
+      "decision": "rejected",
+      "implementation": "not_started",
+      "reviewer_note": "7~8点不是弱牌，斯台曼后同伴若不答2S则封局5C"
+    },
+    "G037": {
+      "title": "G037 · ♦长套4♦邀请按控制接受",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP2NP3DP4DPPP",
+      "proposed_call": "2NT→4♦",
+      "proposal": "先2NT转♦，七张以上♦达到畸形邀请条件时再4♦邀请5♦；开叫人依据将牌原点和边花控制决定是否加5♦。",
+      "basis": [
+        "Daqiush §1NT：2♠转移♣、2NT转移♦（保6）；弱牌可停3m，畸形牌可邀请5m。",
+        "新睿 1N_P_2S#提供弱♣转移的基础；其2NT含义不同，不覆盖 Daqiush。",
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "rejected",
+      "implementation": "not_started",
+      "reviewer_note": "8个D决不能接受3NT。也无需邀请，都统一5D即可。"
+    },
+    "G038": {
+      "title": "G038 · 宕牌警报先不推翻体系叫法",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NPPP",
+      "proposed_call": "Pass",
+      "proposal": "当前首口 Pass 有既定止叫或转移依据；复采样 DDS 宕牌率偏高，先用同一南北牌的真实防守/做庄模拟比较替代路线，避免把双明手率写成绝对叫牌规则。",
+      "basis": [
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G039": {
+      "title": "G039 · 弱♠先转移并止叫",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP2HP2SPPP",
+      "proposed_call": "2♥",
+      "proposal": "保留2♥雅可比转移至♠，弱牌停在2♠；双明手偶然出现的局或满贯不足以强迫弱牌跳局。",
+      "basis": [
+        "Daqiush §1NT：2♦/2♥雅可比转移；超转表及“超转后所有探贯牌立即4NT”。",
+        "新睿 1N_P_2D#、1N_P_2H#：分别转移♥、♠。",
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "needs_changes",
+      "implementation": "not_started",
+      "reviewer_note": "同超转后考虑进局项"
+    },
+    "G040": {
+      "title": "G040 · 强六张♣兼四张♠先自然出套",
+      "diagnosis": "原进程的叫法未充分表达这类牌，或仍需复核其依据。",
+      "kind": "change",
+      "target_auction": "1NT–2♣–2♥",
+      "proposed_call": "3♣",
+      "proposal": "♥未配，3♣自然显示六张♣和进局以上实力；开叫人若另有四张♠，3♠优先于低花支持。之后再用模拟比较6♣与6♠。",
+      "basis": [
+        "Daqiush §1NT：2♣问高花；找到高花配合后，3oM=带单缺探贯，4♦=无单缺探贯。",
+        "Daqiush：1NT–2♣–2♥–3m自然，开叫人3♠优先。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": "同伴3♠后，应叫人获得“叫♠️满贯”目的，4♦️、4♥均约定为定♠️将牌的扣叫"
+    },
+    "G041": {
+      "title": "G041 · 弱♠先转移并止叫",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP2HP3CP3HP3SPPP",
+      "proposed_call": "2♥",
+      "proposal": "保留2♥雅可比转移至♠，弱牌停在2♠；双明手偶然出现的局或满贯不足以强迫弱牌跳局。",
+      "basis": [
+        "Daqiush §1NT：2♦/2♥雅可比转移；超转表及“超转后所有探贯牌立即4NT”。",
+        "新睿 1N_P_2D#、1N_P_2H#：分别转移♥、♠。",
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G042": {
+      "title": "G042 · 弱6♣5♠双套需要选路",
+      "diagnosis": "Daqiush已定义弱5–4双高花按套质量转移，但这里是6♣5♠，7–4原则也不能直接外推。",
+      "kind": "investigate",
+      "target_auction": "1NT",
+      "proposed_call": "",
+      "proposal": "先比较2♠转♣后停3♣与2♥转♠后停2♠的单明手期望；在体系写出6m5M弱牌优先级后才能指定统一首口。",
+      "basis": [
+        "Daqiush §1NT：2♠转移♣、2NT转移♦（保6）；弱牌可停3m，畸形牌可邀请5m。",
+        "新睿 1N_P_2S#提供弱♣转移的基础；其2NT含义不同，不覆盖 Daqiush。",
+        "Daqiush §1NT：2♦/2♥雅可比转移；超转表及“超转后所有探贯牌立即4NT”。",
+        "新睿 1N_P_2D#、1N_P_2H#：分别转移♥、♠。",
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "rejected",
+      "implementation": "not_started",
+      "reviewer_note": "6以下有效点停2S（同伴超转时除外），6以上有效点伪装成6张S邀请牌"
+    },
+    "G043": {
+      "title": "G043 · 宕牌警报先不推翻体系叫法",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP2NP3DPPP",
+      "proposed_call": "2NT",
+      "proposal": "当前首口 2NT 有既定止叫或转移依据；复采样 DDS 宕牌率偏高，先用同一南北牌的真实防守/做庄模拟比较替代路线，避免把双明手率写成绝对叫牌规则。",
+      "basis": [
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G044": {
+      "title": "G044 · 均型高点无高花配合可直接6NT",
+      "diagnosis": "原进程的叫法未充分表达这类牌，或仍需复核其依据。",
+      "kind": "change",
+      "target_auction": "1NT–2♣–2♠",
+      "proposed_call": "6NT",
+      "proposal": "应叫人没有♠配合，联手原始HCP的保底已超过33；这是已确认的“均型、配合不佳6NT按33 HCP”例外，可直接6NT，不沿用有将满贯的DDS选路。",
+      "basis": [
+        "用户确认：均型、配合不佳时冲6NT按联手原始HCP≥33。",
+        "Daqiush §1NT：2♣问高花；找到高花配合后，3oM=带单缺探贯，4♦=无单缺探贯。"
+      ],
+      "decision": "rejected",
+      "implementation": "not_started",
+      "reviewer_note": "差的21叫5NT（自己查是什么意思），好的21以上叫7NT"
+    },
+    "G045": {
+      "title": "G045 · 弱♠先转移并止叫",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP2HP2SPPP",
+      "proposed_call": "2♥",
+      "proposal": "保留2♥雅可比转移至♠，弱牌停在2♠；双明手偶然出现的局或满贯不足以强迫弱牌跳局。",
+      "basis": [
+        "Daqiush §1NT：2♦/2♥雅可比转移；超转表及“超转后所有探贯牌立即4NT”。",
+        "新睿 1N_P_2D#、1N_P_2H#：分别转移♥、♠。",
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "rejected",
+      "implementation": "not_started",
+      "reviewer_note": "5有效点以上的65高花处理成55邀请（同伴如果接受邀请选3NT，则改叫4S）以下的才是弱牌"
+    },
+    "G046": {
+      "title": "G046 · 宕牌警报先不推翻体系叫法",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NPPP",
+      "proposed_call": "Pass",
+      "proposal": "当前首口 Pass 有既定止叫或转移依据；复采样 DDS 宕牌率偏高，先用同一南北牌的真实防守/做庄模拟比较替代路线，避免把双明手率写成绝对叫牌规则。",
+      "basis": [
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G047": {
+      "title": "G047 · ♥配合带单缺用另一高花探贯",
+      "diagnosis": "原进程直接封局，可能遗漏体系已有的探贯步骤。",
+      "kind": "change",
+      "target_auction": "1NT–2♣–2♥",
+      "proposed_call": "3♠",
+      "proposal": "♥配合且有单缺，以3♠显示配合单缺；3NT问单缺，答4♥代表♠单缺。五张另一高花的自然价值须在后续模拟中另行核对。",
+      "basis": [
+        "Daqiush §1NT：2♣问高花；找到高花配合后，3oM=带单缺探贯，4♦=无单缺探贯。",
+        "新睿 1N_P_2C#：斯台曼可用于寻找高花配合；与 Daqiush 冲突时以 Daqiush 为准。"
+      ],
+      "decision": "needs_changes",
+      "implementation": "not_started",
+      "reviewer_note": "3NT问单缺后答什么？"
+    },
+    "G048": {
+      "title": "G048 · 弱♣转移后停叫",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP2SP3CPPP",
+      "proposed_call": "2♠→3♣",
+      "proposal": "弱长♣用2♠转移并停3♣；这类牌不因 DDS 漏局提示自动加到5♣。",
+      "basis": [
+        "Daqiush §1NT：2♠转移♣、2NT转移♦（保6）；弱牌可停3m，畸形牌可邀请5m。",
+        "新睿 1N_P_2S#提供弱♣转移的基础；其2NT含义不同，不覆盖 Daqiush。",
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G049": {
+      "title": "G049 · 单缺已答，补探贯收束",
+      "diagnosis": "当前代码已先叫3♥并答出♣单缺，但开叫人在4♣之后阻塞。",
+      "kind": "change",
+      "target_auction": "1NT–2♣–2♠–3♥–3NT–4♣",
+      "proposed_call": "4NT（控制与模拟支持）／4♠（否则）",
+      "proposal": "先按♣单缺重估开叫人的废点和剩余控制；若公共信息下的发牌模拟支持探贯，4NT以已定♠问关键张；若缺控制或不足则4♠止叫。不能仅按原始HCP自动问A。",
+      "basis": [
+        "Daqiush §1NT：2♣问高花；找到高花配合后，3oM=带单缺探贯，4♦=无单缺探贯。",
+        "新睿 1N_P_2C#：斯台曼可用于寻找高花配合；与 Daqiush 冲突时以 Daqiush 为准。"
+      ],
+      "decision": "rejected",
+      "implementation": "partial",
+      "reviewer_note": "自己查新睿体系去，55高花怎么叫"
+    },
+    "G050": {
+      "title": "G050 · 宕牌警报先不推翻体系叫法",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NPPP",
+      "proposed_call": "Pass",
+      "proposal": "当前首口 Pass 有既定止叫或转移依据；复采样 DDS 宕牌率偏高，先用同一南北牌的真实防守/做庄模拟比较替代路线，避免把双明手率写成绝对叫牌规则。",
+      "basis": [
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G051": {
+      "title": "G051 · 五张♥邀请接受需按好坏校准",
+      "diagnosis": "现有开叫人接受五张♥邀请的候选缺少高低限及配合质量判定；DDS显示部分4♥失败，但不能据此规定一律拒绝。",
+      "kind": "investigate",
+      "target_auction": "1NT–2♦–2♥–2NT",
+      "proposed_call": "",
+      "proposal": "按邀请公理与好坏点力评估接受范围：拒绝有♥配合时叫3♥，接受叫4♥；需要先确定这组的相对质量边界再落实判定。",
+      "basis": [
+        "Daqiush §1NT：2♦/2♥雅可比转移；超转表及“超转后所有探贯牌立即4NT”。",
+        "新睿 1N_P_2D#、1N_P_2H#：分别转移♥、♠。",
+        "Daqiush 邀请公理：好牌下限+1/下限+2等接受范围。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G052": {
+      "title": "G052 · 复采样未重现原警报",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP2DP3CP3DP3HPPP",
+      "proposed_call": "2D",
+      "proposal": "原警报在本组新样本未跨过阈值；先保留当前首口 2D，后续仅在具体体系规则或单明手模拟支持时再改。",
+      "basis": [
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G053": {
+      "title": "G053 · 3NT寻找♠配合后继续探贯",
+      "diagnosis": "原进程的叫法未充分表达这类牌，或仍需复核其依据。",
+      "kind": "change",
+      "target_auction": "1NT–2♣–2♥–3NT–4♠",
+      "proposed_call": "4NT",
+      "proposal": "应叫人不配♥、有四张♠，先3NT让开叫人以四张♠叫4♠。已找到八张♠配合且模拟判为探贯时，下一口4NT以♠问关键张；普通进局牌Pass。",
+      "basis": [
+        "Daqiush §1NT：2♣问高花；找到高花配合后，3oM=带单缺探贯，4♦=无单缺探贯。",
+        "用户确认：1NT–2♣–2♥后应叫人有四张♠且逼局时3NT，开叫人配♠叫4♠或扣叫。"
+      ],
+      "decision": "rejected",
+      "implementation": "not_started",
+      "reviewer_note": "4333逼局牌叫3C而非2C，这类牌不打44配的4高花，只打54配。好16~17的，2C-2D后直接叫4NT。"
+    },
+    "G054": {
+      "title": "G054 · 宕牌警报先不推翻体系叫法",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP2DP2HPPP",
+      "proposed_call": "2D",
+      "proposal": "当前首口 2D 有既定止叫或转移依据；复采样 DDS 宕牌率偏高，先用同一南北牌的真实防守/做庄模拟比较替代路线，避免把双明手率写成绝对叫牌规则。",
+      "basis": [
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G055": {
+      "title": "G055 · 宕牌警报先不推翻体系叫法",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP2SP3CPPP",
+      "proposed_call": "2S",
+      "proposal": "当前首口 2S 有既定止叫或转移依据；复采样 DDS 宕牌率偏高，先用同一南北牌的真实防守/做庄模拟比较替代路线，避免把双明手率写成绝对叫牌规则。",
+      "basis": [
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G056": {
+      "title": "G056 · 宕牌警报先不推翻体系叫法",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NPPP",
+      "proposed_call": "Pass",
+      "proposal": "当前首口 Pass 有既定止叫或转移依据；复采样 DDS 宕牌率偏高，先用同一南北牌的真实防守/做庄模拟比较替代路线，避免把双明手率写成绝对叫牌规则。",
+      "basis": [
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G057": {
+      "title": "G057 · 宕牌警报先不推翻体系叫法",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP2SP2NP3CPPP",
+      "proposed_call": "2S",
+      "proposal": "当前首口 2S 有既定止叫或转移依据；复采样 DDS 宕牌率偏高，先用同一南北牌的真实防守/做庄模拟比较替代路线，避免把双明手率写成绝对叫牌规则。",
+      "basis": [
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G058": {
+      "title": "G058 · 宕牌警报先不推翻体系叫法",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NPPP",
+      "proposed_call": "Pass",
+      "proposal": "当前首口 Pass 有既定止叫或转移依据；复采样 DDS 宕牌率偏高，先用同一南北牌的真实防守/做庄模拟比较替代路线，避免把双明手率写成绝对叫牌规则。",
+      "basis": [
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G059": {
+      "title": "G059 · ♦单缺已答，补探贯收束",
+      "diagnosis": "当前代码已显示♦单缺，下一口开叫人阻塞。",
+      "kind": "change",
+      "target_auction": "1NT–2♣–2♠–3♥–3NT–4♦",
+      "proposed_call": "4NT（控制与模拟支持）／4♠（否则）",
+      "proposal": "按♦单缺扣除废点并审查边花控制；值得探贯时4NT以♠问关键张，否则4♠止叫。具体判定需用模拟校准。",
+      "basis": [
+        "Daqiush §1NT：2♣问高花；找到高花配合后，3oM=带单缺探贯，4♦=无单缺探贯。",
+        "新睿 1N_P_2C#：斯台曼可用于寻找高花配合；与 Daqiush 冲突时以 Daqiush 为准。"
+      ],
+      "decision": "needs_changes",
+      "implementation": "partial",
+      "reviewer_note": "22HCP以上直接7NT即可（联手37）；21定将后问A或无配合5NT邀请决定打不打7。"
+    },
+    "G060": {
+      "title": "G060 · 弱♠先转移并止叫",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP2HP2SPPP",
+      "proposed_call": "2♥",
+      "proposal": "保留2♥雅可比转移至♠，弱牌停在2♠；双明手偶然出现的局或满贯不足以强迫弱牌跳局。",
+      "basis": [
+        "Daqiush §1NT：2♦/2♥雅可比转移；超转表及“超转后所有探贯牌立即4NT”。",
+        "新睿 1N_P_2D#、1N_P_2H#：分别转移♥、♠。",
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G061": {
+      "title": "G061 · 单缺已答，补探贯收束",
+      "diagnosis": "当前代码已先叫3♥并答出♣单缺，但开叫人在4♣之后阻塞。",
+      "kind": "change",
+      "target_auction": "1NT–2♣–2♠–3♥–3NT–4♣",
+      "proposed_call": "4NT（控制与模拟支持）／4♠（否则）",
+      "proposal": "先按♣单缺重估开叫人的废点和剩余控制；若公共信息下的发牌模拟支持探贯，4NT以已定♠问关键张；若缺控制或不足则4♠止叫。不能仅按原始HCP自动问A。",
+      "basis": [
+        "Daqiush §1NT：2♣问高花；找到高花配合后，3oM=带单缺探贯，4♦=无单缺探贯。",
+        "新睿 1N_P_2C#：斯台曼可用于寻找高花配合；与 Daqiush 冲突时以 Daqiush 为准。"
+      ],
+      "decision": "rejected",
+      "implementation": "partial",
+      "reviewer_note": "同前"
+    },
+    "G062": {
+      "title": "G062 · 宕牌警报先不推翻体系叫法",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NPPP",
+      "proposed_call": "Pass",
+      "proposal": "当前首口 Pass 有既定止叫或转移依据；复采样 DDS 宕牌率偏高，先用同一南北牌的真实防守/做庄模拟比较替代路线，避免把双明手率写成绝对叫牌规则。",
+      "basis": [
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G063": {
+      "title": "G063 · 4♦探贯被拒后强牌仍可继续",
+      "diagnosis": "当前代码已走4♦无单缺探贯，但开叫人4♠拒绝后应叫人一律Pass。",
+      "kind": "change",
+      "target_auction": "1NT–2♣–2♠–4♦–4♠",
+      "proposed_call": "4NT（仍有探贯实力且模拟支持时）",
+      "proposal": "应叫人若凭自己的更高实力及开叫人已保证的范围仍值得探贯，4♠拒绝后可以4NT以♠问关键张；其余Pass。选择条件由模拟确定，不能把33 HCP的6NT原则直接套在有将满贯。",
+      "basis": [
+        "Daqiush §1NT：2♣问高花；找到高花配合后，3oM=带单缺探贯，4♦=无单缺探贯。",
+        "新睿 1N_P_2C#：斯台曼可用于寻找高花配合；与 Daqiush 冲突时以 Daqiush 为准。"
+      ],
+      "decision": "rejected",
+      "implementation": "partial",
+      "reviewer_note": "19点直接叫6NT，20~21（4333不可能是好21，不考虑7NT）直接叫5NT，4333不主动打有将"
+    },
+    "G064": {
+      "title": "G064 · 弱♣转移后停叫",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP2SP2NP3CPPP",
+      "proposed_call": "2♠→3♣",
+      "proposal": "弱长♣用2♠转移并停3♣；这类牌不因 DDS 漏局提示自动加到5♣。",
+      "basis": [
+        "Daqiush §1NT：2♠转移♣、2NT转移♦（保6）；弱牌可停3m，畸形牌可邀请5m。",
+        "新睿 1N_P_2S#提供弱♣转移的基础；其2NT含义不同，不覆盖 Daqiush。",
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G065": {
+      "title": "G065 · 复采样未重现原警报",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NPPP",
+      "proposed_call": "Pass",
+      "proposal": "原警报在本组新样本未跨过阈值；先保留当前首口 Pass，后续仅在具体体系规则或单明手模拟支持时再改。",
+      "basis": [
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G066": {
+      "title": "G066 · 宕牌警报先不推翻体系叫法",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NPPP",
+      "proposed_call": "Pass",
+      "proposal": "当前首口 Pass 有既定止叫或转移依据；复采样 DDS 宕牌率偏高，先用同一南北牌的真实防守/做庄模拟比较替代路线，避免把双明手率写成绝对叫牌规则。",
+      "basis": [
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G067": {
+      "title": "G067 · 弱♠先转移并止叫",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP2HP2SPPP",
+      "proposed_call": "2♥",
+      "proposal": "保留2♥雅可比转移至♠，弱牌停在2♠；双明手偶然出现的局或满贯不足以强迫弱牌跳局。",
+      "basis": [
+        "Daqiush §1NT：2♦/2♥雅可比转移；超转表及“超转后所有探贯牌立即4NT”。",
+        "新睿 1N_P_2D#、1N_P_2H#：分别转移♥、♠。",
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "rejected",
+      "implementation": "not_started",
+      "reviewer_note": "7有效点逼局，5有效点邀请（先2C，同伴2M则加叫、2D则2S；1N-2C-2D-2S-2NT则3S，-3NT则4S），以下才是弱牌。牌型太好了。"
+    },
+    "G068": {
+      "title": "G068 · 五张高花问出配合后需比较低花",
+      "diagnosis": "应叫人有三张♠、五张♦四张♣，虽然♠达八张配合，低花双套也可能改变最佳将牌。现有3♣问叫后未定义如何同时保留这两条路线。",
+      "kind": "investigate",
+      "target_auction": "1NT–3♣–3♠",
+      "proposed_call": "",
+      "proposal": "用同样开叫人公开约束比较6♠、6♦、6♣，随后再定义3♣答叫后的自然低花/问关键张分工；目前不能擅自指定4♦或4NT。",
+      "basis": [
+        "Daqiush：3♣问五张高花，逼局。",
+        "跨体系：比较长套与高花配合的预期定约。"
+      ],
+      "decision": "rejected",
+      "implementation": "not_started",
+      "reviewer_note": "就打S，如果认为可能有满贯叫4H（见前）"
+    },
+    "G069": {
+      "title": "G069 · 六张♣先区分弱牌与普通邀请",
+      "diagnosis": "原进程的叫法未充分表达这类牌，或仍需复核其依据。",
+      "kind": "change",
+      "target_auction": "1NT",
+      "proposed_call": "2♠／2♣（按邀请实力）",
+      "proposal": "六张♣弱牌先2♠转♣后停3♣；达到普通无特征邀请强度则忽略♣套，2♣斯台曼后2NT。只有♣套具备两张A/K/Q，才走“好套邀请3NT”的低花转移路线。",
+      "basis": [
+        "Daqiush §1NT：2♠转移♣、2NT转移♦（保6）；弱牌可停3m，畸形牌可邀请5m。",
+        "新睿 1N_P_2S#提供弱♣转移的基础；其2NT含义不同，不覆盖 Daqiush。",
+        "Daqiush §1NT：2♣问高花；找到高花配合后，3oM=带单缺探贯，4♦=无单缺探贯。",
+        "新睿 1N_P_2C#：斯台曼可用于寻找高花配合；与 Daqiush 冲突时以 Daqiush 为准。",
+        "用户确认：普通邀请忽略低花套；低花邀请必须是好套邀3NT。"
+      ],
+      "decision": "needs_changes",
+      "implementation": "not_started",
+      "reviewer_note": "如果套过好（CAKQ），因为有S，直接3C，问不到S就3NT，无需任何邀请。"
+    },
+    "G070": {
+      "title": "G070 · 宕牌警报先不推翻体系叫法",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP2SP3CPPP",
+      "proposed_call": "2S",
+      "proposal": "当前首口 2S 有既定止叫或转移依据；复采样 DDS 宕牌率偏高，先用同一南北牌的真实防守/做庄模拟比较替代路线，避免把双明手率写成绝对叫牌规则。",
+      "basis": [
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G071": {
+      "title": "G071 · 六张♣兼四张♠单缺先出♣",
+      "diagnosis": "原进程的叫法未充分表达这类牌，或仍需复核其依据。",
+      "kind": "change",
+      "target_auction": "1NT–2♣–2♠",
+      "proposed_call": "3♣",
+      "proposal": "这类10–12 HCP牌若模拟认为有贯，先自然3♣显示六张♣，而不是直接4♠；再比较♣与♠将牌。未达到探贯条件的牌仍按进局/邀请实力止叫。",
+      "basis": [
+        "Daqiush §1NT：2♣问高花；找到高花配合后，3oM=带单缺探贯，4♦=无单缺探贯。",
+        "Daqiush：1NT–2♣–2M后3m自然出套。"
+      ],
+      "decision": "rejected",
+      "implementation": "not_started",
+      "reviewer_note": "你不会叫3H吗？边缘满贯，44配合一定优于62/63（记住这个知识点）"
+    },
+    "G072": {
+      "title": "G072 · 弱♥先转移并止叫",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP2DP2HPPP",
+      "proposed_call": "2♦",
+      "proposal": "保留2♦雅可比转移至♥，弱牌停在2♥；双明手偶然出现的局不足以强迫弱牌跳局。",
+      "basis": [
+        "Daqiush §1NT：2♦/2♥雅可比转移；超转表及“超转后所有探贯牌立即4NT”。",
+        "新睿 1N_P_2D#、1N_P_2H#：分别转移♥、♠。",
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "rejected",
+      "implementation": "not_started",
+      "reviewer_note": "好的6个点以上就是邀请"
+    },
+    "G073": {
+      "title": "G073 · 关键张0/3歧义后不能猜满贯",
+      "diagnosis": "当前代码已4♦探贯、4NT问♥关键张，但在5♦（0或3张）后阻塞。",
+      "kind": "investigate",
+      "target_auction": "1NT–2♣–2♥–4♦–4NT–5♦",
+      "proposed_call": "",
+      "proposal": "先以开叫已保证点力、控制和剩余关键张排除0/3中不可能的一项；无法排除时，体系仍缺询问或安全止叫约定，不直接猜6♥。",
+      "basis": [
+        "Daqiush §1NT：2♣问高花；找到高花配合后，3oM=带单缺探贯，4♦=无单缺探贯。",
+        "新睿 1N_P_2C#：斯台曼可用于寻找高花配合；与 Daqiush 冲突时以 Daqiush 为准。"
+      ],
+      "decision": "rejected",
+      "implementation": "partial",
+      "reviewer_note": "4333无需找配合；18~19叫6NT；20叫5NT"
+    },
+    "G074": {
+      "title": "G074 · ♦长套4♦邀请按控制接受",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP2NP3DP4DPPP",
+      "proposed_call": "2NT→4♦",
+      "proposal": "先2NT转♦，七张以上♦达到畸形邀请条件时再4♦邀请5♦；开叫人依据将牌原点和边花控制决定是否加5♦。",
+      "basis": [
+        "Daqiush §1NT：2♠转移♣、2NT转移♦（保6）；弱牌可停3m，畸形牌可邀请5m。",
+        "新睿 1N_P_2S#提供弱♣转移的基础；其2NT含义不同，不覆盖 Daqiush。",
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "needs_changes",
+      "implementation": "not_started",
+      "reviewer_note": "8张和7张要区分，8张无需邀请直接进局"
+    },
+    "G075": {
+      "title": "G075 · ♥配合带单缺用另一高花探贯",
+      "diagnosis": "原进程直接封局，可能遗漏体系已有的探贯步骤。",
+      "kind": "change",
+      "target_auction": "1NT–2♣–2♥",
+      "proposed_call": "3♠",
+      "proposal": "♥配合且有单缺，以3♠显示配合单缺；3NT问单缺，答4♥代表♠单缺。五张另一高花的自然价值须在后续模拟中另行核对。",
+      "basis": [
+        "Daqiush §1NT：2♣问高花；找到高花配合后，3oM=带单缺探贯，4♦=无单缺探贯。",
+        "新睿 1N_P_2C#：斯台曼可用于寻找高花配合；与 Daqiush 冲突时以 Daqiush 为准。"
+      ],
+      "decision": "rejected",
+      "implementation": "not_started",
+      "reviewer_note": "55高花"
+    },
+    "G076": {
+      "title": "G076 · ♠配合带单缺用另一高花探贯",
+      "diagnosis": "原进程直接封局，可能遗漏体系已有的探贯步骤。",
+      "kind": "change",
+      "target_auction": "1NT–2♣–2♠",
+      "proposed_call": "3♥",
+      "proposal": "已确认♠至少八张配合且应叫人有单缺；以3♥显示配合单缺，开叫人3NT问出单缺后再判断控制和关键张，避免直接4♠止叫。",
+      "basis": [
+        "Daqiush §1NT：2♣问高花；找到高花配合后，3oM=带单缺探贯，4♦=无单缺探贯。",
+        "新睿 1N_P_2C#：斯台曼可用于寻找高花配合；与 Daqiush 冲突时以 Daqiush 为准。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G077": {
+      "title": "G077 · 弱♠先转移并止叫",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP2HP2SPPP",
+      "proposed_call": "2♥",
+      "proposal": "保留2♥雅可比转移至♠，弱牌停在2♠；双明手偶然出现的局或满贯不足以强迫弱牌跳局。",
+      "basis": [
+        "Daqiush §1NT：2♦/2♥雅可比转移；超转表及“超转后所有探贯牌立即4NT”。",
+        "新睿 1N_P_2D#、1N_P_2H#：分别转移♥、♠。",
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": "7张了，这是强牌，德克萨斯"
+    },
+    "G078": {
+      "title": "G078 · 宕牌警报先不推翻体系叫法",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP2NP3DPPP",
+      "proposed_call": "2NT",
+      "proposal": "当前首口 2NT 有既定止叫或转移依据；复采样 DDS 宕牌率偏高，先用同一南北牌的真实防守/做庄模拟比较替代路线，避免把双明手率写成绝对叫牌规则。",
+      "basis": [
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G079": {
+      "title": "G079 · 三♠邀请后的接受应看牌质",
+      "diagnosis": "原进程的叫法未充分表达这类牌，或仍需复核其依据。",
+      "kind": "change",
+      "target_auction": "1NT–2♣–2♠–3♠",
+      "proposed_call": "4♠（好牌接受时）",
+      "proposal": "3♠是♠配合邀请；开叫人若经高低限及配合质量评估落在接受范围，叫4♠，否则Pass。不要让“有四张♠”单独替代邀请接受判定。",
+      "basis": [
+        "Daqiush §1NT：2♣问高花；找到高花配合后，3oM=带单缺探贯，4♦=无单缺探贯。",
+        "新睿 1N_P_2C#：斯台曼可用于寻找高花配合；与 Daqiush 冲突时以 Daqiush 为准。",
+        "Daqiush 邀请公理：接受/拒绝按开叫人范围和好坏点力。"
+      ],
+      "decision": "rejected",
+      "implementation": "not_started",
+      "reviewer_note": "胡说八道，听不懂你在说啥"
+    },
+    "G080": {
+      "title": "G080 · 宕牌警报先不推翻体系叫法",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NPPP",
+      "proposed_call": "Pass",
+      "proposal": "当前首口 Pass 有既定止叫或转移依据；复采样 DDS 宕牌率偏高，先用同一南北牌的真实防守/做庄模拟比较替代路线，避免把双明手率写成绝对叫牌规则。",
+      "basis": [
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G081": {
+      "title": "G081 · 雅可比普通接受后的无单缺探贯",
+      "diagnosis": "多数样本的德克萨斯后4NT已能问A；其中经雅可比普通接受的高实力六♥牌仍可能在2♥后阻塞。",
+      "kind": "change",
+      "target_auction": "1NT–2♦–2♥",
+      "proposed_call": "4♥",
+      "proposal": "对已归类为无单缺探贯的六♥牌，普通接受后4♥邀请满贯；开叫人Pass拒绝或4NT接受问♥关键张。若开叫人超转，应叫人直接4NT。",
+      "basis": [
+        "Daqiush §1NT：2♦/2♥雅可比转移；超转表及“超转后所有探贯牌立即4NT”。",
+        "新睿 1N_P_2D#、1N_P_2H#：分别转移♥、♠。",
+        "用户确认：普通接受后4M邀请满贯，开叫人Pass拒绝、一般4NT接受。"
+      ],
+      "decision": "rejected",
+      "implementation": "partial",
+      "reviewer_note": "这是德克萨斯然后问A甚至直接7NT的牌；雅可比只收不确定打不打满贯的牌和不足进局的（如果6张单套）"
+    },
+    "G082": {
+      "title": "G082 · 宕牌警报先不推翻体系叫法",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP2DP3CP3DP3HPPP",
+      "proposed_call": "2D",
+      "proposal": "当前首口 2D 有既定止叫或转移依据；复采样 DDS 宕牌率偏高，先用同一南北牌的真实防守/做庄模拟比较替代路线，避免把双明手率写成绝对叫牌规则。",
+      "basis": [
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G083": {
+      "title": "G083 · 宕牌警报先不推翻体系叫法",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NPPP",
+      "proposed_call": "Pass",
+      "proposal": "当前首口 Pass 有既定止叫或转移依据；复采样 DDS 宕牌率偏高，先用同一南北牌的真实防守/做庄模拟比较替代路线，避免把双明手率写成绝对叫牌规则。",
+      "basis": [
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G084": {
+      "title": "G084 · 七张♣但不够好套邀请3NT",
+      "diagnosis": "原进程的叫法未充分表达这类牌，或仍需复核其依据。",
+      "kind": "change",
+      "target_auction": "1NT",
+      "proposed_call": "2♠",
+      "proposal": "♣只有一张A/K/Q，不满足当前“好低花套邀3NT”的两大牌初值。先2♠转♣；按牌质与边花控制决定停3♣或再4♣邀请5♣，不要把这类牌当无特征3NT邀请。",
+      "basis": [
+        "Daqiush §1NT：2♠转移♣、2NT转移♦（保6）；弱牌可停3m，畸形牌可邀请5m。",
+        "新睿 1N_P_2S#提供弱♣转移的基础；其2NT含义不同，不覆盖 Daqiush。",
+        "用户确认：低花邀请3NT必须是好套；普通邀请须忽略低花套。"
+      ],
+      "decision": "needs_changes",
+      "implementation": "not_started",
+      "reviewer_note": "看有效点，8以上直接5C好了，不足再邀请。好套（AKQ有2个）2S目的邀请3NT，坚固套（AKQ有3个）直接打3NT。"
+    },
+    "G085": {
+      "title": "G085 · 六张♦五张♣按畸形低花邀请",
+      "diagnosis": "原进程的叫法未充分表达这类牌，或仍需复核其依据。",
+      "kind": "change",
+      "target_auction": "1NT–2NT–3♦",
+      "proposed_call": "4♦（达到邀请实力时）",
+      "proposal": "这类6♦5♣若控制和牌型达到畸形5♦邀请强度，转♦后4♦邀请，开叫人按将牌原点和边花控制折算选择Pass或5♦；弱牌停3♦。不要用无特征斯台曼掩盖低花双套。",
+      "basis": [
+        "Daqiush §1NT：2♠转移♣、2NT转移♦（保6）；弱牌可停3m，畸形牌可邀请5m。",
+        "新睿 1N_P_2S#提供弱♣转移的基础；其2NT含义不同，不覆盖 Daqiush。",
+        "用户确认：畸形邀请尤其看控制质量；既定边花控制折算表。"
+      ],
+      "decision": "rejected",
+      "implementation": "not_started",
+      "reviewer_note": "7有效大牌点以上叫4NT表示65低花选局，不足则叫3H，自己查什么意思"
+    },
+    "G086": {
+      "title": "G086 · 宕牌警报先不推翻体系叫法",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NPPP",
+      "proposed_call": "Pass",
+      "proposal": "当前首口 Pass 有既定止叫或转移依据；复采样 DDS 宕牌率偏高，先用同一南北牌的真实防守/做庄模拟比较替代路线，避免把双明手率写成绝对叫牌规则。",
+      "basis": [
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G087": {
+      "title": "G087 · 宕牌警报先不推翻体系叫法",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NPPP",
+      "proposed_call": "Pass",
+      "proposal": "当前首口 Pass 有既定止叫或转移依据；复采样 DDS 宕牌率偏高，先用同一南北牌的真实防守/做庄模拟比较替代路线，避免把双明手率写成绝对叫牌规则。",
+      "basis": [
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    },
+    "G088": {
+      "title": "G088 · 六张♠进局目的保留德克萨斯",
+      "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
+      "kind": "keep",
+      "target_auction": "1NT 开叫后；原进程 1NP4DP4HP4SPPP",
+      "proposed_call": "4♦→4♠",
+      "proposal": "只打4♠的六张♠牌以4♦南非德克萨斯起步，开叫人答叫后在4♠停叫；偶然 DDS 满贯不自动转为探贯。",
+      "basis": [
+        "Daqiush：南非德克萨斯用于只打4M或关键张合适打6M。",
+        "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
+      ],
+      "decision": "approved",
+      "implementation": "not_started",
+      "reviewer_note": ""
+    }
+  }
+}

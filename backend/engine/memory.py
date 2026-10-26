@@ -5,6 +5,32 @@ from typing import Any
 
 
 @dataclass(frozen=True)
+class Purpose:
+    """A bidder's private plan, fixed when its initiating call is selected."""
+
+    kind: str
+    owner: str
+    source_index: int
+    source_call: str
+    trump: str
+    status: str = "active"
+    own_keycards: int | None = None
+    owns_trump_queen: bool | None = None
+    responses: dict[str, str] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Purpose":
+        return cls(**{key: data.get(key) for key in (
+            'kind', 'owner', 'source_index', 'source_call', 'trump',
+            'status', 'own_keycards', 'owns_trump_queen', 'responses') if key in data})
+
+    def to_dict(self) -> dict[str, Any]:
+        return {key: getattr(self, key) for key in (
+            'kind', 'owner', 'source_index', 'source_call', 'trump',
+            'status', 'own_keycards', 'owns_trump_queen', 'responses')}
+
+
+@dataclass(frozen=True)
 class MemoryRoute:
     qualified_id: str
     route_id: str | None
@@ -65,6 +91,7 @@ class MemoryRoute:
 @dataclass(frozen=True)
 class SeatMemory:
     selected_routes: tuple[MemoryRoute, ...] = ()
+    purposes: tuple[Purpose, ...] = ()
 
     @classmethod
     def from_dict(cls, data: dict[str, Any] | None) -> "SeatMemory":
@@ -74,7 +101,8 @@ class SeatMemory:
             selected_routes=tuple(
                 MemoryRoute.from_dict(item)
                 for item in data.get("selected_routes", []) or []
-            )
+            ),
+            purposes=tuple(Purpose.from_dict(item) for item in data.get('purposes', []) or []),
         )
 
     @classmethod
@@ -91,7 +119,15 @@ class SeatMemory:
             return self
         routes = [route for route in self.selected_routes if route.qualified_id != memory_route.qualified_id]
         routes.append(memory_route)
-        return SeatMemory(selected_routes=tuple(routes))
+        return SeatMemory(selected_routes=tuple(routes), purposes=self.purposes)
+
+    def with_purpose(self, purpose: Purpose) -> "SeatMemory":
+        return SeatMemory(selected_routes=self.selected_routes,
+                          purposes=(*self.purposes, purpose))
+
+    def replace_purpose(self, old: Purpose, new: Purpose) -> "SeatMemory":
+        return SeatMemory(selected_routes=self.selected_routes,
+                          purposes=tuple(new if item is old else item for item in self.purposes))
 
     def has_selected_route(self, origin: dict[str, Any] | None) -> bool:
         if not origin:
@@ -105,4 +141,5 @@ class SeatMemory:
     def to_dict(self) -> dict[str, Any]:
         return {
             "selected_routes": [route.to_dict() for route in self.selected_routes],
+            "purposes": [purpose.to_dict() for purpose in self.purposes],
         }

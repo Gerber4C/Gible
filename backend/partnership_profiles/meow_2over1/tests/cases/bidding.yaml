@@ -1065,11 +1065,11 @@ cases:
   hand: SKQJT98HA43DA2CAK
   environment: *id001
   expected:
-    call: P
-    selected_source_kind: default_policy
+    call: 6S
+    selected_source_kind: heuristic_fallback
     diagnostics_include:
     - Illegal candidate 4N
-    - defaulting to P
+    - defaulting to 6S
 - name: meow_minor_response_bypasses_diamonds_for_hearts
   profile: meow_2over1
   auction: 1CP
@@ -2159,7 +2159,7 @@ cases:
   hand: SAQ7HKJ8DKJ6CQ542
   environment: *id001
   expected:
-    call: 4N
+    call: null
     diagnostics_include:
     - Ambiguous meaning for call 4N
 - name: meow_strong_two_club_very_strong_unbalanced_opens_two_club
@@ -2487,4 +2487,223 @@ cases:
     selection_policy:
       object_id: meow_new_suit_forcing_rebid
       algorithm: python_bsl_function
+    diagnostics: []
+
+- name: meow_spiral_missing_continuation_returns_to_agreed_spades
+  profile: meow_2over1
+  auction: 1DP1SP2SP2NP3HP
+  hand: SAQ83H743DJ84CAJ8
+  expected:
+    call: 3S
+    public_meaning:
+      action_type: fallback_return_to_agreed_trump
+      target_suit: S
+      level: 3
+    selected_source_kind: heuristic_fallback
+    diagnostics_include:
+    - 'No matching Call Specification'
+    - 'defaulting to 3S'
+
+- name: meow_fallback_does_not_raise_an_existing_agreed_trump_contract
+  profile: meow_2over1
+  auction: 1DP1SP2SP2NP3HP3SP
+  hand: SKJT5HATDAQ92C652
+  expected:
+    call: P
+    public_meaning:
+      action_type: fallback_pass
+    diagnostics_include:
+    - 'defaulting to P'
+
+- name: meow_spiral_1c_h_3_card_13_hcp
+  profile: meow_2over1
+  auction: 1CP1HP2HP2NP
+  hand: SAT9HKT5D652CAQ92
+  expected:
+    call: 3C
+    public_meaning:
+      action_type: spiral_3344_answer
+      target_suit: H
+      support_length: 3
+      opener_strength: minimum
+    diagnostics: []
+- name: meow_spiral_1c_h_3_card_14_hcp
+  profile: meow_2over1
+  auction: 1CP1HP2HP2NP
+  hand: SAT9HKJ5D652CAQ92
+  expected:
+    call: 3D
+    public_meaning:
+      action_type: spiral_3344_answer
+      target_suit: H
+      support_length: 3
+      opener_strength: maximum
+    diagnostics: []
+- name: meow_spiral_1c_h_4_card_13_hcp
+  profile: meow_2over1
+  auction: 1CP1HP2HP2NP
+  hand: SATHKT95D652CAQ92
+  expected:
+    call: 3H
+    public_meaning:
+      action_type: spiral_3344_answer
+      target_suit: H
+      support_length: 4
+      opener_strength: minimum
+    diagnostics: []
+- name: meow_spiral_1c_h_4_card_14_hcp
+  profile: meow_2over1
+  auction: 1CP1HP2HP2NP
+  hand: SATHKJT5D652CAQ92
+  expected:
+    call: 3S
+    public_meaning:
+      action_type: spiral_3344_answer
+      target_suit: H
+      support_length: 4
+      opener_strength: maximum
+    diagnostics: []
+- name: meow_spiral_1c_s_3_card_13_hcp
+  profile: meow_2over1
+  auction: 1CP1SP2SP2NP
+  hand: SKT5HAT9D652CAQ92
+  expected:
+    call: 3C
+    public_meaning:
+      action_type: spiral_3344_answer
+      target_suit: S
+      support_length: 3
+      opener_strength: minimum
+    diagnostics: []
+- name: meow_spiral_1c_s_3_card_14_hcp
+  profile: meow_2over1
+  auction: 1CP1SP2SP2NP
+  hand: SKJ5HAT9D652CAQ92
+  expected:
+    call: 3D
+    public_meaning:
+      action_type: spiral_3344_answer
+      target_suit: S
+      support_length: 3
+      opener_strength: maximum
+    diagnostics: []
+- name: meow_spiral_1c_s_4_card_13_hcp
+  profile: meow_2over1
+  auction: 1CP1SP2SP2NP
+  hand: SKT95HATD652CAQ92
+  expected:
+    call: 3H
+    public_meaning:
+      action_type: spiral_3344_answer
+      target_suit: S
+      support_length: 4
+      opener_strength: minimum
+    diagnostics: []
+- name: meow_spiral_1c_s_4_card_14_hcp
+  profile: meow_2over1
+  auction: 1CP1SP2SP2NP
+  hand: SKJT5HATD652CAQ92
+  expected:
+    call: 3S
+    public_meaning:
+      action_type: spiral_3344_answer
+      target_suit: S
+      support_length: 4
+      opener_strength: maximum
+    diagnostics: []
+- name: meow_spiral_1d_h_3_card_13_hcp
+  profile: meow_2over1
+  auction: 1DP1HP2HP2NP
+  hand: SAT9HKT5DAQ92C652
+  expected:
+    call: 3C
+    public_meaning:
+      action_type: spiral_3344_answer
+      target_suit: H
+      support_length: 3
+      opener_strength: minimum
+    diagnostics: []
+- name: meow_spiral_1d_h_3_card_14_hcp
+  profile: meow_2over1
+  auction: 1DP1HP2HP2NP
+  hand: SAT9HKJ5DAQ92C652
+  expected:
+    call: 3D
+    public_meaning:
+      action_type: spiral_3344_answer
+      target_suit: H
+      support_length: 3
+      opener_strength: maximum
+    diagnostics: []
+- name: meow_spiral_1d_h_4_card_13_hcp
+  profile: meow_2over1
+  auction: 1DP1HP2HP2NP
+  hand: SATHKT95DAQ92C652
+  expected:
+    call: 3H
+    public_meaning:
+      action_type: spiral_3344_answer
+      target_suit: H
+      support_length: 4
+      opener_strength: minimum
+    diagnostics: []
+- name: meow_spiral_1d_h_4_card_14_hcp
+  profile: meow_2over1
+  auction: 1DP1HP2HP2NP
+  hand: SATHKJT5DAQ92C652
+  expected:
+    call: 3S
+    public_meaning:
+      action_type: spiral_3344_answer
+      target_suit: H
+      support_length: 4
+      opener_strength: maximum
+    diagnostics: []
+- name: meow_spiral_1d_s_3_card_13_hcp
+  profile: meow_2over1
+  auction: 1DP1SP2SP2NP
+  hand: SKT5HAT9DAQ92C652
+  expected:
+    call: 3C
+    public_meaning:
+      action_type: spiral_3344_answer
+      target_suit: S
+      support_length: 3
+      opener_strength: minimum
+    diagnostics: []
+- name: meow_spiral_1d_s_3_card_14_hcp
+  profile: meow_2over1
+  auction: 1DP1SP2SP2NP
+  hand: SKJ5HAT9DAQ92C652
+  expected:
+    call: 3D
+    public_meaning:
+      action_type: spiral_3344_answer
+      target_suit: S
+      support_length: 3
+      opener_strength: maximum
+    diagnostics: []
+- name: meow_spiral_1d_s_4_card_13_hcp
+  profile: meow_2over1
+  auction: 1DP1SP2SP2NP
+  hand: SKT95HATDAQ92C652
+  expected:
+    call: 3H
+    public_meaning:
+      action_type: spiral_3344_answer
+      target_suit: S
+      support_length: 4
+      opener_strength: minimum
+    diagnostics: []
+- name: meow_spiral_1d_s_4_card_14_hcp
+  profile: meow_2over1
+  auction: 1DP1SP2SP2NP
+  hand: SKJT5HATDAQ92C652
+  expected:
+    call: 3S
+    public_meaning:
+      action_type: spiral_3344_answer
+      target_suit: S
+      support_length: 4
+      opener_strength: maximum
     diagnostics: []

@@ -10,6 +10,9 @@ def explain(selection: BidDecision) -> dict:
     pool = selection.context.candidates if selection.context is not None else None
     return {
         "call": selection.call,
+        "status": "selected" if selection.call is not None else "blocked",
+        "axioms": selection.trace.axioms,
+        "simulation": getattr(selection.trace, 'simulation_decision', None),
         "public_meaning": _public_meaning(selected),
         "internal_origin": {
             "selected": _selected_origin(selected),
@@ -31,7 +34,8 @@ def explain(selection: BidDecision) -> dict:
                 for candidate in selection.candidate_pool.candidates
             ],
             "applied_meanings": selection.trace.applied_meanings,
-            "state_records": [record.to_dict() for record in selection.trace.state_records],
+            "state_records": [record.to_dict() for record in selection.trace.current_state_records],
+            "state_events": [record.to_dict() for record in selection.trace.state_records],
             "state_view": selection.context.state.to_dict() if selection.context is not None else None,
             "frame_states": [frame.to_dict() for frame in selection.trace.frame_states],
             "private_route_states": [route_state.to_dict() for route_state in selection.trace.private_route_states],

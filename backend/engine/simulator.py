@@ -13,14 +13,6 @@ from .legality import auction_is_complete
 from .selector import choose_bid
 
 
-PARTNERS = {
-    "n": "s",
-    "s": "n",
-    "e": "w",
-    "w": "e",
-}
-
-
 @dataclass(frozen=True)
 class SimulatedCall:
     seat: str
@@ -34,6 +26,8 @@ class SimulatedAuction:
     call_records: tuple[SimulatedCall, ...]
     diagnostics: tuple[str, ...]
     private_memories: dict[str, Any]
+    status: str = "complete"
+    blocked: dict[str, Any] | None = None
 
     def compact_sequence(self) -> str:
         return "".join(self.calls)
@@ -52,9 +46,12 @@ def simulate_auction(
     records: list[SimulatedCall] = []
     diagnostics: list[str] = []
     active_environment = dict(environment or {})
+    # The runner owns all supplied hands; an individual bidder must not see them.
+    active_environment.pop("partner_hand", None)
     active_environment.setdefault("dealer", dealer)
     active_environment.setdefault("vulnerability", vulnerability)
     private_memories: dict[str, SeatMemory] = {seat: SeatMemory() for seat in parsed_hands}
+    blocked = None
 
     while len(calls) < max_calls:
         auction = Auction(calls=tuple(calls), dealer=dealer, vulnerability=vulnerability)
@@ -68,17 +65,19 @@ def simulate_auction(
             continue
 
         hand = parsed_hands[actor]
-        partner_hand = parsed_hands.get(PARTNERS[actor])
         selection_environment = {
             **active_environment,
             "seat": actor,
-            "partner_hand": partner_hand,
         }
         selection = choose_bid(profile, auction, hand, selection_environment, private_memories.get(actor))
         private_memories[actor] = selection.private_memory
         explanation = explain(selection)
-        call = normalize_call(explanation["call"])
         diagnostics.extend(explanation.get("diagnostics", []))
+        if selection.call is None:
+            blocked = {'auction':auction.compact_sequence(),'seat':actor,
+                       'diagnostics':explanation['diagnostics'],'axioms':explanation['axioms']}
+            break
+        call = normalize_call(explanation["call"])
         records.append(SimulatedCall(seat=actor, call=call, explanation=explanation))
         calls.append(call)
 
@@ -90,4 +89,6 @@ def simulate_auction(
         call_records=tuple(records),
         diagnostics=tuple(diagnostics),
         private_memories={seat: memory.to_dict() for seat, memory in private_memories.items()},
+        status='blocked' if blocked else ('complete' if auction_is_complete(Auction(tuple(calls),dealer,vulnerability)) else 'limit'),
+        blocked=blocked,
     )

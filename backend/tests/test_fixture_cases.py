@@ -76,7 +76,7 @@ class FixtureBiddingTests(unittest.TestCase):
             self.assertEqual(result["internal_origin"]["selected"]["source_kind"], expected["selected_source_kind"])
 
         selected_private_route_origin = expected.get("selected_private_route_origin", {})
-        actual_selected_private_route_origin = result["internal_origin"]["selected"].get("private_route_origin") or {}
+        actual_selected_private_route_origin = (result["internal_origin"]["selected"] or {}).get("private_route_origin") or {}
         for key, value in selected_private_route_origin.items():
             self.assertEqual(actual_selected_private_route_origin.get(key), value)
 
@@ -123,7 +123,7 @@ class FixtureBiddingTests(unittest.TestCase):
 
         selected_criteria = {
             item["criterion_id"]
-            for item in result["internal_origin"]["selected"].get("criteria_results", [])
+            for item in (result["internal_origin"]["selected"] or {}).get("criteria_results", [])
         }
         if selected_criteria:
             for criterion_id in expected.get("selected_criteria_include", []):
@@ -249,7 +249,7 @@ class InfrastructureTests(unittest.TestCase):
                         "    namespace='nt',",
                         "    name='Simple BSL Gadget',",
                         "    version='0.1.0',",
-                        "    author={'name': 'Partner Prototype'},",
+                        "    author={'name': 'Gible Prototype'},",
                         ")",
                         "Call(id='c1', context={'auction_pattern': ''}, bid='1N')",
                     ]
@@ -551,7 +551,7 @@ class InfrastructureTests(unittest.TestCase):
 
         trace = replay_auction(profile, auction, hand, {"dealer": "n", "vulnerability": "none"})
 
-        self.assertTrue(trace.state_exists({"key": "agreed_suit", "suit": "H"}))
+        self.assertEqual(trace.trump_state('ns').suit, 'H')
         frame_statuses = {(frame.frame_type, frame.status) for frame in trace.frame_states}
         self.assertIn(("major_transfer", "closed"), frame_statuses)
         self.assertIn(("control_bidding", "closed"), frame_statuses)

@@ -167,9 +167,9 @@ def _resolve_expr_var(path: str, hand: Hand, environment: dict[str, Any]) -> Any
     if path.startswith("self.") and path.endswith(".length"):
         return hand.length(path.split(".")[1])
     if path == "partner.hcp":
-        return _partner_hand(environment).hcp
+        return _partner_hand().hcp
     if path.startswith("partner.") and path.endswith(".length"):
-        return _partner_hand(environment).length(path.split(".")[1])
+        return _partner_hand().length(path.split(".")[1])
     if path.startswith("env."):
         return environment.get(path.removeprefix("env."))
     if path.startswith("candidate."):
@@ -226,17 +226,15 @@ def _expression_hand(expr: dict[str, Any], hand: Hand, environment: dict[str, An
     if hand_name == "self":
         return hand
     if hand_name == "partner":
-        return _partner_hand(environment)
+        return _partner_hand()
     raise ValueError(f"Unsupported expression hand: {hand_name}")
 
 
-def _partner_hand(environment: dict[str, Any]) -> Hand:
-    partner = environment.get("partner_hand")
-    if isinstance(partner, Hand):
-        return partner
-    if isinstance(partner, str):
-        return Hand.parse(partner)
-    raise ValueError("Expression requires partner_hand in environment")
+def _partner_hand() -> Hand:
+    raise ValueError(
+        "Actual partner hand is hidden during bidding; use public auction evidence "
+        "from state/knowledge instead of partner-hand expressions"
+    )
 
 
 def _expression_suit(value: Any, hand: Hand, trace: AuctionTrace, environment: dict[str, Any], params: dict[str, Any]) -> Any:

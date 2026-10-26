@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from copy import copy
 
 from .auction import Auction
 from .call_space import steps_after
@@ -8,11 +9,12 @@ from .calls import normalize_call
 from .cards import Hand
 from .context import BridgeContext, CallCandidate
 from .evaluator import evaluate
-from .legality import is_call_legal, legal_calls
+from .legality import SIDE_BY_SEAT, is_call_legal, last_contract_state, legal_calls
 from .matcher import matches_context, matches_pattern
 from .memory import SeatMemory
 from .model import CallSpec, PartnershipProfile
 from .trace import AuctionTrace, PrivateRouteState
+from .trump_state import is_transition_effect
 
 
 def generate_candidates(
@@ -24,17 +26,22 @@ def generate_candidates(
     private_memory: SeatMemory,
 ) -> tuple[CallCandidate, ...]:
     call_specification_candidates = []
+    promoted_trace = copy(trace)
+    promoted_trace.trump_states = dict(trace.trump_states)
+    promoted_trace.promote_for_call(auction.actor_to_call)
     for call_specification in profile.call_specifications:
+        explicit_transition = any(is_transition_effect(effect) for effect in call_specification.effects)
+        active_trace = trace if explicit_transition else promoted_trace
         if call_specification.default_policy:
             continue
         if not matches_context(call_specification.context, auction):
             continue
-        if not _condition_passes(call_specification.requires, auction, hand, trace, environment):
+        if not _condition_passes(call_specification.requires, auction, hand, active_trace, environment):
             continue
-        if not _condition_passes(call_specification.applicability, auction, hand, trace, environment):
+        if not _condition_passes(call_specification.applicability, auction, hand, active_trace, environment):
             continue
 
-        candidate = _candidate(call_specification, auction, hand, trace, environment)
+        candidate = _candidate(call_specification, auction, hand, active_trace, environment)
         if candidate is None:
             continue
         if not is_call_legal(auction, candidate.call):
@@ -106,6 +113,53 @@ def default_candidate(call_specifications: list[CallSpec], auction: Auction) -> 
     return _hard_fallback_candidate()
 
 
+def agreed_trump_fallback(auction: Auction, trace: AuctionTrace) -> CallCandidate | None:
+    """Before passing for lack of a rule, return to the cheapest agreed trump contract."""
+    agreements = trace.matching_state({"key": "agreed_suit", "namespace": "public"})
+    if not agreements:
+        return None
+    agreement = agreements[-1]
+    suit = agreement.attribute("suit")
+    if suit not in ("C", "D", "H", "S"):
+        return None
+    contract = last_contract_state(auction)
+    if contract and contract.side == SIDE_BY_SEAT[auction.actor_to_call] and contract.call[1:] == suit:
+        return None  # Already in our agreed denomination; do not bid it up again.
+    call = next((call for call in legal_calls(auction) if call[1:] == suit), None)
+    if call is None:
+        return None
+    origin = {
+        "namespace": "engine",
+        "gadget_id": "fallback",
+        "gadget_name": "Engine Fallback",
+        "object_type": "fallback_policy",
+        "object_id": "return_to_agreed_trump",
+        "qualified_id": "engine/fallback:return_to_agreed_trump",
+    }
+    return CallCandidate(
+        call=call,
+        origin=origin,
+        public_meaning={
+            "nature_labels": ["natural"],
+            "call_act_types": ["final_placement"],
+            "action_type": "fallback_return_to_agreed_trump",
+            "target_suit": suit,
+            "level": int(call[0]),
+            "alertable": False,
+        },
+        source_kind="heuristic_fallback",
+        source_id="return_to_agreed_trump",
+        implementation_origin=origin,
+        score=0,
+        criterion_results=(),
+        capabilities=("fallback", "place_contract"),
+        metadata={
+            "selection_algorithm": "cheapest_legal_agreed_trump",
+            "agreed_suit_evidence": agreement.to_dict(),
+        },
+    )
+
+
 def _candidate(
     call_specification: CallSpec,
     auction: Auction,
@@ -117,6 +171,14 @@ def _candidate(
     if call is None:
         return None
     evaluation = {"score": 0, "criteria_results": (), "algorithm": "python_applies"}
+    private_purpose = call_specification.private_purpose
+    if callable(private_purpose):
+        ctx = BridgeContext.from_trace(
+            phase='candidate', auction=auction, hand=hand,
+            environment=environment, trace=trace, legal_calls=legal_calls(auction))
+        private_purpose = private_purpose(ctx)
+    if private_purpose is not None and not isinstance(private_purpose, dict):
+        raise ValueError('private_purpose must resolve to a mapping or None')
     return CallCandidate(
         call=call,
         origin=call_specification.origin_dict(),
@@ -127,7 +189,12 @@ def _candidate(
         criterion_results=tuple(evaluation["criteria_results"]),
         implementation_origin=call_specification.origin_dict(),
         capabilities=call_specification.capabilities,
-        metadata={"selection_algorithm": evaluation["algorithm"]},
+        metadata={"selection_algorithm": evaluation["algorithm"],
+                  "priority": call_specification.priority,
+                  "explicit_trump_transition": any(is_transition_effect(effect) for effect in call_specification.effects),
+                  "context_specificity": (int(call_specification.context.get('auction_pattern') != '*')
+                                          + int(bool(call_specification.context.get('seat_positions'))))},
+        private_purpose=private_purpose,
     )
 
 

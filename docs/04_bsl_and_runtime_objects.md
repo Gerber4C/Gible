@@ -4,7 +4,7 @@ Platform Version: 0.0.8
 Author: Meow Li
 Copyright: Copyright by Meow Li 2026. All Rights Reserved.
 
-This document defines the current executable authoring model. Partner source is Python-shaped BSL plus Python Policy Functions. The source should read like bridge code: a Partnership Profile lists Gadgets, each Gadget is a class, and the Gadget builds calls, frames, private routes, and evaluators by assigning fields.
+This document defines the current executable authoring model. Gible source is Python-shaped BSL plus Python Policy Functions. The source should read like bridge code: a Partnership Profile lists Gadgets, each Gadget is a class, and the Gadget builds calls, frames, private routes, and evaluators by assigning fields.
 
 ## Language Position
 

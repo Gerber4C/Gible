@@ -1,23 +1,26 @@
 import { React, e } from "./ui/react.js";
 import {
   deleteProfileFile,
+  generateTrainingDeal,
   listProfileFiles,
   listProfiles,
   readProfileFile,
   simulateAuction,
   writeProfileFile,
-} from "./api/partnerApi.js";
+} from "./api/gibleApi.js";
 import { CodeEditor } from "./components/CodeEditor.js";
 import { FileTree } from "./components/FileTree.js";
 import { StructuredEditor } from "./components/StructuredEditor.js";
 import { BridgePanel } from "./components/BridgeTools.js";
+import { IVScanner } from "./components/IVScanner.js";
 import { fileKindLabel, displayFileName } from "./lib/files.js";
 import { lintText } from "./lib/bsl.js";
-import { parseHand } from "./lib/bridge.js";
+import { parseHand, seatName } from "./lib/bridge.js";
+import { clearOpponents, compactHand, completeOpponents, initialDeal, randomDeal, validateDeal } from "./lib/deal.js";
 
 export default function App() {
   const [profiles, setProfiles] = React.useState([]);
-  const [profileId, setProfileId] = React.useState("meow_2over1");
+  const [profileId, setProfileId] = React.useState("daqiush_2over1");
   const [files, setFiles] = React.useState([]);
   const [selectedFile, setSelectedFile] = React.useState("");
   const [originalContent, setOriginalContent] = React.useState("");
@@ -26,14 +29,26 @@ export default function App() {
   const [workspaceView, setWorkspaceView] = React.useState("editor");
   const [viewMode, setViewMode] = React.useState("guide");
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
-  const [northHand, setNorthHand] = React.useState("SAQ7HKJ8DA762CQ54");
-  const [southHand, setSouthHand] = React.useState("S72HAQJ987D53CK42");
+  const [deal, setDeal] = React.useState(initialDeal);
+  const [showOpponents, setShowOpponents] = React.useState(false);
+  const dealValidation = React.useMemo(() => validateDeal(deal), [deal]);
+  const northSouthValidation = React.useMemo(() => validateDeal(deal, ["n", "s"]), [deal]);
   const [dealer, setDealer] = React.useState("n");
   const [vulnerability, setVulnerability] = React.useState("none");
   const [simulation, setSimulation] = React.useState(null);
   const [visibleCallCount, setVisibleCallCount] = React.useState(0);
   const [simulationLoading, setSimulationLoading] = React.useState(false);
+  const [trainingMode, setTrainingMode] = React.useState("off");
+  const [targetOpening, setTargetOpening] = React.useState("1NT");
+  const [targetResponse, setTargetResponse] = React.useState("4C");
+  const [targetOpener, setTargetOpener] = React.useState("ns");
+  const [trainingSeed, setTrainingSeed] = React.useState("");
+  const [trainingResult, setTrainingResult] = React.useState(null);
+  const [trainingLoading, setTrainingLoading] = React.useState(false);
+  const trainingAbort = React.useRef(null);
   const simulationRequestId = React.useRef(0);
+  const auctionRequested = React.useRef(false);
+  const replayCount = React.useRef(0);
 
   const dirty = fileContent !== originalContent;
   const diagnostics = React.useMemo(() => lintText(fileContent, selectedFile), [fileContent, selectedFile]);
@@ -60,27 +75,126 @@ export default function App() {
   }, [profileId, selectedFile]);
 
   React.useEffect(() => {
-    if (!isCompleteHand(northHand) || !isCompleteHand(southHand)) {
+    simulationRequestId.current += 1;
+    setSimulation(null);
+    setVisibleCallCount(0);
+    setSimulationLoading(false);
+    if (!dealValidation.valid || !auctionRequested.current) return;
+    setSimulationLoading(true);
+    const timer = window.setTimeout(() => {
+      refreshSimulation("count", replayCount.current);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [profileId, deal, dealer, vulnerability, trainingResult]);
+
+  function setHolding(seat, suit, value) {
+    if (deal[seat][suit] === value) return;
+    simulationRequestId.current += 1;
+    invalidateTrainingSearch();
+    setDeal((prior) => ({ ...prior, [seat]: { ...prior[seat], [suit]: value } }));
+  }
+
+  function dealRandomHands() {
+    invalidateTrainingSearch();
+    simulationRequestId.current += 1;
+    auctionRequested.current = false;
+    replayCount.current = 0;
+    setSimulation(null);
+    setVisibleCallCount(0);
+    setSimulationLoading(false);
+    setDeal(randomDeal());
+    setStatus("New deal ready. Press play to begin the auction.");
+  }
+
+  function invalidateTrainingSearch() {
+    trainingAbort.current?.abort();
+    trainingAbort.current = null;
+    setTrainingLoading(false);
+    setTrainingResult(null);
+  }
+
+  function cancelTrainingSearch() {
+    invalidateTrainingSearch();
+    setStatus("Training deal search cancelled.");
+  }
+
+  async function generateMatchingDeal() {
+    trainingAbort.current?.abort();
+    const controller = new AbortController();
+    trainingAbort.current = controller;
+    setTrainingLoading(true);
+    setStatus("Searching for a deal that produces the selected calls...");
+    try {
+      const seedText = trainingSeed.trim();
+      if (seedText && !/^-?\d+$/.test(seedText)) throw new Error("Seed must be an integer.");
+      if (seedText && !Number.isSafeInteger(Number(seedText))) throw new Error("Seed must be a safe integer.");
+      const result = await generateTrainingDeal({
+        profile: { id: profileId }, opening: targetOpening,
+        response: trainingMode === "response" ? targetResponse : null,
+        opener: targetOpener, vulnerability,
+        seed: seedText ? Number(seedText) : null, max_attempts: 2000,
+      }, controller.signal);
+      if (trainingAbort.current !== controller) return;
+      if (result.status !== "matched") {
+        setStatus(`${result.message} Tried ${result.attempts} deals (seed ${result.seed}).`);
+        return;
+      }
+      const nextDeal = Object.fromEntries(Object.entries(result.hands).map(
+        ([seat, cards]) => [seat, parseHand(cards)]));
+      const checked = validateDeal(nextDeal);
+      if (!checked.valid) throw new Error(`Generated deal was invalid: ${checked.errors.join(" ")}`);
+      auctionRequested.current = false;
+      replayCount.current = 0;
       simulationRequestId.current += 1;
       setSimulation(null);
       setVisibleCallCount(0);
       setSimulationLoading(false);
-      return;
+      setTrainingResult(result);
+      setDeal(nextDeal);
+      setDealer(result.dealer);
+      if (result.opener === "e" || result.opener === "w") setShowOpponents(true);
+      setStatus(`Matched ${result.calls.map((call) => call === "P" ? "Pass" : call.replace("N", "NT")).join(" · ")} after ${result.attempts} deals. Seed ${result.seed}. Press play to replay.`);
+    } catch (error) {
+      if (trainingAbort.current === controller && error?.name !== "AbortError") {
+        setStatus(`Training deal search failed: ${error.message}`);
+      }
+    } finally {
+      if (trainingAbort.current === controller) {
+        trainingAbort.current = null;
+        setTrainingLoading(false);
+      }
     }
-    if (!simulation && !simulationLoading) {
-      setVisibleCallCount(0);
-      return;
+  }
+
+  function revealCalls(count) {
+    replayCount.current = count;
+    setVisibleCallCount(count);
+  }
+
+  function fillOpponents() {
+    try {
+      const completed = completeOpponents(deal);
+      simulationRequestId.current += 1;
+      invalidateTrainingSearch();
+      setDeal(completed);
+      setStatus("E/W hands filled randomly from the remaining 26 cards. N/S hands preserved.");
+    } catch (error) {
+      setStatus(`Cannot fill E/W hands: ${error.message}`);
     }
-    const revealCount = visibleCallCount;
+  }
+
+  function clearEastWestHands() {
     simulationRequestId.current += 1;
+    invalidateTrainingSearch();
+    auctionRequested.current = false;
+    replayCount.current = 0;
     setSimulation(null);
     setVisibleCallCount(0);
-    setSimulationLoading(true);
-    const timer = window.setTimeout(() => {
-      refreshSimulation("count", revealCount);
-    }, 250);
-    return () => window.clearTimeout(timer);
-  }, [profileId, northHand, southHand, dealer, vulnerability]);
+    setSimulationLoading(false);
+    setDeal((prior) => clearOpponents(prior));
+    setShowOpponents(true);
+    setStatus("E/W hands cleared. N/S hands preserved.");
+  }
 
   async function refreshFiles(activeProfileId = profileId) {
     try {
@@ -169,29 +283,35 @@ export default function App() {
   }
 
   async function refreshSimulation(revealMode = "preserve", requestedCount = 0) {
+    if (!dealValidation.valid) return;
+    auctionRequested.current = true;
     const requestId = simulationRequestId.current + 1;
     simulationRequestId.current = requestId;
     setSimulationLoading(true);
     setStatus("Building auction...");
     try {
+      const activeSeats = trainingResult?.status === "matched"
+        ? [trainingResult.opener, { n: "s", s: "n", e: "w", w: "e" }[trainingResult.opener]]
+        : ["n", "s"];
       const result = await simulateAuction({
         profile: { id: profileId },
-        hands: { n: northHand, s: southHand },
+        hands: Object.fromEntries(activeSeats.map((seat) => [seat, compactHand(deal[seat])])),
         environment: { dealer, vulnerability, scoring: "IMP" },
         max_calls: 60,
       });
       if (requestId !== simulationRequestId.current) return;
       setSimulation(result);
       const total = result.records?.length ?? result.calls?.length ?? 0;
-      setVisibleCallCount((prior) => {
-        if (revealMode === "all") return total;
-        if (revealMode === "first") return Math.min(1, total);
-        if (revealMode === "none") return 0;
-        if (revealMode === "count") return Math.min(requestedCount, total);
-        return Math.min(prior, total);
-      });
+      const count = revealMode === "all" ? total
+        : revealMode === "first" ? Math.min(1, total)
+        : revealMode === "none" ? 0
+        : Math.min(revealMode === "count" ? requestedCount : replayCount.current, total);
+      revealCalls(count);
       setSimulationLoading(false);
-      setStatus("Auction ready.");
+      setStatus(result.status === "blocked"
+        ? `Auction blocked${result.blocked?.seat ? ` · ${seatName(result.blocked.seat)}` : ""}. Review the auction diagnostics.`
+        : result.status === "limit" ? "Auction stopped at the call limit. Replay available calls."
+        : "Auction ready.");
     } catch (error) {
       if (requestId !== simulationRequestId.current) return;
       setSimulationLoading(false);
@@ -200,15 +320,15 @@ export default function App() {
   }
 
   async function stepForward() {
-    if (!simulation || visibleCallCount === 0) {
+    if (!simulation) {
       await refreshSimulation("first");
       return;
     }
-    setVisibleCallCount((count) => Math.min(count + 1, simulation.records?.length ?? 0));
+    revealCalls(Math.min(visibleCallCount + 1, simulation.records?.length ?? 0));
   }
 
   function stepBackward() {
-    setVisibleCallCount((count) => Math.max(0, count - 1));
+    revealCalls(Math.max(0, visibleCallCount - 1));
   }
 
   async function showEntireAuction() {
@@ -216,7 +336,7 @@ export default function App() {
       await refreshSimulation("all");
       return;
     }
-    setVisibleCallCount(simulation.records?.length ?? 0);
+    revealCalls(simulation.records?.length ?? 0);
   }
 
   async function showFirstCall() {
@@ -224,16 +344,16 @@ export default function App() {
       await refreshSimulation("first");
       return;
     }
-    setVisibleCallCount(Math.min(1, simulation.records?.length ?? 0));
+    revealCalls(Math.min(1, simulation.records?.length ?? 0));
   }
 
   return e("div", { className: sidebarCollapsed ? "app sidebar-collapsed" : "app" },
     e("aside", { className: sidebarCollapsed ? "sidebar collapsed" : "sidebar" },
       e("div", { className: "sidebar-top" },
         e("div", { className: "brand" },
-          e("div", { className: "brand-mark" }, "P"),
+          e("div", { className: "brand-mark" }, "G"),
           !sidebarCollapsed && e("div", null,
-            e("h1", null, "Partner"),
+            e("h1", null, "Gible"),
             e("p", null, "Partnership Profile workspace"),
           ),
         ),
@@ -255,10 +375,15 @@ export default function App() {
               title: "Table",
               onClick: () => setWorkspaceView("table"),
             }, "T"),
+            e("button", {
+              className: workspaceView === "scanner" ? "rail-tab active" : "rail-tab",
+              title: "IV Scanner",
+              onClick: () => setWorkspaceView("scanner"),
+            }, "IV"),
           )
         : e(React.Fragment, null,
             e("label", { className: "field-label" }, "Profile"),
-            e("select", { value: profileId, onChange: (event) => setProfileId(event.target.value) },
+            e("select", { value: profileId, onChange: (event) => { invalidateTrainingSearch(); setProfileId(event.target.value); } },
               profiles.map((profile) => e("option", { key: profile.id, value: profile.id }, profile.name || profile.id)),
             ),
             e("div", { className: "workspace-switcher" },
@@ -270,6 +395,10 @@ export default function App() {
                 className: workspaceView === "table" ? "nav-tab active" : "nav-tab",
                 onClick: () => setWorkspaceView("table"),
               }, "Table"),
+              e("button", {
+                className: workspaceView === "scanner" ? "nav-tab active" : "nav-tab",
+                onClick: () => setWorkspaceView("scanner"),
+              }, "IV Scanner"),
             ),
             workspaceView === "editor" && e(FileTree, {
               files,
@@ -281,7 +410,8 @@ export default function App() {
             }),
           ),
     ),
-    e("main", { className: workspaceView === "editor" ? "workspace editor-workspace" : "workspace table-workspace" },
+    e("main", { className: `workspace ${workspaceView === "editor" ? "editor-workspace" : workspaceView === "scanner" ? "scanner-workspace" : "table-workspace"}` },
+      workspaceView === "scanner" && e(IVScanner, { profileId }),
       workspaceView === "editor" && e("section", { className: "editor-panel" },
         e("div", { className: "panel-header" },
           e("div", null,
@@ -320,14 +450,26 @@ export default function App() {
             })),
       ),
       workspaceView === "table" && e(BridgePanel, {
-        northHand,
-        setNorthHand,
-        southHand,
-        setSouthHand,
+        profileId,
+        deal,
+        setHolding,
+        validation: dealValidation,
+        showOpponents,
+        setShowOpponents,
+        onRandomDeal: dealRandomHands,
+        trainingMode, setTrainingMode: (value) => { invalidateTrainingSearch(); setTrainingMode(value); },
+        targetOpening, setTargetOpening: (value) => { invalidateTrainingSearch(); setTargetOpening(value); },
+        targetResponse, setTargetResponse: (value) => { invalidateTrainingSearch(); setTargetResponse(value); },
+        targetOpener, setTargetOpener: (value) => { invalidateTrainingSearch(); setTargetOpener(value); },
+        trainingSeed, setTrainingSeed: (value) => { if (trainingLoading) invalidateTrainingSearch(); setTrainingSeed(value); }, trainingResult, trainingLoading,
+        onGenerateTraining: generateMatchingDeal, onCancelTraining: cancelTrainingSearch,
+        onCompleteOpponents: fillOpponents,
+        onClearOpponents: clearEastWestHands,
+        canCompleteOpponents: northSouthValidation.valid,
         dealer,
-        setDealer,
+        setDealer: (value) => { invalidateTrainingSearch(); setDealer(value); },
         vulnerability,
-        setVulnerability,
+        setVulnerability: (value) => { invalidateTrainingSearch(); setVulnerability(value); },
         simulation,
         simulationLoading,
         visibleCallCount,
@@ -339,9 +481,4 @@ export default function App() {
     ),
     e("footer", { className: "statusbar" }, status || "Ready"),
   );
-}
-
-function isCompleteHand(text) {
-  const hand = parseHand(text);
-  return Object.values(hand).join("").length === 13;
 }

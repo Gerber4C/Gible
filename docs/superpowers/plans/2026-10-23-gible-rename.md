@@ -62,14 +62,14 @@
 **Files:** local Git `origin` configuration only.
 
 - [x] Check authenticated GitHub management access: the available credential has no admin access to `profthecopyright/Partner`; the settings page is unavailable.
-- [ ] Await the owner's Gible fork URL. Set `origin` to that fork and `upstream` to `profthecopyright/Partner`; verify both with `git ls-remote`.
+- [x] Set `origin` to the owner's `Daqiush/Gible` fork and `upstream` to `profthecopyright/Partner`; verify both with `git ls-remote`.
 - [ ] Until the fork exists, leave `origin` at the valid old URL and give the owner exact fork/rename instructions.
 
 ### Task 7: Public website prerequisites and cutover
 
 **Files:** `frontend/src/api/partnerApi.js`, `frontend/server.mjs`, `backend/server.py`, deployment-specific configuration/tests, hosting/DNS configuration.
 
-- [ ] Verify whether an existing `partner.hogetsu.uk` deployment exists and identify its hosting/DNS provider.
+- [x] Identify the planned host and DNS provider: Fly.io has not yet deployed the app; Cloudflare manages `hogetsu.uk`. The old hostname's live deployment status remains unverified.
 - [ ] Before public cutover, implement a production API route (same-origin proxy or configurable HTTPS API URL) and test it from the deployed hostname.
 - [ ] Decide whether each profile is public or private; add access controls or remove profile listing, source read, write, and delete endpoints for private profiles. Test that an anonymous remote request cannot read or mutate private systems.
 - [ ] Configure `gible.hogetsu.uk`, verify TLS and end-to-end use from a remote browser, then redirect the old hostname when supported.

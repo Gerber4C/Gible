@@ -111,11 +111,20 @@ def _resolve_same_call_meanings(
         if route_selected is not None:
             resolved.append(route_selected)
             continue
-        ordered_group = sorted(group, key=lambda candidate: candidate.score, reverse=True)
+        ordered_group = sorted(group, key=_meaning_rank, reverse=True)
+        if _meaning_rank(ordered_group[0]) != _meaning_rank(ordered_group[1]):
+            resolved.append(ordered_group[0])
+            continue
         origins = ", ".join(candidate.origin["qualified_id"] for candidate in ordered_group)
         trace.warn(f"Ambiguous meaning for call {call}: {origins}")
-        resolved.extend(ordered_group)
+        # No policy may invent which of two public meanings this call conveys.
     return tuple(resolved)
+
+
+def _meaning_rank(candidate: CallCandidate) -> tuple[int, int, int]:
+    return (int(bool(candidate.metadata.get('explicit_trump_transition'))),
+            int(candidate.metadata.get('priority', 0)),
+            int(candidate.metadata.get('context_specificity', 0)))
 
 
 def _same_final_pass_action(group: list[CallCandidate]) -> bool:

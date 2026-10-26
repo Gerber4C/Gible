@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(fileURLToPath(new URL(".", import.meta.url)));
 const host = "127.0.0.1";
-const port = Number(process.env.PARTNER_FRONTEND_PORT || process.argv[2] || 5173);
+const port = Number(process.env.GIBLE_FRONTEND_PORT || process.env.PARTNER_FRONTEND_PORT || process.argv[2] || 5173);
 
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
@@ -35,5 +35,5 @@ createServer(async (request, response) => {
     response.end("Not found");
   }
 }).listen(port, host, () => {
-  console.log(`Partner frontend listening at http://${host}:${port}`);
+  console.log(`Gible frontend listening at http://${host}:${port}`);
 });

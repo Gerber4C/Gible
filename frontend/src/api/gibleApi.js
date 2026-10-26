@@ -28,6 +28,34 @@ export async function simulateAuction(payload) {
   return postJson("/api/simulate", payload);
 }
 
+export async function generateTrainingDeal(payload, signal) {
+  return requestJson("POST", "/api/training/deal", payload, signal);
+}
+
+export async function analyzeContracts(payload, signal) {
+  return requestJson("POST", "/api/analysis/contracts", payload, signal);
+}
+
+export async function analyzeRoutes(payload, signal) {
+  return requestJson("POST", "/api/analysis/routes", payload, signal);
+}
+
+export async function listScannerReports() {
+  return getJson("/api/scanner/reports");
+}
+
+export async function readScannerReport(reportId) {
+  return getJson(`/api/scanner/reports/${encodeURIComponent(reportId)}`);
+}
+
+export async function scannerRunStatus() {
+  return getJson("/api/scanner/runs/current");
+}
+
+export async function startScannerRun(payload) {
+  return postJson("/api/scanner/runs", payload);
+}
+
 async function getJson(path) {
   return requestJson("GET", path);
 }
@@ -40,16 +68,18 @@ async function deleteJson(path) {
   return requestJson("DELETE", path);
 }
 
-async function requestJson(method, path, payload) {
+async function requestJson(method, path, payload, signal) {
   let response;
   try {
     response = await fetch(`${API_BASE}${path}`, {
       method,
       headers: payload ? { "Content-Type": "application/json" } : undefined,
       body: payload ? JSON.stringify(payload) : undefined,
+      signal,
     });
-  } catch {
-    throw new Error("Backend is not running. Start run_local.cmd and keep that window open.");
+  } catch (error) {
+    if (error?.name === "AbortError") throw error;
+    throw new Error("Backend is not running. Start gible.cmd (or python gible.py) and keep that window open.");
   }
   return parseResponse(response, path);
 }
@@ -70,10 +100,10 @@ async function parseResponse(response, path) {
 function friendlyApiMessage(response, data, path) {
   if (response.status === 404 || data.error === "not_found") {
     if (path.includes("/file")) return "That file is not in this profile.";
-    return "That Partner workspace endpoint is not available.";
+    return "That Gible workspace endpoint is not available.";
   }
-  if (response.status === 403) return "Partner blocked that file path.";
+  if (response.status === 403) return "Gible blocked that file path.";
   if (data.message) return data.message;
   if (data.error) return String(data.error).replaceAll("_", " ");
-  return "Partner could not complete that request.";
+  return "Gible could not complete that request.";
 }
