@@ -72,6 +72,12 @@ silently imported into Daqiush.
   if the solver or enough samples are unavailable, the auction blocks with a
   diagnostic. The 33-HCP rule applies to suitable no-trump slams, not this
   minor-slam route.
+- After `1NT–3C–3S`, no automatic `4H` convention is currently defined.
+  The audit's proposed meaning would require a public agreement that `3S`
+  establishes the spade-trump investigation and would also need explicit
+  later continuations. The responder's possible three-card spade fit is not
+  inferred from the auction, so this incomplete route remains blocked rather
+  than inventing a keycard or control-bidding sequence.
 - Exactly five-five minors with 10–12 raw HCP start the personal `3D` game
   force. Opener bids `3NT` with both major stoppers, otherwise shows the one
   major stopper at `3H` or `3S`. Responder chooses `3NT` when holding the

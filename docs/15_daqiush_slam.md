@@ -8,6 +8,16 @@ preemptive contexts beyond the initial uncontested 1NT scope. All original notes
 are retained below. Explicit contextual exceptions must remain distinguishable;
 neither conventional familiarity nor the old Meow profile supplies missing rules.
 
+### Incomplete five-card-major follow-up
+
+The sequence `1NT–3C–3S` does not, by itself, establish a public spade-trump
+fit. In particular, the responder's possible three-card spade support is not
+information that can be promoted into an automatic convention. The reviewed
+`4H` idea therefore remains intentionally unimplemented: its public trigger
+and subsequent continuations are not specified completely. Replay preserves an
+unset trump state and selector requests at this point block instead of
+inventing a keycard or control-bidding route.
+
 ## 1. Authoring structure
 
 | Module | Owner-supplied behavior to represent | Important context / pending decisions |

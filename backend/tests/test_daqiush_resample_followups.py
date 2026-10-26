@@ -92,6 +92,22 @@ class DaqiushResampleFollowupTests(unittest.TestCase):
         self.assertEqual(self.bid('1NP2CP2SP4DP', 'SKJ982HAK6DA76CQ2'), '4N')
         self.assertEqual(self.bid('1NP2CP2SP4DP', 'SAQT4HQ93DK5CA873'), '4S')
 
+    def test_five_card_spade_reply_does_not_infer_four_heart_slam_trigger(self):
+        # G016 rejected the 4NT proposal: 3S does not publicly establish a
+        # trump fit, and the review's proposed artificial 4H continuation has
+        # no complete public trigger or defined follow-up.
+        trace = replay_auction(self.profile, Auction.parse('1NP3CP3S'))
+        self.assertEqual(trace.trump_state('ns').status, 'unset')
+        self.assertFalse(trace.state_exists({'key': 'keycard_context'}))
+
+        three_spade_fit = 'SAQ4HKQJ9DAKQC876'
+        decision = choose_bid(
+            self.profile,
+            Auction.parse('1NP3CP3SP'),
+            Hand.parse(three_spade_fit),
+        )
+        self.assertIsNone(decision.call)
+
     def test_strong_responder_can_continue_after_no_shortage_slam_try_is_refused(self):
         auction = Auction.parse('1NP2CP2SP4DP4SP')
         strong = 'SAKQ4HKQJ9DAKQC87'
