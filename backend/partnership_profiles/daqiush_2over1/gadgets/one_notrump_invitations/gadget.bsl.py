@@ -226,6 +226,7 @@ def minor_slam_probe(ctx):
             and ctx.hand_quality['kr_points'] >= 14
             and max(ctx.hand.length(s) for s in 'HS') <= 3
             and max(ctx.hand.length(s) for s in 'CD') >= 5
+            and not solid_six_club_route(ctx)
             and not (ctx.hand.length('C') == 5 and ctx.hand.length('D') == 5)
             and not good_minor_5422(ctx)
             and not (sorted(ctx.hand.length(s) for s in 'HS') == [1, 3]
@@ -275,7 +276,12 @@ def shapely_invite(ctx, suit):
 
 
 def direct_minor_game(ctx, suit):
-    if ctx.hand is None or ctx.hand.length(suit) < 7 or ctx.hand.hcp > 10:
+    if ctx.hand is None or ctx.hand.length(suit) < 7:
+        return False
+    if (shapely_effective_points(ctx.hand, suit) >= 8
+            and max(ctx.hand.length(s) for s in 'HS') <= 3):
+        return True
+    if ctx.hand.hcp > 10:
         return False
     if ctx.hand.length(suit) >= 8:
         return True
@@ -290,6 +296,12 @@ def solid_minor_three_notrump(ctx, suit):
             and ctx.hand.honor_count(suit, ('A', 'K', 'Q')) == 3
             and (ctx.hand.length(suit) >= 7
                  or max(ctx.hand.length(s) for s in 'HS') <= 2))
+
+
+def solid_six_club_route(ctx):
+    return (ctx.hand is not None and ctx.hand.length('C') == 6
+            and ctx.hand.length('S') >= 1
+            and ctx.hand.honor_count('C', ('A', 'K', 'Q')) == 3)
 
 
 def weak_minor(ctx, suit):

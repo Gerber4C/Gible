@@ -81,6 +81,12 @@ class DaqiushMinorInvitationTests(unittest.TestCase):
         self.assertEqual(self.bid('1NP2NP', 'SAQ7HKJ8DA762CQ54'), '3C')
         self.assertEqual(self.bid('1NP2NP3CP', 'SJ74H63DAQJ754C82'), '3N')
 
+    def test_six_clubs_with_ca_kq_and_a_spade_uses_direct_three_clubs(self):
+        self.assertEqual(self.bid('1NP', 'SAK2HQ3D42CAKQ987'), '3C')
+
+    def test_seven_clubs_with_eight_effective_points_places_five_clubs(self):
+        self.assertEqual(self.bid('1NP', 'SAHQ3D42JCAKQ9876'), '5C')
+
     def test_good_minor_private_plan_survives_normalized_notrump_calls(self):
         result = simulate_auction(self.profile, {
             'n': 'SKQ59HTAD9TJAC98Q',

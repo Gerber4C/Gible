@@ -143,6 +143,12 @@ class DaqiushOneNotrumpExpansionTests(unittest.TestCase):
                 self.assertEqual(decision.selected_candidate.public_meaning['hcp_max'], 15)
         self.assertNotEqual(self.bid('1NP3CP3DP', 'SA2HK2DAQ76CKJ984'), '4N')
 
+    def test_six_five_minors_after_diamond_transfer_use_effective_point_split(self):
+        strong = 'SAKDAKQJ76CKQJ32'
+        weak = 'S2H3D987654CQJ432'
+        self.assertEqual(self.bid('1NP2NTP3DP', strong), '4N')
+        self.assertEqual(self.bid('1NP2NTP3DP', weak), '3H')
+
 
 if __name__ == '__main__':
     unittest.main()

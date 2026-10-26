@@ -14,6 +14,15 @@ def six_five_minor_choice(ctx):
             and shapely_combined_effective_points(ctx.hand) >= 7)
 
 
+def six_five_after_diamond_transfer(ctx):
+    return (ctx.hand is not None
+            and sorted(ctx.hand.length(s) for s in 'CD') == [5, 6])
+
+
+def six_five_transfer_strength(ctx):
+    return shapely_combined_effective_points(ctx.hand) >= 7
+
+
 def preferred_minor(ctx):
     return max('CD', key=lambda suit: (
         ctx.hand.length(suit),
@@ -34,6 +43,26 @@ class MinorTwoSuitGame(Gadget):
     author = Author('Daqiush')
 
     def build(self):
+        for bid, applies, action in (
+            ('4NT', lambda ctx: six_five_after_diamond_transfer(ctx)
+             and six_five_transfer_strength(ctx), 'select_minor'),
+            ('3H', lambda ctx: six_five_after_diamond_transfer(ctx)
+             and not six_five_transfer_strength(ctx), 'signoff'),
+        ):
+            route = self.call('six_five_after_diamond_transfer_' + action)
+            route.when = '1NP2NTP3DP'
+            route.bid = bid
+            route.applies = applies
+            route.meaning.action = 'six_five_minor_' + action
+            route.meaning.nature = ['artificial'] if bid == '4NT' else ['natural']
+            route.meaning.acts = ['inquiry', 'game_forcing'] if bid == '4NT' else ['signoff', 'final_placement']
+            route.meaning.target_suit = 'N' if bid == '4NT' else 'H'
+            if bid == '4NT':
+                route.meaning.forcing = 'game_forcing'
+            else:
+                route.meaning.purpose_completed = True
+            route.description = 'Use effective points to route a six-five minor hand after the diamond transfer.'
+
         choice = self.call('six_five_minor_game_choice')
         choice.when = '1NP'
         choice.bid = '4NT'
