@@ -1170,6 +1170,7 @@ def _base_namespace(collector: _Collector) -> dict[str, Any]:
         "minor_game_control_points": minor_game_control_points,
         "shapely_effective_points": shapely_effective_points,
         "shapely_combined_effective_points": shapely_combined_effective_points,
+        "shapely_description_proxy": shapely_description_proxy,
         "S": "S",
         "H": "H",
         "D": "D",

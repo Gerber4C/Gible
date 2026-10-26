@@ -93,6 +93,7 @@ def project_report(report: dict, report_id: str) -> dict:
             'blocked': case.get('blocked'), 'flags': list(flags),
             'rates': analysis.get('rates', {}),
             'alternative_game_rates': analysis.get('alternative_game_rates', {}),
+            'wrong_game_comparison': analysis.get('wrong_game_comparison', {}),
             'class_pairs': analysis.get('class_pairs'),
             'dds_boards': analysis.get('dds_boards'),
         })
@@ -100,6 +101,7 @@ def project_report(report: dict, report_id: str) -> dict:
         'id': report_id, 'profile': report.get('profile'),
         'seed': report.get('seed'), 'filters': report.get('filters'),
         'budget': report.get('budget'), 'summary': report.get('summary'),
+        'wrong_game_rule': report.get('wrong_game_rule', 'legacy_joint_failure_30pct'),
         'counts': counts, 'cases': cases,
         'method_note': report.get('method_note'),
     }
@@ -137,6 +139,7 @@ def list_reports(root: Path = REPORT_ROOT) -> list[dict]:
             continue
         results.append({'id': path.name, 'profile': projected['profile'],
                         'seed': projected['seed'], 'summary': projected['summary'],
+                        'wrong_game_rule': projected['wrong_game_rule'],
                         'counts': projected['counts'], 'budget': projected['budget'],
                         'modified_at': datetime.fromtimestamp(
                             path.stat().st_mtime, timezone.utc).isoformat()})

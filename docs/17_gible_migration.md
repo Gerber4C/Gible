@@ -16,7 +16,7 @@ bridge concepts; they are not renamed.
 
 ## GitHub fork
 
-The owner-controlled repository is [Daqiush/Gible](https://github.com/Daqiush/Gible),
+The owner-controlled repository is [Gerber4C/Gible](https://github.com/Gerber4C/Gible),
 forked from [profthecopyright/Partner](https://github.com/profthecopyright/Partner).
 In a checkout, `origin` should point to the Gible fork and `upstream` to the
 original. Verify with `git remote -v` and `git ls-remote --heads origin`.

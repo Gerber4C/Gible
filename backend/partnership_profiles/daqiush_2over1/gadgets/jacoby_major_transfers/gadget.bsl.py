@@ -41,7 +41,7 @@ def starts_jacoby(ctx, trump):
         return False
     shaped_points = shapely_second_minor_strength(ctx, trump)
     if shaped_points is not None and 4 <= shaped_points <= 6:
-        return ctx.hand_quality['kr_points'] + 15 < 25
+        return False  # A weak 6M–5m–1–1 describes only the major game via Texas.
     if named_evaluator(ctx, 'texas_slam_keycard_' + trump):
         return False
     if named_evaluator(ctx, 'six_card_slam_interest_' + trump):
@@ -66,10 +66,12 @@ def weak_jacoby(ctx, trump):
 
 
 def inviting_jacoby(ctx, trump):
+    shaped_points = shapely_second_minor_strength(ctx, trump)
     return (ctx.hand is not None and ctx.hand.length(trump) >= 5
             and not (min(ctx.hand.length('H'), ctx.hand.length('S')) >= 5)
-            and not ((shapely_second_minor_strength(ctx, trump) or 0) >= 7)
+            and (shaped_points is None or 7 <= shaped_points < 9)
             and (ctx.hand.hcp in (8, 9)
+                 or (shaped_points is not None and 7 <= shaped_points < 9)
                  or (ctx.hand.length(trump) == 5
                      and max(ctx.hand.length(s) for s in 'CD') == 5
                      and 7 <= shapely_combined_effective_points(ctx.hand) < 9)
@@ -122,7 +124,7 @@ def second_minor_game_force(ctx, trump, minor):
         return False
     shaped_points = shapely_second_minor_strength(ctx, trump)
     if shaped_points is not None:
-        return shaped_points >= 7
+        return shaped_points >= 9
     if ctx.hand.length(trump) == 5 and ctx.hand.length(minor) == 5:
         return shapely_combined_effective_points(ctx.hand) >= 9
     return ctx.hand.hcp >= 10
@@ -410,7 +412,7 @@ class JacobyMajorTransfers(Gadget):
                 shaped_game.when = minor_prefix + '3NTP'
                 shaped_game.bid = '4' + trump
                 shaped_game.applies = (lambda ctx, t=trump:
-                                       (shapely_second_minor_strength(ctx, t) or 0) >= 7)
+                                       (shapely_second_minor_strength(ctx, t) or 0) >= 9)
                 shaped_game.meaning.action = 'six_five_major_game_without_minor_fit'
                 shaped_game.meaning.nature = ['natural']
                 shaped_game.meaning.acts = ['signoff', 'final_placement']

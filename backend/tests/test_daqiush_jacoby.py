@@ -41,6 +41,9 @@ class DaqiushJacobyTests(unittest.TestCase):
                             self.assertEqual(self.bid(prefix, hand),
                                              '3H' if transfer == '2H' else '3D')
 
+    def test_six_minor_five_major_invite_uses_description_proxy(self):
+        self.assertEqual(self.bid('1NP2DP2HP', 'S3HKQJ76D4CQ98765'), '3H')
+
     def test_confirmed_six_card_slam_interest_transfers_but_game_only_uses_texas(self):
         self.assertEqual(self.bid('1NP', 'SA62HAQJT72DJ7CJ4'), '2D')
         self.assertEqual(self.bid('1NP', 'SAQJT72HA62DJ7CJ4'), '2H')

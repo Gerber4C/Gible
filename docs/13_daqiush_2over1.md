@@ -142,10 +142,10 @@ qualify for that phrase. The owner has confirmed K-R for 14+/17− and softness;
 the initial opening cutoffs and fit-sensitive absolute-maximum test are now
 implemented as described below.
 
-M, m, oM, and om are retained as contextual major/minor notation in the owner's
-source. Confirm the relevant suit anchor before expanding relative bids such
-as M-1, +1, or +2. Do not assume every minus-one notation refers to the same
-kind of step without a branch-specific definition.
+M/m mean major/minor; oM/om mean the other major/minor relative to the suit
+just named. For example, after `2H`, `3oM` is `3S`; after clubs, om is diamonds.
+Confirm the reference suit before expanding relative bids such as M-1, +1,
+or +2. The [quick glossary](14_bidding_terminology.md) records these shorthands.
 
 ## 3. Owner clarifications — authoritative over the original notes
 
@@ -352,13 +352,40 @@ from length alone. Interference is not covered by this slice.
   [slam-agreement notes](15_daqiush_slam.md).
 
 The 6M-5m-1-1 second-suit route counts singleton A as 4, K as 1, and Q/J
-as 0 when removing waste from raw HCP. With 7 or more retained points it
-starts Jacoby and rebids natural `3m` after ordinary acceptance, even when raw
-HCP is below 10. With 4–6 retained points and enough K–R game strength it
-uses game-only South African Texas. If opener denies four-card support for the
-second minor with natural `3NT`, responder returns to `4M`. Later slam
+as 0 when removing waste from raw HCP. With 7–8 retained points it starts
+Jacoby and rebids `3M` after ordinary acceptance, describing the hand as a
+six-card-major invitation. With at least 9 retained points it rebids natural
+`3m` to show the second suit and force to game, even when raw HCP is below 10.
+With 4–6 retained points it uses game-only South African Texas. If opener
+denies four-card support for the second minor with natural `3NT`, responder
+returns to `4M`. Later slam
 exploration after opener shows exceptionally strong minor support remains to
 be authored.
+
+For 6–4 major hands, evaluate the entire hand with the shapely effective-point
+rule. Below five effective points, transfer the six-card major and pass ordinary
+acceptance. Five to below seven keeps the previously agreed Stayman invitation:
+a four-card fit is invited at `3M`; a `2D` denial permits `2M` and then `3M`
+after opener's `2NT` rejection. Seven to below ten is game-going without a
+slam probe: bid direct South African Texas for the six-card major, ignoring the
+four-card other major.
+
+Ten to below twelve effective points is **weak slam interest** and starts `2C`.
+After `2D`, `4D` transfers to `4H` with six hearts, while `4H` transfers to
+`4S` with six spades. When the Stayman answer finds a 4–4 fit, responder bids
+`3oM` to probe slam in that fit. When it finds the 6–4 fit, responder raises
+to `4M`. Twelve to below fourteen is **moderate slam interest**; after `2D`
+responder bids three of the four-card major, and after either `2M` answer bids
+`3oM`. At fourteen or more effective points, **strong slam interest** uses the
+same immediate calls. Later, where the moderate route signs off at `4M`, the
+strong route instead uses a `4m` control cue. After the `2D–3M–3NT` branch,
+moderate interest compares `4M` and `6M` on hands sampled from the public 1NT
+promise and major denial, then stops at `4M` or starts with a controlled `4m`
+cue. Strong interest starts with the lowest controlled minor cue. If the
+double-dummy solver is unavailable, the simulation decision blocks visibly.
+Other slam continuations still require authored simulation decisions; the
+effective-point band alone does not choose a final slam. All heart/spade
+mirrors follow the same rule.
 
 ### Opening calibration exercise — first owner labels recorded
 

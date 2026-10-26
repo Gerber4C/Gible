@@ -16,16 +16,34 @@ def invitation_action(own, low, high, threshold):
     return None
 
 
-def certified_game_strength(meaning, quality, config):
+def certified_game_strength(meaning, quality, config, hand=None):
     """Let a profile supply a checkable non-HCP game valuation for this call."""
     evidence = meaning.get('strength_evidence')
-    if not isinstance(evidence, dict) or evidence.get('model') != 'kaplan_rubens':
+    if not isinstance(evidence, dict) or evidence.get('model') not in (
+            'kaplan_rubens', 'kaplan_rubens_or_shapely_effective'):
         return False
     suit = meaning.get('target_suit')
     partner_min = evidence.get('partner_min')
     if suit not in config['game_hcp'] or isinstance(partner_min, bool) or not isinstance(partner_min, (int, float)):
         return False
-    return quality['kr_points'] + partner_min >= config['game_hcp'][suit]
+    if quality['kr_points'] + partner_min >= config['game_hcp'][suit]:
+        return True
+    if evidence['model'] != 'kaplan_rubens_or_shapely_effective' or hand is None:
+        return False
+    shape_minimum = evidence.get('shape_minimum')
+    shape_lengths = evidence.get('shape_lengths')
+    if (isinstance(shape_minimum, bool) or not isinstance(shape_minimum, (int, float))
+            or not isinstance(shape_lengths, (tuple, list))):
+        return False
+    patterns = (shape_lengths if shape_lengths and isinstance(shape_lengths[0], (tuple, list))
+                else (shape_lengths,))
+    if any(len(pattern) != 4 or any(isinstance(length, bool) or not isinstance(length, int)
+                                   for length in pattern) for pattern in patterns):
+        return False
+    actual_shape = sorted(hand.length(other) for other in 'SHDC')
+    if not any(actual_shape == sorted(pattern) for pattern in patterns):
+        return False
+    return shapely_combined_effective_points(hand) >= shape_minimum
 
 
 def certified_shape_invitation(meaning, hand):
@@ -104,9 +122,15 @@ def evaluate_axioms(auction, hand, trace, candidates, raw_config=None):
     elif not facts['own_game'] and not forced and not forces:
         # Inquiry answers must first deliver the requested information.
         answering = bool(previous_tags & {'inquiry','directive','relay'})
+        invitation_resolved = (bool(previous_tags & {'accept', 'reject'})
+                               and previous is not None
+                               and any(entry['seat'] == actor
+                                       and entry['index'] < previous['index']
+                                       and tags(entry['public_meaning']) & INVITES
+                                       for entry in facts['ours']))
         low,high = facts['ranges'].get(partner(actor),(None,None))
         threshold = config['game_hcp'][facts['agreed'] or 'N']
-        if not answering:
+        if not answering and not invitation_resolved:
             action = invitation_action(hand.hcp,low,high,threshold)
             if action:
                 obligations.append({'kind':action,'own_hcp':hand.hcp,'partner_range':[low,high],
@@ -161,7 +185,7 @@ def evaluate_axioms(auction, hand, trace, candidates, raw_config=None):
                                                   ('minor_transfer_superaccept', 'transfer_superaccept')))):
             reject('INVITATION_REQUIRED','Choose an invitation or a defined game-forcing route')
         elif action == 'signoff' and not (candidate_tags & {'invite_minus','signoff'} or unclassified_continuation
-                                          or certified_game_strength(m, quality, config)
+                                          or certified_game_strength(m, quality, config, hand)
                                           or (candidate_tags & INVITES and certified_shape_invitation(m, hand))
                                           or (m.get('shape_invitation') and candidate_tags & INVITES
                                               and hand.length(m.get('target_suit')) >= 7

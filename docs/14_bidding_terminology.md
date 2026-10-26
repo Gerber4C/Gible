@@ -12,6 +12,8 @@ an approximate numeric test without the profile author's confirmation.
 | Term | Owner's definition | Scope / caution |
 | --- | --- | --- |
 | 有大牌 / an honor for this phrase | Q or higher: Q, K, A | Owner's general bidding terminology, supplied with Daqiush 2/1. J does not qualify for this phrase. This does not change ordinary HCP or K-R calculations. |
+| M / m | A major (H or S) / a minor (C or D) | Read relative to the suit named in the current auction. |
+| oM / om | The other major / the other minor | If the reference suit is H, oM is S; if it is C, om is D. Always identify the reference suit before expanding a call. |
 | 硬点 / hard values | Many A/K, few Q/J, concentrated honors | Daqiush: qualitative definition confirmed; exact predicate not yet specified. |
 | 14+ / 17− / 点力软 | Evaluate using K-R | Daqiush has approved provisional opening cutoffs in its profile notes; these are not universal thresholds. |
 | 绝对高限 / absolute maximum | Raw HCP minus the confirmed Q/J wastage deductions; 16 remaining with four trumps or 15 with five | Daqiush: see the exact formula and positive examples in the profile notes; independent of opening K-R cutoffs. |

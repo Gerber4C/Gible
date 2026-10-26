@@ -18,7 +18,9 @@ from .replay import active_environment_for, replay_auction
 from .simulation_decision import (decide_minor_5422, is_minor_5422_decision,
                                   decide_minor_major_74, is_minor_major_74_decision,
                                   decide_two_major_spade_slam,
-                                  is_two_major_spade_slam_decision)
+                                  is_two_major_spade_slam_decision,
+                                  decide_six_four_major_after_three_notrump,
+                                  is_six_four_major_after_three_notrump)
 
 
 def choose_bid(
@@ -133,6 +135,23 @@ def choose_bid(
         selected = next((item for item in candidates if item.call == simulated['call']), None)
         if selected is None:
             trace.warn('Two-major slam comparison chose a call absent from this profile')
+            return BidDecision(call=None, selected_candidate=None,
+                               candidate_pool=CandidatePool(candidates, auction),
+                               trace=trace, private_memory=actor_memory)
+        trace.simulation_decision = simulated
+        candidates = (selected,)
+
+    if is_six_four_major_after_three_notrump(profile.id, auction, hand):
+        try:
+            simulated = decide_six_four_major_after_three_notrump(profile, auction, hand)
+        except (DDSUnavailableError, SamplingExhausted, RuntimeError, ValueError) as exc:
+            trace.warn('Six-four major slam simulation unavailable: ' + str(exc))
+            return BidDecision(call=None, selected_candidate=None,
+                               candidate_pool=CandidatePool(candidates, auction),
+                               trace=trace, private_memory=actor_memory)
+        selected = next((item for item in candidates if item.call == simulated['call']), None)
+        if selected is None:
+            trace.warn('Six-four major simulation chose a call absent from this profile')
             return BidDecision(call=None, selected_candidate=None,
                                candidate_pool=CandidatePool(candidates, auction),
                                trace=trace, private_memory=actor_memory)

@@ -11,8 +11,13 @@ SLAM_INTEREST = {
 
 
 def has_texas_game(ctx, suit):
-    return (ctx.hand is not None and ctx.hand.length(suit) >= 6
-            and ctx.hand_quality['kr_points'] + 15 >= GAME_KR_TOTAL)
+    if ctx.hand is None or ctx.hand.length(suit) < 6:
+        return False
+    if sorted((ctx.hand.length('H'), ctx.hand.length('S'))) == [4, 6]:
+        return 7 <= shapely_combined_effective_points(ctx.hand) < 10
+    shaped_points = named_evaluator(ctx, 'shapely_second_minor_strength_' + suit)
+    return (ctx.hand_quality['kr_points'] + 15 >= GAME_KR_TOTAL
+            or shaped_points is not None and 4 <= shaped_points <= 6)
 
 
 def six_card_slam_interest(ctx, suit):
@@ -39,6 +44,8 @@ def six_card_slam_interest(ctx, suit):
 def game_only_texas(ctx, suit):
     if not has_texas_game(ctx, suit) or ctx.hand.length(suit) != 6:
         return False
+    if sorted((ctx.hand.length('H'), ctx.hand.length('S'))) == [4, 6]:
+        return True
     side_lengths = sorted(ctx.hand.length(other) for other in 'SHDC' if other != suit)
     if side_lengths == [2, 2, 3]:
         supported = True
@@ -142,14 +149,18 @@ class SouthAfricanTexas(Gadget):
             call.meaning.acts = ['directive', 'game_forcing']
             call.meaning.forcing = 'game_forcing'
             call.meaning.agreed_suit = suit
-            call.meaning.strength_evidence = {'model': 'kaplan_rubens', 'partner_min': 15}
+            call.meaning.strength_evidence = {
+                'model': 'kaplan_rubens_or_shapely_effective', 'partner_min': 15,
+                'shape_minimum': 4,
+                'shape_lengths': [[1, 1, 5, 6], [1, 2, 4, 6], [0, 3, 4, 6]]}
             call.meaning.public_evidence = {
                 'evaluator': 'texas_' + suit + '_public', 'equals': True,
                 'bounds': {'min_lengths': {suit: 6}},
             }
             call.effect('agreed_suit').suit = suit
             call.description = ('South African Texas transfer with a six-card major, '
-                                'K-R game strength, and a privately fixed game-only purpose.')
+                                'game strength or the authored 6M–5m shape exception, '
+                                'and a privately fixed game-only purpose.')
 
             for answer, applies, id_suffix, natural in (
                 (weak, does_not_want_declarer, 'decline_declarer', False),

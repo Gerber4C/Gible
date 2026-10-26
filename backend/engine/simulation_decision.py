@@ -7,13 +7,15 @@ constraints; the actual Table partner and opponents never enter the solver.
 from __future__ import annotations
 
 from hashlib import sha256
+import random
 from types import SimpleNamespace
 
 from .auction import Auction
 from .cards import Hand
 from .contract_evaluation import ContractTarget, compare_contract_targets
 from .dds_adapter import calculate_available_table
-from .deal_sampler import sample_deals
+from .deal_sampler import SamplingExhausted, SamplingResult, _hand_from_cards, sample_deals
+from .constrained_deals import DECK, HandConstraints, _HandPlan
 from .hand_quality import assess_quality, shapely_combined_effective_points
 from .honor_quality import assess_honor_texture
 
@@ -26,6 +28,10 @@ TWO_MAJOR_SPADE_SUPERACCEPTS = {
     ('1N', 'P', '2H', 'P', '3C', 'P'): 'C',
     ('1N', 'P', '2H', 'P', '3D', 'P'): 'D',
     ('1N', 'P', '2H', 'P', '3S', 'P'): None,
+}
+SIX_FOUR_MAJOR_THREE_NOTRUMP = {
+    ('1N', 'P', '2C', 'P', '2D', 'P', '3H', 'P', '3N', 'P'): 'S',
+    ('1N', 'P', '2C', 'P', '2D', 'P', '3S', 'P', '3N', 'P'): 'H',
 }
 SAMPLE_COUNT = 20
 MIN_GOOD_SAMPLES = 12
@@ -52,6 +58,67 @@ def is_two_major_spade_slam_decision(profile_id: str, auction: Auction, hand: Ha
             and shapely_combined_effective_points(hand) >= 9)
 
 
+def is_six_four_major_after_three_notrump(profile_id: str, auction: Auction,
+                                           hand: Hand) -> bool:
+    major = SIX_FOUR_MAJOR_THREE_NOTRUMP.get(auction.calls)
+    return (profile_id == 'daqiush_2over1' and major is not None
+            and hand.length(major) == 6
+            and hand.length('S' if major == 'H' else 'H') == 4
+            and 12 <= shapely_combined_effective_points(hand) < 14)
+
+
+def decide_six_four_major_after_three_notrump(profile, auction: Auction,
+                                               hand: Hand) -> dict:
+    """Compare game and slam on the same deals compatible with 1NT–2C–2D."""
+    if not is_six_four_major_after_three_notrump(profile.id, auction, hand):
+        raise ValueError('Expected the moderate six-four major slam decision')
+    actor = auction.actor_to_call
+    partner = {'n': 's', 's': 'n', 'e': 'w', 'w': 'e'}[actor]
+    major = SIX_FOUR_MAJOR_THREE_NOTRUMP[auction.calls]
+    constraints = {partner: {'min_hcp': 14, 'max_hcp': 18,
+                             'max_lengths': {'H': 3, 'S': 3}}}
+    sampled = sample_deals(actor, hand, public_constraints=constraints,
+                           sample_count=60, seed=_seed(auction, hand),
+                           max_attempts=50000, max_seconds=8.0)
+    opening = next((item.definition for item in profile.named_evaluators
+                    if item.id == 'opening_assessment'), None)
+    if opening is None:
+        raise ValueError('Profile lacks the public 1NT opening predicate')
+    deals = tuple(deal for deal in sampled.deals
+                  if opening(SimpleNamespace(hand=deal[partner],
+                                             hand_quality=assess_quality(deal[partner])))['eligible'])
+    if len(deals) < 8:
+        raise ValueError(f'Only {len(deals)} sampled hands matched the public 1NT promise')
+    estimates = compare_contract_targets(
+        deals, (ContractTarget(4, major, actor), ContractTarget(6, major, actor)),
+        solve_table=calculate_available_table)
+    vulnerable = _vulnerable(auction)
+    expected = {}
+    rates = {}
+    for item in estimates:
+        contract = item.contract
+        # Major-suit duplicate score with binary completion, no overtricks.
+        level = int(contract[0])
+        made = level * 30 + (500 if vulnerable else 300)
+        if level == 6:
+            made += 750 if vulnerable else 500
+        down = -100 if vulnerable else -50
+        expected[contract] = item.completion_rate * made + (1 - item.completion_rate) * down
+        rates[contract] = item.completion_rate
+    cue_suit = next((minor for minor in 'CD'
+                     if hand.length(minor) <= 1
+                     or hand.contains_rank(minor, 'A')
+                     or hand.contains_rank(minor, 'K')), None)
+    if cue_suit is None:
+        raise ValueError('No minor-suit control cue available after 3NT')
+    pursue_slam = expected['6' + major] > expected['4' + major]
+    return {'call': '4' + cue_suit if pursue_slam else '4' + major,
+            'sample_count': len(deals), 'attempts': sampled.attempts,
+            'seed': sampled.seed, 'completion_rates': rates,
+            'expected_scores': expected,
+            'comparison': '4M versus 6M binary completion on public-compatible sampled deals'}
+
+
 def decide_two_major_spade_slam(profile, auction: Auction, hand: Hand) -> dict:
     """Use only the responder hand and publicly promised opener range/support."""
     if not is_two_major_spade_slam_decision(profile.id, auction, hand):
@@ -70,19 +137,22 @@ def decide_two_major_spade_slam(profile, auction: Auction, hand: Hand) -> dict:
         min_lengths.update({suit: (4 if suit == 'S' else 3) for suit in 'SHDC'})
     constraints = {partner: {'min_hcp': 16, 'max_hcp': 18,
                              'min_lengths': min_lengths, 'max_lengths': max_lengths}}
-    sampled = sample_deals(actor, hand, public_constraints=constraints,
-                           sample_count=72 if superaccept else 24,
-                           seed=_seed(auction, hand),
-                           max_attempts=90000, max_seconds=12.0)
     opening = next((item.definition for item in profile.named_evaluators
                     if item.id == 'opening_assessment'), None)
     if opening is None:
         raise ValueError('Profile lacks the public 1NT opening predicate')
-    deals = tuple(deal for deal in sampled.deals
-                  if opening(SimpleNamespace(hand=deal[partner],
-                                             hand_quality=assess_quality(deal[partner])))['eligible']
-                  and (not superaccept or
-                       assess_honor_texture(deal[partner])['adjusted_hcp'] >= 16))
+    if superaccept:
+        sampled = _sample_superaccept_openers(
+            hand, shown_doubleton, auction.calls[-2] == '3S',
+            _seed(auction, hand), opening)
+        deals = sampled.deals
+    else:
+        sampled = sample_deals(actor, hand, public_constraints=constraints,
+                               sample_count=24, seed=_seed(auction, hand),
+                               max_attempts=50000, max_seconds=8.0)
+        deals = tuple(deal for deal in sampled.deals
+                      if opening(SimpleNamespace(hand=deal[partner],
+                                                 hand_quality=assess_quality(deal[partner])))['eligible'])
     if len(deals) < 8:
         raise ValueError(f'Only {len(deals)} sampled hands matched the public 1NT promise')
     estimates = compare_contract_targets(
@@ -101,6 +171,59 @@ def decide_two_major_spade_slam(profile, auction: Auction, hand: Hand) -> dict:
             'completion_rates': rates,
             'expected_scores': {s: expected(s) for s in ('4S', '6S')},
             'comparison': 'game and slam completion on the same publicly compatible deals'}
+
+
+def _sample_superaccept_openers(responder: Hand, doubleton: str | None,
+                                flat_4333: bool, seed: int, opening) -> SamplingResult:
+    """Draw a rare 1NT superaccept directly by its published shape and HCP."""
+    rng = random.Random(seed)
+    available = tuple(card for card in DECK if not responder.contains_rank(*card))
+    plans = []
+    for spades in range(4, 6):
+        for hearts in range(1, 7):
+            for diamonds in range(1, 7):
+                clubs = 13 - spades - hearts - diamonds
+                if not 1 <= clubs <= 6:
+                    continue
+                shape = (spades, hearts, diamonds, clubs)
+                lengths = dict(zip('SHDC', shape))
+                if (flat_4333 and shape != (4, 3, 3, 3)) or (
+                        doubleton and lengths[doubleton] != 2):
+                    continue
+                try:
+                    plan = _HandPlan(available, HandConstraints(shape, (16, 18), (-5, 35)))
+                except ValueError:
+                    continue
+                if plan.total:
+                    plans.append(plan)
+    if not plans:
+        raise ValueError('No public-compatible superaccept hand exists')
+    total = sum(plan.total for plan in plans)
+    deals = []
+    attempts = 0
+    while len(deals) < 24 and attempts < 1200:
+        attempts += 1
+        draw = rng.randrange(total)
+        for plan in plans:
+            if draw < plan.total:
+                break
+            draw -= plan.total
+        north_cards = plan.sample(rng)
+        north = _hand_from_cards(north_cards)
+        if not opening(SimpleNamespace(hand=north,
+                                       hand_quality=assess_quality(north)))['eligible']:
+            continue
+        if assess_honor_texture(north)['adjusted_hcp'] < 16:
+            continue
+        north_set = set(north_cards)
+        east_west = [card for card in available if card not in north_set]
+        rng.shuffle(east_west)
+        deals.append({'n': north, 's': responder,
+                      'e': _hand_from_cards(east_west[:13]),
+                      'w': _hand_from_cards(east_west[13:])})
+    if len(deals) < 8:
+        raise SamplingExhausted(attempts, len(deals))
+    return SamplingResult(tuple(deals), attempts, seed)
 
 
 def decide_minor_major_74(profile, auction: Auction, hand: Hand) -> dict:

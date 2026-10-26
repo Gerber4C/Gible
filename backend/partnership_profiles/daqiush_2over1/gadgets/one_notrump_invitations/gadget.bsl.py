@@ -88,6 +88,35 @@ def six_four_major_strength(ctx):
     return shapely_combined_effective_points(ctx.hand)
 
 
+def six_four_slam_band(ctx):
+    """The owner's effective-point bands for a six-four two-major hand."""
+    points = six_four_major_strength(ctx)
+    if points is None or points < 10:
+        return None
+    if points >= 14:
+        return 'strong'
+    if points >= 12:
+        return 'moderate'
+    return 'weak'
+
+
+def six_four_long_major(ctx):
+    if six_four_major_strength(ctx) is None:
+        return None
+    return 'H' if ctx.hand.length('H') == 6 else 'S'
+
+
+def six_four_first_minor_control(ctx):
+    if ctx.hand is None:
+        return None
+    for minor in 'CD':
+        if (ctx.hand.length(minor) <= 1
+                or ctx.hand.contains_rank(minor, 'A')
+                or ctx.hand.contains_rank(minor, 'K')):
+            return minor
+    return None
+
+
 def both_four_major_invite(ctx):
     return (ctx.hand is not None
             and ctx.hand.length('H') == ctx.hand.length('S') == 4
@@ -118,12 +147,25 @@ def major_fit_slam_probe(ctx, answer):
 
 
 def shortage_fit_probe(ctx, answer):
+    if six_four_fit_probe(ctx, answer):
+        return True
     return (answer in ('2H', '2S') and game_stayman(ctx)
             and ctx.hand.length(answer[-1]) >= 4
             and (major_fit_slam_probe(ctx, answer)
                  or (ctx.hand.hcp >= 11 and ctx.hand_quality['kr_points'] >= 13.5))
             and any(ctx.hand.length(suit) <= 1 for suit in 'SHDC'
                     if suit != answer[-1]))
+
+
+def six_four_fit_probe(ctx, answer):
+    if answer not in ('2H', '2S'):
+        return False
+    points = six_four_major_strength(ctx)
+    if points is None or points < 10:
+        return False
+    answered = answer[-1]
+    long_major = six_four_long_major(ctx)
+    return answered != long_major or points >= 12
 
 
 def flat_fit_probe(ctx, answer):
@@ -193,7 +235,8 @@ def asks_stayman(ctx):
             or double_major_invite(ctx) or both_four_major_invite(ctx) or game_stayman(ctx)
             or minor_slam_probe(ctx) or minor_stayman_probe(ctx)
             or garbage_stayman(ctx) or seven_minor_four_major_game(ctx) is not None
-            or (six_four_major_strength(ctx) or 0) >= 5)
+            or 5 <= (six_four_major_strength(ctx) or 0) < 7
+            or six_four_slam_band(ctx) is not None)
 
 
 def direct_notrump_power(ctx):
@@ -495,17 +538,19 @@ class OneNotrumpInvitations(Gadget):
                  and not shortage_fit_probe(ctx, a)
                  or a == '2H' and seven_minor_four_major_game(ctx) is not None
                  and ctx.hand.length('H') == 4
-                 or a == '2H' and ctx.hand.length('H') >= 4
-                 and (six_four_major_strength(ctx) or 0) >= 7, 'game_hearts'),
+                 or a == '2H' and six_four_long_major(ctx) == 'H'
+                 and six_four_slam_band(ctx) == 'weak', 'game_hearts'),
                 ('4S', lambda ctx, a=answer: a == '2S' and game_stayman(ctx)
                  and ctx.hand.length('S') >= 4
                  and not major_fit_slam_probe(ctx, a)
                  and not shortage_fit_probe(ctx, a)
                  or a == '2S' and seven_minor_four_major_game(ctx) is not None
                  and ctx.hand.length('S') == 4
-                 or a == '2S' and ctx.hand.length('S') >= 4
-                 and (six_four_major_strength(ctx) or 0) >= 7, 'game_spades'),
+                 or a == '2S' and six_four_long_major(ctx) == 'S'
+                 and six_four_slam_band(ctx) == 'weak', 'game_spades'),
             ):
+                if answer == '2D' and bid in ('4H', '4S'):
+                    continue  # No 4M Stayman placement after a major denial.
                 continuation = self.call('stayman_' + answer.lower() + '_' + action)
                 continuation.when = prefix
                 continuation.bid = bid
@@ -514,6 +559,8 @@ class OneNotrumpInvitations(Gadget):
                 continuation.meaning.nature = ['natural']
                 continuation.meaning.acts = ['descriptive'] if answer == '2H' and bid == '3NT' else ['signoff', 'final_placement']
                 continuation.meaning.target_suit = 'N' if bid == '3NT' else bid[-1]
+                if bid in ('4H', '4S'):
+                    continuation.meaning.quality_upgrade = True
                 if not (answer == '2H' and bid == '3NT'):
                     continuation.meaning.purpose_completed = True
                 continuation.description = 'Game-going Stayman hand places game after opener describes the majors.'
@@ -530,7 +577,8 @@ class OneNotrumpInvitations(Gadget):
                 shortage.meaning.agreed_suit = answer[-1]
                 shortage.meaning.target_suit = answer[-1]
                 shortage.effect('agreed_suit').suit = answer[-1]
-                shortage.description = 'Other major confirms a four-card fit and short-suit slam interest.'
+                shortage.description = ('Other major confirms the answered major as a fit and probes slam; '
+                                        'a six-four two-major hand can use this call too.')
 
                 no_shortage = self.call('stayman_' + answer.lower() + '_fit_no_shortage_slam')
                 no_shortage.when = prefix
@@ -891,11 +939,14 @@ class OneNotrumpInvitations(Gadget):
             show.meaning.nature = ['natural']
             show.meaning.acts = ['invite']
             show.meaning.target_suit = major
-            show.description = 'Nonforcing invitation showing five of this major and four of the other.'
+            show.meaning.shape_invitation = {
+                'minimum': 5, 'min_lengths': {major: 5,
+                                              'H' if major == 'S' else 'S': 4}}
+            show.description = 'Shows at least five of this major and four of the other; responder may still hold game-forcing shape strength.'
 
             prefix = '1NP2CP2DP2' + major + 'P'
             for bid, action, fits in (
-                ('P', 'reject', None), ('3NT', 'accept', False),
+                ('2NT', 'reject', None), ('3NT', 'accept', False),
                 ('4' + major, 'accept', True),
             ):
                 placement = self.call('stayman_five_' + major.lower() + '_' + action + '_' + bid.lower())
@@ -905,19 +956,44 @@ class OneNotrumpInvitations(Gadget):
                                      and (f is None or (ctx.hand.length(s) >= 3) == f))
                 placement.meaning.action = 'five_major_invitation_' + action
                 placement.meaning.nature = ['natural']
-                placement.meaning.acts = [action] if bid == 'P' else [action, 'final_placement']
+                placement.meaning.acts = ([action, 'final_placement']
+                                          if bid == '4' + major else [action])
                 placement.meaning.target_suit = 'N' if bid == '3NT' else major
-                if bid != 'P':
+                if bid == '4' + major:
                     placement.meaning.purpose_completed = True
-                placement.description = 'Reject at 2M or accept the game invitation in 3NT/4M.'
+                placement.description = 'Reject with 2NT or accept the game invitation in 3NT/4M.'
+
+            five_four_stop = self.call('stayman_five_' + major.lower() + '_reject_stop')
+            five_four_stop.when = prefix + '2NTP'
+            five_four_stop.bid = 'P'
+            five_four_stop.applies = lambda ctx, s=major: (double_major_invite(ctx)
+                                                           and ctx.hand.length(s) == 5)
+            five_four_stop.meaning.action = 'five_four_major_invitation_stop'
+            five_four_stop.meaning.nature = ['natural']
+            five_four_stop.meaning.acts = ['signoff', 'final_placement']
+            five_four_stop.meaning.target_suit = 'N'
+            five_four_stop.meaning.purpose_completed = True
+            five_four_stop.description = 'Without a six-card suit, respect opener’s rejection and play 2NT.'
+
+            five_four_game = self.call('stayman_five_' + major.lower() + '_game_stop')
+            five_four_game.when = prefix + '3NTP'
+            five_four_game.bid = 'P'
+            five_four_game.applies = lambda ctx, s=major: (double_major_invite(ctx)
+                                                           and ctx.hand.length(s) == 5)
+            five_four_game.meaning.action = 'five_four_major_game_stop'
+            five_four_game.meaning.nature = ['natural']
+            five_four_game.meaning.acts = ['signoff', 'final_placement']
+            five_four_game.meaning.target_suit = 'N'
+            five_four_game.meaning.purpose_completed = True
+            five_four_game.description = 'Without a six-card suit, accept opener’s notrump game.'
 
             for earlier, final in (('2NT', '3' + major), ('3NT', '4' + major)):
                 long_rebid = self.call('six_four_' + major.lower() + '_over_' + earlier.lower())
                 long_rebid.when = prefix + earlier.replace('NT', 'N') + 'P'
                 long_rebid.bid = final
-                long_rebid.applies = lambda ctx, s=major: (ctx.hand is not None
-                                                            and ctx.hand.length(s) == 6
-                                                            and (six_four_major_strength(ctx) or 0) >= 5)
+                long_rebid.applies = lambda ctx, s=major, e=earlier: (
+                    ctx.hand is not None and ctx.hand.length(s) == 6
+                    and 5 <= (six_four_major_strength(ctx) or 0) < 7)
                 long_rebid.meaning.action = 'six_four_major_placement'
                 long_rebid.meaning.nature = ['natural']
                 long_rebid.meaning.acts = ['signoff', 'final_placement']
@@ -1030,3 +1106,90 @@ class OneNotrumpInvitations(Gadget):
                         verdict.meaning.acts = ['accept', 'final_placement']
                         verdict.meaning.purpose_completed = True
                     verdict.description = '5m invitation judged by retained trump HCP and outside controls.'
+
+        # Six-four majors: game-only hands use direct Texas (in that gadget).
+        # Slam-interest hands start with Stayman; H/S are handled symmetrically.
+        for long_major, short_major in (('H', 'S'), ('S', 'H')):
+            denial = '1NP2CP2DP'
+            weak_transfer = '4D' if long_major == 'H' else '4H'
+            weak = self.call('six_four_' + long_major.lower() + '_weak_slam_transfer')
+            weak.when = denial
+            weak.bid = weak_transfer
+            weak.applies = lambda ctx, s=long_major: (six_four_long_major(ctx) == s
+                                                       and six_four_slam_band(ctx) == 'weak')
+            weak.meaning.action = 'six_four_weak_slam_transfer'
+            weak.meaning.nature = ['artificial']
+            weak.meaning.acts = ['directive', 'slam_try', 'game_forcing']
+            weak.meaning.forcing = 'game_forcing'
+            weak.meaning.target_suit = long_major
+            weak.description = 'Weak slam interest after 2D: transfer to four of the six-card major.'
+
+            complete = self.call('six_four_' + long_major.lower() + '_complete_weak_transfer')
+            complete.when = denial + weak_transfer + 'P'
+            complete.bid = '4' + long_major
+            complete.applies = lambda ctx: ctx.hand is not None
+            complete.meaning.action = 'complete_six_four_weak_slam_transfer'
+            complete.meaning.nature = ['natural']
+            complete.meaning.acts = ['descriptive']
+            complete.meaning.target_suit = long_major
+            complete.meaning.agreed_suit = long_major
+            complete.effect('agreed_suit').suit = long_major
+            complete.description = 'Complete the transfer; further slam choice awaits simulation.'
+
+            strong_show = self.call('six_four_' + long_major.lower() + '_show_four_after_denial')
+            strong_show.when = denial
+            strong_show.bid = '3' + short_major
+            strong_show.applies = lambda ctx, s=long_major: (six_four_long_major(ctx) == s
+                                                              and six_four_slam_band(ctx)
+                                                              in ('moderate', 'strong'))
+            strong_show.meaning.action = 'six_four_slam_show_four_major'
+            strong_show.meaning.nature = ['natural']
+            strong_show.meaning.acts = ['descriptive', 'slam_try', 'game_forcing']
+            strong_show.meaning.forcing = 'game_forcing'
+            strong_show.meaning.target_suit = short_major
+            strong_show.description = 'Moderate/strong slam interest: show the four-card major after 2D.'
+
+            three_nt = self.call('six_four_' + long_major.lower() + '_opener_three_notrump')
+            three_nt.when = denial + '3' + short_major + 'P'
+            three_nt.bid = '3NT'
+            three_nt.applies = lambda ctx: ctx.hand is not None
+            three_nt.meaning.action = 'six_four_major_no_fit_notrump'
+            three_nt.meaning.nature = ['natural']
+            three_nt.meaning.acts = ['descriptive']
+            three_nt.meaning.target_suit = 'N'
+            three_nt.description = 'After denying a four-card major, offer 3NT; responder uses sampling.'
+
+            choice_prefix = denial + '3' + short_major + 'P3NTP'
+            game = self.call('six_four_' + long_major.lower() + '_moderate_game_after_three_nt')
+            game.when = choice_prefix
+            game.bid = '4' + long_major
+            game.applies = lambda ctx, s=long_major: (six_four_long_major(ctx) == s
+                                                       and six_four_slam_band(ctx) == 'moderate')
+            game.meaning.action = 'six_four_major_simulated_game'
+            game.meaning.nature = ['natural']
+            game.meaning.acts = ['signoff', 'final_placement']
+            game.meaning.target_suit = long_major
+            game.meaning.agreed_suit = long_major
+            game.meaning.quality_upgrade = True
+            game.meaning.purpose_completed = True
+            game.effect('agreed_suit').suit = long_major
+            game.description = 'Moderate slam interest stops at 4M when sampled deals favor game.'
+
+            for minor in 'CD':
+                cue = self.call('six_four_' + long_major.lower() + '_'
+                                + minor.lower() + '_cue_after_three_nt')
+                cue.when = choice_prefix
+                cue.bid = '4' + minor
+                cue.applies = lambda ctx, s=long_major, m=minor: (
+                    six_four_long_major(ctx) == s
+                    and six_four_slam_band(ctx) in ('moderate', 'strong')
+                    and six_four_first_minor_control(ctx) == m)
+                cue.meaning.action = 'six_four_major_control_cue'
+                cue.meaning.nature = ['artificial']
+                cue.meaning.acts = ['slam_try', 'control_showing', 'game_forcing']
+                cue.meaning.forcing = 'game_forcing'
+                cue.meaning.target_suit = long_major
+                cue.meaning.agreed_suit = long_major
+                cue.meaning.control_suit = minor
+                cue.effect('agreed_suit').suit = long_major
+                cue.description = 'Control cue with the six-card major agreed; later choices need simulation.'

@@ -502,19 +502,19 @@
       "reviewer_note": "AKQJ:9\nAKQ:8.4\nAKJ:7.3\nAQJ:5.8\nKQJ:4.7\nAK:7\nAQ:5.5\nAJ:4.4(>=3)/4.1(2)\nKQ:4.4(>=3)/4.1(2)\nKJ:3.1(>=3)/2.9(2)\nQJ:1.5(>=3)/0.4(2)\nA:4\nK:2.6(>=2)/1.5(1)\nQ:1.3(>=3)/1(2)/0.3(1)\nJ:0.5(>=3)/0.2(2)/0.1(1)\n\n调整后仍有开1NT点力则接受"
     },
     "G034": {
-      "title": "G034 · 弱♥先转移并止叫",
+      "title": "G034 · 六♥五低花按有效点分流",
       "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
-      "kind": "keep",
+      "kind": "change",
       "target_auction": "1NT 开叫后；原进程 1NP2DP2HPPP",
       "proposed_call": "2♦",
-      "proposal": "保留2♦雅可比转移至♥，弱牌停在2♥；双明手偶然出现的局不足以强迫弱牌跳局。",
+      "proposal": "6♥5低花且两个单张的牌，保留有效点7–8时先2♦转移，普通接受后3♥邀请；9以上则3m自然显示第二套并逼局；4–6走南非德克萨斯只打4♥。黑桃对应分支同理。",
       "basis": [
         "Daqiush §1NT：2♦/2♥雅可比转移；超转表及“超转后所有探贯牌立即4NT”。",
         "新睿 1N_P_2D#、1N_P_2H#：分别转移♥、♠。",
         "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
       ],
       "decision": "needs_changes",
-      "implementation": "not_started",
+      "implementation": "complete",
       "reviewer_note": "采用畸形牌有效点机制算点：达到7有效点就假装自己是6个H邀请；达到9有效点就走两套逼局"
     },
     "G035": {
@@ -625,12 +625,12 @@
       "reviewer_note": ""
     },
     "G042": {
-      "title": "G042 · 弱6♣5♠双套需要选路",
+      "title": "G042 · 六♣五♠按有效点邀请或停叫",
       "diagnosis": "Daqiush已定义弱5–4双高花按套质量转移，但这里是6♣5♠，7–4原则也不能直接外推。",
-      "kind": "investigate",
+      "kind": "change",
       "target_auction": "1NT",
-      "proposed_call": "",
-      "proposal": "先比较2♠转♣后停3♣与2♥转♠后停2♠的单明手期望；在体系写出6m5M弱牌优先级后才能指定统一首口。",
+      "proposed_call": "2♥",
+      "proposal": "6♣5♠及花色互换的6m5M牌，先雅可比转移高花；低于6有效点普通接受后停2M，超转按既有重转移路线；6有效点以上普通接受后3M，描述成六张高花邀请。",
       "basis": [
         "Daqiush §1NT：2♠转移♣、2NT转移♦（保6）；弱牌可停3m，畸形牌可邀请5m。",
         "新睿 1N_P_2S#提供弱♣转移的基础；其2NT含义不同，不覆盖 Daqiush。",
@@ -639,7 +639,7 @@
         "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
       ],
       "decision": "rejected",
-      "implementation": "not_started",
+      "implementation": "complete",
       "reviewer_note": "6以下有效点停2S（同伴超转时除外），6以上有效点伪装成6张S邀请牌"
     },
     "G043": {
@@ -672,19 +672,19 @@
       "reviewer_note": "差的21叫5NT（自己查是什么意思），好的21以上叫7NT"
     },
     "G045": {
-      "title": "G045 · 弱♠先转移并止叫",
+      "title": "G045 · 六五双高花按有效点邀请",
       "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
-      "kind": "keep",
+      "kind": "change",
       "target_auction": "1NT 开叫后；原进程 1NP2HP2SPPP",
-      "proposed_call": "2♥",
-      "proposal": "保留2♥雅可比转移至♠，弱牌停在2♠；双明手偶然出现的局或满贯不足以强迫弱牌跳局。",
+      "proposed_call": "2♦→2♠",
+      "proposal": "6♠5♥达到5有效点先2♦转♥，普通接受后2♠按55双高花邀请；开叫人若接受并叫3NT，应叫人改4♠。不足5有效点转移长♠后停2♠。高花互换时按相应自然长度与套质量处理。",
       "basis": [
         "Daqiush §1NT：2♦/2♥雅可比转移；超转表及“超转后所有探贯牌立即4NT”。",
         "新睿 1N_P_2D#、1N_P_2H#：分别转移♥、♠。",
         "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
       ],
       "decision": "rejected",
-      "implementation": "not_started",
+      "implementation": "complete",
       "reviewer_note": "5有效点以上的65高花处理成55邀请（同伴如果接受邀请选3NT，则改叫4S）以下的才是弱牌"
     },
     "G046": {
@@ -996,19 +996,19 @@
       "reviewer_note": ""
     },
     "G067": {
-      "title": "G067 · 弱♠先转移并止叫",
+      "title": "G067 · 六四高花按有效点选择邀请或进局",
       "diagnosis": "原报告标为可疑，但没有足以推翻本体系叫法的单明手证据。",
-      "kind": "keep",
+      "kind": "change",
       "target_auction": "1NT 开叫后；原进程 1NP2HP2SPPP",
-      "proposed_call": "2♥",
-      "proposal": "保留2♥雅可比转移至♠，弱牌停在2♠；双明手偶然出现的局或满贯不足以强迫弱牌跳局。",
+      "proposed_call": "2♣",
+      "proposal": "6♠4♥及互换牌型，有效点5–6先2♣，找到4张配合就3M邀请；答2♦后2M示邀请或更强，开叫人2NT拒绝时3M止叫。有效点7以上沿同路进局，2NT后4M；不足5点才弱转移并停2M。",
       "basis": [
         "Daqiush §1NT：2♦/2♥雅可比转移；超转表及“超转后所有探贯牌立即4NT”。",
         "新睿 1N_P_2D#、1N_P_2H#：分别转移♥、♠。",
         "复采样报告是 DDS 双明手筛查，不等于单明手实战成约率；不凭一个警报改叫。"
       ],
       "decision": "rejected",
-      "implementation": "not_started",
+      "implementation": "complete",
       "reviewer_note": "7有效点逼局，5有效点邀请（先2C，同伴2M则加叫、2D则2S；1N-2C-2D-2S-2NT则3S，-3NT则4S），以下才是弱牌。牌型太好了。"
     },
     "G068": {

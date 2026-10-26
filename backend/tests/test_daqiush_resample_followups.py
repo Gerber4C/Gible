@@ -19,6 +19,12 @@ class DaqiushResampleFollowupTests(unittest.TestCase):
     def bid(self, auction, cards):
         return choose_bid(self.profile, Auction.parse(auction), Hand.parse(cards)).call
 
+    def test_two_major_superaccept_samples_matching_openers(self):
+        decision = choose_bid(self.profile, Auction.parse('1NP2HP3CP'),
+                              Hand.parse('SAQT75HJT532DATCA'))
+        self.assertIn(decision.call, ('4S', '4N'))
+        self.assertGreaterEqual(decision.trace.simulation_decision['sample_count'], 8)
+
     def test_stayman_fit_with_shortage_starts_slam_probe(self):
         for cards in ('SA852HK76DQCAKJ32', 'SK874HK7DACKJT986'):
             with self.subTest(cards=cards):
@@ -198,9 +204,54 @@ class DaqiushResampleFollowupTests(unittest.TestCase):
         self.assertEqual(result.status, 'complete')
         self.assertEqual(result.calls[-6:], ('3N', 'P', '4S', 'P', 'P', 'P'))
 
+    def test_seven_retained_points_six_five_major_minor_invites_in_major(self):
+        heart_cards = 'S2HKQJT98DJ9543C2'
+        spade_cards = 'SKQJT98H2DJ9543C2'
+        self.assertEqual(self.bid('1NP', heart_cards), '2D')
+        self.assertEqual(self.bid('1NP2DP2HP', heart_cards), '3H')
+        self.assertEqual(self.bid('1NP', spade_cards), '2H')
+        self.assertEqual(self.bid('1NP2HP2SP', spade_cards), '3S')
+
+    def test_six_four_major_invite_and_game_only_texas_are_distinct(self):
+        inviter = 'SKJT987HJ876D32C2'  # five effective points
+        game_force = 'SKQJ987HJ876D32C2'  # seven effective points
+        heart_force = 'SJ876HKQJ987D32C2'
+        opener = 'SA83HK87DQJ43CAJ8'
+        self.assertEqual(self.bid('1NP', inviter), '2C')
+        self.assertEqual(self.bid('1NP2CP2DP', inviter), '2S')
+        self.assertEqual(self.bid('1NP2CP2DP2SP', opener), '2N')
+        self.assertEqual(self.bid('1NP2CP2DP2SP2NTP', inviter), '3S')
+        self.assertEqual(self.bid('1NP', game_force), '4D')
+        self.assertEqual(self.bid('1NP', heart_force), '4C')
+        five_four_inviter = 'SKJ987HQJ87DQ2C32'
+        self.assertEqual(self.bid('1NP2CP2DP2SP2NTP', five_four_inviter), 'P')
+        self.assertEqual(self.bid('1NP2CP2DP2SP3NTP', five_four_inviter), 'P')
+        self.assertEqual(self.bid('1NP2CP2DP2SP3NTP', inviter), '4S')
+
+    def test_shapely_five_six_two_suit_invitation_thresholds(self):
+        # 6♣–5♠ describes the spades as a six-card invite at six effective
+        # points, while a weaker instance stops at 2♠.
+        strong_minor = 'SKJT98H2D2CQJT987'
+        weak_minor = 'ST9876H2D2CKJT987'
+        self.assertEqual(self.bid('1NP', strong_minor), '2H')
+        self.assertEqual(self.bid('1NP2HP2SP', strong_minor), '3S')
+        self.assertEqual(self.bid('1NP', weak_minor), '2H')
+        self.assertEqual(self.bid('1NP2HP2SP', weak_minor), 'P')
+        # 6♠–5♥ crosses into the two-major invitation at five effective
+        # points; the weaker hand transfers to its longer spade suit.
+        strong_majors = 'SKJT987HJ8765D2C2'
+        weak_majors = 'SJ98765HJ8765D2C2'
+        self.assertEqual(self.bid('1NP', strong_majors), '2D')
+        self.assertEqual(self.bid('1NP2DP2HP', strong_majors), '2S')
+        self.assertEqual(self.bid('1NP', weak_majors), '2H')
+        self.assertEqual(self.bid('1NP2HP2SP', weak_majors), 'P')
+
     def test_lower_retained_strength_six_five_uses_game_only_texas(self):
         cards = 'S2HKQJ987D98765C3'
         self.assertEqual(self.bid('1NP', cards), '4C')
+        # The explicit 6M–5m game-only route also covers a soft five-point
+        # hand whose K–R score alone falls just short of the generic gate.
+        self.assertEqual(self.bid('1NP', 'S2HKJT987DJ8765C3'), '4C')
 
     def test_seven_four_uses_public_deal_comparison(self):
         cards = 'SA743H7DACAKQJ852'

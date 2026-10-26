@@ -140,8 +140,9 @@ class DaqiushOpeningTests(unittest.TestCase):
     def test_missing_continuations_and_competition_block(self):
         profile = self.profile()
         hand = Hand.parse(EXAMPLES[0][1])
-        for auction, cards in [('1NP', Hand.parse('SK32HQ32DAJ3CKQJ8')),
-                               ('1CP', hand), ('1N2D', hand)]:
+        self.assertEqual(choose_bid(profile, Auction.parse('1NP'),
+                                    Hand.parse('SK32HQ32DAJ3CKQJ8')).call, '3C')
+        for auction, cards in [('1CP', hand), ('1N2D', hand)]:
             with self.subTest(auction=auction):
                 report = explain(choose_bid(profile, Auction.parse(auction), cards))
                 self.assertIsNone(report['call'])
