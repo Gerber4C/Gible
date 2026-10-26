@@ -141,7 +141,7 @@ h1{font-size:clamp(29px,3vw,43px);margin:7px 0 8px;letter-spacing:-.025em}
 <main>
   <div class="wrap dashboard">
     <div class="metrics" id="metrics"></div>
-    <details class="method"><summary>怎样阅读这些概率与样本？</summary><p>每组新增 20 对不同的南北牌，每对牌随机补全两次东西牌，因此概率分母通常为 40 个 DDS 牌局，但独立的南北样本只有 20 对。每手牌的四门长度与原组一致；将原牌和新牌合在一起看，北家、南家的 HCP 与 K–R 各自都是最高分减最低分不超过 2，且北家实际选择开叫 1NT。“原概率／新概率”固定原来的定约和庄位比较；下方新牌的自动叫牌结果是另一项观察。DDS 是双明手筛查，不能直接当作实战完成率。原警报阈值：定约失败率大于 50%；未叫到可成的局、小满贯或大满贯，大于 30%。</p></details>
+    <details class="method"><summary>怎样阅读这些概率与样本？</summary><p>每组新增 20 对不同的南北牌，每对牌随机补全两次东西牌，因此概率分母通常为 40 个 DDS 牌局，但独立的南北样本只有 20 对。每手牌的四门长度与原组一致；将原牌和新牌合在一起看，北家、南家的 HCP 与 K–R 各自都是最高分减最低分不超过 2，且北家实际选择开叫 1NT。“原概率／新概率”固定原来的定约和庄位比较；下方新牌的自动叫牌结果是另一项观察。DDS 是双明手筛查，不能直接当作实战完成率。原警报阈值：定约失败率大于 50%；未叫到可成的局、小满贯或大满贯，大于 30%；错局为所选局成功赔率除以最佳替代局成功赔率小于 0.8。</p></details>
     <div class="review-utilities" aria-label="建议审核工具">
       <strong>体系修改意见 · 审核草稿</strong>
       <button id="review-export" type="button">导出审核 JSON</button>
@@ -279,7 +279,7 @@ h1{font-size:clamp(29px,3vw,43px);margin:7px 0 8px;letter-spacing:-.025em}
       '<div class="auction" aria-label="叫牌进程">'+d.calls.map((c,i)=>callHtml(c,i)).join("")+'</div>'+
       (blocked?'<div class="diagnostic"><b>停在这里：</b>'+e(diag||"未找到可用叫品")+'</div>':
       '<div class="minor-note">所选定约在本副牌的 DDS 补样中宕牌：'+pct(failure)+
-      (wrong==null?'':' · 打错局：'+pct(wrong)+(alternatives?'（替代局：'+alternatives+'）':''))+
+      (wrong==null?'':' · 打错局 OR：'+Number(wrong).toFixed(2)+(alternatives?'（替代局成功率：'+alternatives+'）':''))+
       '</div>')+'</div></details>';
   }
   function renderDeals(g){

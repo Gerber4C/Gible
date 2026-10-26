@@ -33,6 +33,8 @@ const fs = require("node:fs/promises");
     await expect(page.locator(".iv-case")).toHaveCount(1);
     await page.locator(".iv-case").click();
     await expect(page.locator(".iv-detail-heading")).toContainText("DEAL #169");
+    await expect(page.locator(".iv-ns-matrix")).toBeVisible();
+    await expect(page.locator(".iv-auction-row")).toHaveCount(2);
     await page.screenshot({ path: path.resolve(__dirname, "../../reports/block_scans/iv-scanner-preview.png") });
 
     await page.locator(".iv-fields input").nth(0).fill("10");

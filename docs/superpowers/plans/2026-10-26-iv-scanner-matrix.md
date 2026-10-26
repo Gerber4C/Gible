@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Merge IV Scanner findings by NS cell and render N/S pair by E/W sample results in a horizontally scrollable matrix, with auctions wrapping every four calls.
+**Goal:** Merge IV Scanner findings by NS cell and render N/S pair by E/W sample results in a horizontally scrollable matrix, with auctions wrapping every four calls; classify wrong-game findings by a selected/alternative success odds ratio below 0.8.
 
 **Architecture:** Keep report data and API contracts unchanged. Add pure frontend display helpers in `IVScanner.js`, derive grouped findings after existing filtering, and render a group list plus matrix detail. Use focused CSS for matrix overflow and call rows.
 

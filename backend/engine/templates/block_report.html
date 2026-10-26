@@ -345,7 +345,7 @@
           const top = elt('div','point-top');
           top.append(elt('span','point-auction',state.mode === 'all' ? `${dealNumber(point.case)} · ${readable(point.auction)}` :
                      state.mode === 'suspicious' ? `北 ${point.case.north_shape.join('–')} · 南 ${point.case.south_shape.join('–')}` : readable(point.auction)),
-                     elt('span','point-count',state.mode === 'blocked' ? point.count : state.mode === 'suspicious' ? `${point.count} 副` : point.case.contract || (point.case.status === 'limit' ? 'LIMIT' : point.case.blocked ? 'BLOCK' : 'PASSOUT')));
+                     elt('span','point-count',state.mode === 'blocked' ? point.count : state.mode === 'suspicious' ? `${point.count} 副` : point.case.contract || (point.case.status === 'limit' ? 'LIMIT' : point.case.blocked ? 'BLOCK 卡' : 'PASSOUT')));
           const counts = point.strata || {};
           const detail = state.mode === 'all'
             ? `${point.case.blocked ? '阻塞' : point.case.status === 'limit' ? '达到上限' : '完成'} · 南家 ${point.case.south_hcp} HCP · ${point.case.south_shape.join('–')}`
@@ -408,7 +408,7 @@
         }
         for (const row of cells) for (const info of row) {
           const cell = elt('div','auction-cell' + (!info ? ' blank' : info.blocked ? ' block' : ''));
-          if (info?.blocked) cell.append(elt('strong','bid','BLOCK'));
+          if (info?.blocked) cell.append(elt('strong','bid','BLOCK 卡'));
           else if (info) { cell.append(bidNode(info.call)); if (info.source) cell.append(elt('span','source',info.source)); }
           grid.append(cell);
         }
@@ -427,7 +427,7 @@
         }
         if (!item.blocked) {
           const analysis = item.analysis || {};
-          const labels = {contract_failure:'所叫定约宕掉', wrong_game:'打错局：本局宕牌而另一局可成', missed_game:'有可打成局却未叫到',
+          const labels = {contract_failure:'所叫定约宕掉', wrong_game:'打错局：所选局/最佳替代局成功赔率比 < 0.8', missed_game:'有可打成局却未叫到',
                           missed_small_slam:'有可打小满贯却未叫到',
                           missed_grand_slam:'有可打大满贯却未叫到'};
           byId('diagnostic-heading').textContent = 'DDS 可疑指标';
@@ -436,7 +436,9 @@
             `同类 ${analysis.class_pairs} 组南北牌 · ${analysis.dds_boards} 副 DDS 求解`));
           for (const flag of analysis.flags || []) {
             const row = elt('div','rate-row');
-            row.append(elt('span','',labels[flag]), elt('strong','',`${Math.round((analysis.rates?.[flag] || 0)*100)}%`));
+            const value = analysis.rates?.[flag];
+            row.append(elt('span','',labels[flag]),
+              elt('strong','',flag === 'wrong_game' ? `OR ${Number(value || 0).toFixed(2)}` : `${Math.round((value || 0)*100)}%`));
             panel.append(row);
           }
           if ((analysis.flags || []).includes('wrong_game')) {

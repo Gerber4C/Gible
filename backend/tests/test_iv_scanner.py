@@ -24,7 +24,11 @@ class IVScannerTests(unittest.TestCase):
             ],
             'complete_cases': [
                 dict(base, id=2, contract='3NT', declarer='n',
-                     dds_tables=[{'large': 'payload'}],
+                     dds_tables=[{
+                         'S': {'n': 8, 's': 8}, 'H': {'n': 8, 's': 8},
+                         'D': {'n': 8, 's': 8}, 'C': {'n': 8, 's': 8},
+                         'NT': {'n': 8, 's': 8},
+                     }],
                      analysis={'flags': ['wrong_game', 'contract_failure'],
                                'rates': {'wrong_game': .4, 'contract_failure': .6},
                                'alternative_game_rates': {'4S': .4},
@@ -42,6 +46,7 @@ class IVScannerTests(unittest.TestCase):
         self.assertEqual([case['id'] for case in projected['cases']], [1, 2, 3])
         self.assertEqual(projected['cases'][1]['categories'], ['down', 'wrong'])
         self.assertEqual(projected['cases'][1]['alternative_game_rates']['4S'], .4)
+        self.assertEqual(projected['cases'][1]['ew_results'], ['down'])
         self.assertNotIn('dds_tables', json.dumps(projected))
 
     def test_scan_options_are_bounded_and_north_one_notrump(self):

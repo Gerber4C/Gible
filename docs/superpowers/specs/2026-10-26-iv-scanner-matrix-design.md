@@ -5,7 +5,8 @@
 Merge IV Scanner findings that belong to the same North/South cell and show
 their independent N/S pair and E/W sample results in a horizontally scrollable
 matrix. Auction calls remain readable by inserting a line break after every
-four calls.
+four calls. Define a wrong-game finding when the selected game's success odds
+divided by the best alternative game's success odds is below 0.8.
 
 ## Scope and assumptions
 

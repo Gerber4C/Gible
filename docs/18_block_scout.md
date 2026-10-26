@@ -111,11 +111,9 @@ For the displayed final contract, a DDS failure rate above 50% is flagged.
 If the auction stopped below game, small slam, or grand slam, a DDS rate
 above 30% for any makeable contract at that level is flagged. A **wrong game**
 warning applies only to an actual `3NT`, `4S`, `4H`, `5D`, or `5C` contract:
-on the same DDS board, the chosen game fails with its actual declarer and at
-least one of the other four game contracts succeeds with either North or South
-as declarer. A board counts once even if several other games succeed. The
-denominator is all DDS boards in the class, and the warning threshold is
-strictly greater than 30%. Alternative-game rates are listed separately and
+the selected game's success odds divided by the best alternative game's
+success odds must be below 0.8. Success odds are `success / failure` across
+all DDS boards in the class; alternative-game rates are listed separately and
 can overlap. A class
 with fewer than `--min-class-boards` DDS boards or
 `--min-class-pairs` distinct North/South hands is marked insufficient rather
@@ -182,13 +180,16 @@ completed reports are saved under `reports/block_scans/`.
 
 The four finding filters are: **Block**, no supported next call; **丢**, a game
 or slam is available more than 30% of comparable DDS boards but was not bid;
-**宕**, the chosen contract fails on more than 50%; and **错**, the chosen game
-fails while another game makes on more than 30% of all comparable boards.
+**宕**, the chosen contract fails on more than 50%; and **错**, the selected
+game's success odds divided by the best alternative game's success odds is
+below 0.8. Success odds are `success / failure` across all comparable boards.
 Comparable hands have the same named-suit shapes and each seat's complete HCP
-and K–R spans stay within two points. The browser omits bulky DDS tables but
-shows numbered N/S hands, the auction, warning rates, alternative games, and
-the number of DDS boards. The saved JSON and standalone HTML retain full
-evidence.
+and K–R spans stay within two points. The browser omits bulky DDS tables,
+merges findings from the same N/S cell, and shows the sampled N/S pairs against
+their E/W completions in a horizontally scrollable matrix. The selected
+auction is rendered in rows of four calls, alongside numbered N/S hands,
+warning rates, alternative games, and the number of DDS boards. The saved JSON
+and standalone HTML retain full evidence.
 
 ## Re-sample small suspicious classes
 

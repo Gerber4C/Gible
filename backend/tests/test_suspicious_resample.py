@@ -14,10 +14,10 @@ class SuspiciousResampleTests(unittest.TestCase):
         table['S']['n'] = 9
         table['NT']['s'] = 9
         rates = _rates_for_contract('4S', 'n', [table] * 2)
-        self.assertEqual(rates['wrong_game'], 1.0)
+        self.assertEqual(rates['wrong_game'], 0.0)
         self.assertEqual(rates['alternative_game_rates']['3NT'], 1.0)
 
-    def test_wrong_game_source_alert_is_retained_only_above_thirty_percent(self):
+    def test_wrong_game_source_alert_is_retained_below_odds_ratio_threshold(self):
         opening = Gadget.from_parts(
             {'id': 'test', 'author': {'name': 'Test'}},
             [{'id': 'opening', 'context': {'auction_pattern': ''},
@@ -37,7 +37,7 @@ class SuspiciousResampleTests(unittest.TestCase):
                                  pairs_per_group=1, ew_samples=2,
                                  solve_table=lambda hands: table)
         check = result['groups'][0]['source_checks'][0]
-        self.assertEqual(check['new_rates']['wrong_game'], 1.0)
+        self.assertEqual(check['new_rates']['wrong_game'], 0.0)
         self.assertEqual(check['retained_flags'], ['wrong_game'])
 
     def source_case(self, case_id, *, north_hcp=16, north_kr=16.0):

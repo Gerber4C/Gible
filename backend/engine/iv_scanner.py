@@ -71,6 +71,17 @@ def project_report(report: dict, report_id: str) -> dict:
         for category in categories:
             counts[category] += 1
         analysis = case.get('analysis', {})
+        contract = case.get('contract')
+        declarer = case.get('declarer')
+        ew_results = []
+        if (isinstance(contract, str) and len(contract) >= 2
+                and declarer in 'ns' and isinstance(case.get('dds_tables'), list)):
+            level = int(contract[0])
+            strain = 'NT' if contract[1:] == 'NT' else contract[1]
+            for table in case['dds_tables']:
+                tricks = table.get(strain, {}).get(declarer)
+                ew_results.append('made' if isinstance(tricks, int) and tricks >= level + 6
+                                  else 'down')
         cases.append({
             'id': case['id'], 'categories': categories,
             'hands': {seat: case['hands'][seat] for seat in 'ns'},
@@ -78,7 +89,7 @@ def project_report(report: dict, report_id: str) -> dict:
             'north_kr': case['north_kr'], 'south_kr': case['south_kr'],
             'north_shape': case['north_shape'], 'south_shape': case['south_shape'],
             'auction': case['auction'], 'calls': case['calls'],
-            'contract': case.get('contract'), 'declarer': case.get('declarer'),
+            'contract': contract, 'declarer': declarer, 'ew_results': ew_results,
             'blocked': case.get('blocked'), 'flags': list(flags),
             'rates': analysis.get('rates', {}),
             'alternative_game_rates': analysis.get('alternative_game_rates', {}),

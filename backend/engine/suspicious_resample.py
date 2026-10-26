@@ -29,7 +29,15 @@ from .simulator import simulate_auction
 
 THRESHOLDS = {'contract_failure': .5, 'missed_game': .3,
               'missed_small_slam': .3, 'missed_grand_slam': .3,
-              'wrong_game': .3}
+              'wrong_game': .8}
+
+
+def _flag_above_threshold(flag: str, rate: float | None) -> bool:
+    if rate is None:
+        return False
+    if flag == 'wrong_game':
+        return rate < THRESHOLDS[flag]
+    return rate > THRESHOLDS[flag]
 
 
 def constraints_for_group(members: list[Mapping]) -> tuple[HandConstraints, HandConstraints]:
@@ -193,8 +201,7 @@ def resample_groups(
                                    for flag in old_flags},
                 'new_rates': {flag: new_rates.get(flag) for flag in old_flags},
                 'retained_flags': [flag for flag in old_flags
-                                   if new_rates.get(flag) is not None
-                                   and new_rates[flag] > THRESHOLDS[flag]],
+                                   if _flag_above_threshold(flag, new_rates.get(flag))],
             })
         groups.append(group)
         if progress is not None:
@@ -314,8 +321,7 @@ def extend_ew_samples(
             check['new_rates'] = {flag: new_rates.get(flag)
                                   for flag in check['original_flags']}
             check['retained_flags'] = [flag for flag in check['original_flags']
-                                       if new_rates.get(flag) is not None
-                                       and new_rates[flag] > THRESHOLDS[flag]]
+                                       if _flag_above_threshold(flag, new_rates.get(flag))]
     updated['budget']['ew_samples'] = ew_samples
     updated['summary']['dds_boards'] = sum(
         group['summary']['dds_boards'] for group in updated['groups'])

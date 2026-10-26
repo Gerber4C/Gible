@@ -124,34 +124,25 @@ class SuspicionTests(unittest.TestCase):
                    'contract': '4S', 'declarer': 'n'}
         neighbor = {**subject, 'id': 2}
 
-        def table(spade_n, nt_s=8, heart_s=9, spade_s=9):
+        def table(spade_n, nt_n=8, heart_n=8):
             values = {strain: {seat: 6 for seat in 'ns'}
                       for strain in ('S', 'H', 'D', 'C', 'NT')}
-            values['S'].update(n=spade_n, s=spade_s)
-            values['NT']['s'] = nt_s
-            values['H']['s'] = heart_s
+            values['S']['n'] = spade_n
+            values['NT']['n'] = nt_n
+            values['H']['n'] = heart_n
             return values
 
-        # Three wrong games, one more failed spade game with no alternative,
-        # and six made spade games. An alternative available on a made 4S
-        # does not count; another 4S declarer is not another game strain.
-        boards = ([table(9, nt_s=9), table(9, nt_s=9),
-                   table(9, heart_s=10), table(9, spade_s=10)]
-                  + [table(10, nt_s=9)] * 6)
+        # 4S succeeds on 4/10 boards while 3NT succeeds on 6/10. The selected
+        # game's success odds are therefore 0.4/0.6, versus 0.6/0.4 for 3NT.
+        boards = ([table(10)] * 4
+                  + [table(9, nt_n=9, heart_n=10)] * 6)
         result = classify_suspicious(subject, [subject, neighbor],
                                      {1: boards[:5], 2: boards[5:]},
                                      min_boards=10)
-        self.assertEqual(result['rates']['wrong_game'], .3)
-        self.assertNotIn('wrong_game', result['flags'])
-        self.assertEqual(result['alternative_game_rates']['3NT'], .2)
-        self.assertEqual(result['alternative_game_rates']['4H'], .1)
-
-        boards[3] = table(9, heart_s=10)
-        result = classify_suspicious(subject, [subject, neighbor],
-                                     {1: boards[:5], 2: boards[5:]},
-                                     min_boards=10)
-        self.assertEqual(result['rates']['wrong_game'], .4)
+        self.assertAlmostEqual(result['rates']['wrong_game'], 4 / 9)
         self.assertIn('wrong_game', result['flags'])
+        self.assertEqual(result['alternative_game_rates']['3NT'], .6)
+        self.assertEqual(result['alternative_game_rates']['4H'], .6)
 
     def test_wrong_game_does_not_apply_to_partscore_or_slam(self):
         base = {'id': 1, 'north_shape': (4, 3, 3, 3),

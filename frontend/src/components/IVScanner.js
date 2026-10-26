@@ -7,14 +7,14 @@ const CATEGORY = {
   block: { title: "Block", detail: "Auction has no supported next call" },
   missed: { title: "丢 / Missed", detail: "Game or slam was available" },
   down: { title: "宕 / Down", detail: "Chosen contract fails too often" },
-  wrong: { title: "错 / Wrong game", detail: "Another game makes when this one fails" },
+  wrong: { title: "错 / WRONG game", detail: "Selected/alternative success odds ratio < 0.8" },
 };
 const FLAG = {
   contract_failure: "Down > 50%",
   missed_game: "Missed game > 30%",
   missed_small_slam: "Missed small slam > 30%",
   missed_grand_slam: "Missed grand slam > 30%",
-  wrong_game: "Wrong game > 30%",
+  wrong_game: "WRONG game: success odds ratio < 0.8",
 };
 const SUITS = [["S", "♠"], ["H", "♥"], ["D", "♦"], ["C", "♣"]];
 const FULL_SCAN_SHAPES = 23;
@@ -41,7 +41,50 @@ function handCard(seat, caseData) {
   );
 }
 
-function caseDetail(caseData) {
+function nsCellKey(caseData) {
+  return [
+    caseData.north_hcp, caseData.south_hcp,
+    ...(caseData.north_shape || []), ...(caseData.south_shape || []),
+  ].join(":");
+}
+
+function auctionRows(calls = []) {
+  const rows = [];
+  for (let index = 0; index < calls.length; index += 4) rows.push(calls.slice(index, index + 4));
+  return rows;
+}
+
+function groupCasesByNsCell(cases, ewSampleCount = 0) {
+  const groups = new Map();
+  cases.forEach((caseData) => {
+    const key = nsCellKey(caseData);
+    const group = groups.get(key) || {
+      key, cases: [], categories: new Set(), ewSamples: 0,
+    };
+    group.cases.push(caseData);
+    caseData.categories.forEach((category) => group.categories.add(category));
+    group.ewSamples = Math.max(group.ewSamples, ewSampleCount || Number(caseData.dds_boards) || 0);
+    groups.set(key, group);
+  });
+  return [...groups.values()].map((group) => ({
+    ...group,
+    categories: [...group.categories].sort(),
+  }));
+}
+
+function matrixCell(caseData, ewIndex) {
+  const result = caseData.ew_results?.[ewIndex];
+  if (result === "made") return "MAKE";
+  if (result === "down") return "LOSE";
+  if (ewIndex >= (Number(caseData.dds_boards) || 0)) return "—";
+  return caseData.contract || "BLOCK 卡";
+}
+
+function warningValue(flag, value) {
+  return flag === "wrong_game" && value != null ? `OR ${Number(value).toFixed(2)}` : pct(value);
+}
+
+function caseDetail(caseData, group) {
   if (!caseData) return e("div", { className: "iv-empty-detail" }, "Select a numbered deal to inspect its hands and auction.");
   const rates = caseData.rates || {};
   const alternatives = Object.entries(caseData.alternative_game_rates || {})
@@ -57,8 +100,31 @@ function caseDetail(caseData) {
     e("div", { className: "iv-hands" }, handCard("n", caseData), handCard("s", caseData)),
     e("div", { className: "iv-detail-section" },
       e("h4", null, "Auction"),
-      e("div", { className: "iv-call-strip" },
-        (caseData.calls || []).map((call, index) => e("span", { key: index }, call))),
+      e("div", { className: "iv-auction-rows" },
+        auctionRows(caseData.calls).map((row, rowIndex) => e("div", {
+          className: "iv-auction-row", key: rowIndex,
+        }, row.map((call, index) => e("span", { key: index }, call))))),
+    ),
+    group && e("div", { className: "iv-detail-section" },
+      e("h4", null, "NS / EW result matrix"),
+      e("div", { className: "iv-ns-matrix" },
+        e("div", { className: "iv-matrix-scroll" },
+          e("table", null,
+            e("thead", null, e("tr", null,
+              e("th", { scope: "col" }, "NS pair"),
+              Array.from({ length: group.ewSamples }, (_, index) => e("th", {
+                scope: "col", key: index,
+              }, `EW ${index + 1}`)),
+            )),
+            e("tbody", null, group.cases.map((pair) => e("tr", { key: pair.id },
+              e("th", { scope: "row" }, `#${pair.id}`),
+              Array.from({ length: group.ewSamples }, (_, index) => e("td", {
+                key: index, className: index < (Number(pair.dds_boards) || 0) ? "" : "empty",
+              }, matrixCell(pair, index))),
+            ))),
+          ),
+        ),
+      ),
     ),
     caseData.blocked && e("div", { className: "iv-detail-section iv-block-diagnostic" },
       e("h4", null, `Blocked at ${caseData.blocked.seat?.toUpperCase() || "?"}`),
@@ -69,7 +135,7 @@ function caseDetail(caseData) {
       e("div", { className: "iv-warning-list" },
         caseData.flags.map((flag) => e("div", { key: flag },
           e("strong", null, FLAG[flag] || flag),
-          e("span", null, pct(rates[flag])),
+        e("span", null, warningValue(flag, rates[flag])),
         )),
       ),
       alternatives.length > 0 && e("p", { className: "iv-alternatives" },
@@ -174,7 +240,11 @@ export function IVScanner({ profileId }) {
       || item.hands.n?.toLowerCase().includes(query)
       || item.hands.s?.toLowerCase().includes(query);
   });
-  const selected = matches.find((item) => item.id === selectedId) || matches[0];
+  const groups = groupCasesByNsCell(matches, report?.budget?.ew_samples);
+  const selectedGroup = groups.find((group) => group.cases.some((item) => item.id === selectedId))
+    || groups[0];
+  const selected = selectedGroup?.cases.find((item) => item.id === selectedId)
+    || selectedGroup?.cases[0];
   const running = run?.status === "running" || run?.status === "queued";
   const planned = (Number(hcpMax) - Number(hcpMin) + 1) * FULL_SCAN_SHAPES * Number(pairs);
 
@@ -183,7 +253,7 @@ export function IVScanner({ profileId }) {
       e("div", null,
         e("span", { className: "iv-eyebrow" }, "GIBLE / DIAGNOSTICS"),
         e("h2", null, "IV Scanner"),
-        e("p", null, "Find blocked auctions, missed contracts, failing contracts, and wrong games."),
+        e("p", null, "Find blocked auctions, missed contracts, failing contracts, and WRONG games."),
       ),
       e("span", { className: "iv-scope-chip" }, "NORTH OPENS 1NT"),
     ),
@@ -248,7 +318,7 @@ export function IVScanner({ profileId }) {
         e("div", { className: "iv-inspection" },
           e("div", { className: "iv-list" },
             e("div", { className: "iv-list-tools" },
-              e("span", null, busy ? "Loading…" : `${matches.length} findings`),
+              e("span", null, busy ? "Loading…" : `${matches.length} findings · ${groups.length} NS cells`),
               e("input", { type: "search", placeholder: "Find deal #, auction, hand", value: search,
                 "aria-label": "Search scanner findings", onChange: (event) => setSearch(event.target.value) }),
               category !== "all" && e("button", { onClick: () => setCategory("all") }, "Show all"),
@@ -256,20 +326,21 @@ export function IVScanner({ profileId }) {
             e("div", { className: "iv-list-scroll" },
               matches.length === 0 && e("p", { className: "iv-empty-list" },
                 report ? "No matching findings in this report." : "Choose or run a scan to see findings."),
-              matches.map((item) => e("button", { key: item.id,
-                className: `iv-case ${selected?.id === item.id ? "selected" : ""}`,
-                onClick: () => setSelectedId(item.id),
+              groups.map((group) => e("button", { key: group.key,
+                className: `iv-case ${selectedGroup?.key === group.key ? "selected" : ""}`,
+                onClick: () => setSelectedId(group.cases[0].id),
               },
                 e("span", { className: "iv-case-top" },
-                  e("strong", null, `#${item.id}`),
-                  e("span", null, item.contract || "BLOCK")),
+                  e("strong", null, `${group.cases.length} NS pair${group.cases.length === 1 ? "" : "s"}`),
+                  e("span", null, `${group.ewSamples} EW samples`)),
                 e("span", { className: "iv-case-tags" },
-                  item.categories.map((key) => e("b", { key, className: `iv-tag iv-tag-${key}` }, CATEGORY[key]?.title || key))),
-                e("span", { className: "iv-case-auction" }, item.auction || "—"),
+                  group.categories.map((key) => e("b", { key, className: `iv-tag iv-tag-${key}` }, CATEGORY[key]?.title || key))),
+                e("span", { className: "iv-case-auction" },
+                  `NS ${group.cases[0].north_hcp}/${group.cases[0].south_hcp} HCP · ${group.cases[0].auction || "—"}`),
               )),
             ),
           ),
-          e("div", { className: "iv-detail" }, caseDetail(selected)),
+          e("div", { className: "iv-detail" }, caseDetail(selected, selectedGroup)),
         ),
         e("p", { className: "iv-method" },
           "DDS compares complete four-hand deals. These rates are diagnostic samples, not estimates of actual declarer play. Similar hands share named-suit shapes and a maximum HCP/K–R span of 2 per seat."),

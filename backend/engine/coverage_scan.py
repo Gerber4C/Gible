@@ -172,12 +172,13 @@ GAME_TARGETS = {'3NT': ('NT', 9), '4S': ('S', 10), '4H': ('H', 10),
 
 def wrong_game_rates(contract: str, declarer: str,
                      boards: list[Mapping]) -> tuple[float | None, dict[str, float]]:
-    """DDS rate of chosen game down while a different game can be made.
+    """Return the best alternative's success-odds ratio and success rates.
 
-    Each board counts at most once in the overall rate. Alternative rates may
-    overlap because more than one other game can make on the same board.
-    The chosen contract uses its actual declarer; an alternative may be played
-    by either partnership seat. The denominator is every sampled board.
+    The selected game's odds are compared with each alternative game's odds
+    across all sampled boards. The smallest selected/alternative ratio is
+    returned, so a selected game is flagged when any other game is materially
+    more successful. Alternative rates may overlap because multiple games can
+    make on one board.
     """
     if contract not in GAME_TARGETS or not boards:
         return None, {}
@@ -185,19 +186,39 @@ def wrong_game_rates(contract: str, declarer: str,
     alternatives = {name: target for name, target in GAME_TARGETS.items()
                     if name != contract}
     counts = dict.fromkeys(alternatives, 0)
-    wrong = 0
+    selected_successes = 0
     for table in boards:
         if table[chosen_strain][declarer] >= chosen_tricks:
-            continue
-        made_other = False
+            selected_successes += 1
         for name, (strain, tricks) in alternatives.items():
             if max(table[strain][seat] for seat in 'ns') >= tricks:
                 counts[name] += 1
-                made_other = True
-        wrong += made_other
     denominator = len(boards)
-    return wrong / denominator, {name: count / denominator
-                                 for name, count in counts.items()}
+    if denominator == 0:
+        return None, {name: 0.0 for name in alternatives}
+
+    selected_rate = selected_successes / denominator
+    alternative_rates = {name: count / denominator
+                         for name, count in counts.items()}
+
+    def odds(rate: float) -> float:
+        if rate <= 0:
+            return 0.0
+        if rate >= 1:
+            return float('inf')
+        return rate / (1 - rate)
+
+    selected_odds = odds(selected_rate)
+    ratios = []
+    for rate in alternative_rates.values():
+        alternative_odds = odds(rate)
+        if alternative_odds == 0:
+            continue
+        if selected_odds == float('inf') and alternative_odds == float('inf'):
+            ratios.append(1.0)
+        else:
+            ratios.append(selected_odds / alternative_odds)
+    return (min(ratios) if ratios else None), alternative_rates
 
 
 def classify_suspicious(
@@ -252,7 +273,7 @@ def classify_suspicious(
         result['flags'].append('contract_failure')
     if not _reached_game(subject['contract']) and rates['missed_game'] > .3:
         result['flags'].append('missed_game')
-    if rates['wrong_game'] is not None and rates['wrong_game'] > .3:
+    if rates['wrong_game'] is not None and rates['wrong_game'] < .8:
         result['flags'].append('wrong_game')
     if level < 6 and rates['missed_small_slam'] > .3:
         result['flags'].append('missed_small_slam')
