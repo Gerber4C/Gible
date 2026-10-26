@@ -131,6 +131,10 @@ def flat_fit_probe(ctx, answer):
             and not shortage_fit_probe(ctx, answer))
 
 
+def no_shortage_refusal_keycard(ctx):
+    return ctx.hand is not None and ctx.hand.hcp >= 16
+
+
 def seven_four_minor_alternative(ctx, answer, minor):
     return (shortage_fit_probe(ctx, answer)
             and ctx.hand.length(answer[-1]) == 4
@@ -649,8 +653,41 @@ class OneNotrumpInvitations(Gadget):
                 refusal.meaning.acts = ['reject', 'signoff', 'final_placement']
                 refusal.meaning.target_suit = answer[-1]
                 refusal.meaning.agreed_suit = answer[-1]
-                refusal.meaning.purpose_completed = True
                 refusal.description = 'Decline the no-shortage slam try at four of the agreed major.'
+
+                continue_prefix = prefix + '4DP4' + answer[-1] + 'P'
+                continue_ask = self.call('stayman_' + answer.lower()
+                                         + '_no_shortage_after_refusal_keycard')
+                continue_ask.when = continue_prefix
+                continue_ask.bid = '4NT'
+                continue_ask.applies = no_shortage_refusal_keycard
+                continue_ask.meaning.action = 'rkcb_1430'
+                continue_ask.meaning.nature = ['artificial']
+                continue_ask.meaning.acts = ['inquiry', 'keycard_asking']
+                continue_ask.meaning.target_suit = answer[-1]
+                continue_ask.meaning.agreed_suit = answer[-1]
+                continue_ask.effect('agreed_suit').suit = answer[-1]
+                keycards = continue_ask.effect('keycard_context')
+                keycards.trump_suit = answer[-1]
+                keycards.ask_call = '4N'
+                keycards.method = 'rkcb_1430'
+                keycards.status = 'pending'
+                continue_ask.description = (
+                    'After the opener declines the no-shortage try, '
+                    'a sufficiently strong responder continues with keycard.')
+
+                continue_pass = self.call('stayman_' + answer.lower()
+                                          + '_no_shortage_after_refusal_pass')
+                continue_pass.when = continue_prefix
+                continue_pass.bid = 'P'
+                continue_pass.applies = lambda ctx: not no_shortage_refusal_keycard(ctx)
+                continue_pass.meaning.action = 'no_shortage_slam_decline'
+                continue_pass.meaning.nature = ['natural']
+                continue_pass.meaning.acts = ['signoff', 'final_placement']
+                continue_pass.meaning.target_suit = answer[-1]
+                continue_pass.meaning.agreed_suit = answer[-1]
+                continue_pass.meaning.purpose_completed = True
+                continue_pass.description = 'Pass after the opener declines and responder lacks further slam strength.'
 
             for minor in 'CD':
                 show = self.call('stayman_' + answer.lower() + '_show_' + minor.lower())

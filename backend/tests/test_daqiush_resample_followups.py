@@ -5,6 +5,7 @@ from unittest.mock import patch
 from engine.auction import Auction
 from engine.cards import Hand
 from engine.loader import load_profile
+from engine.replay import replay_auction
 from engine.selector import choose_bid
 from engine.simulation_decision import decide_minor_major_74
 from engine.simulator import simulate_auction
@@ -90,6 +91,21 @@ class DaqiushResampleFollowupTests(unittest.TestCase):
         self.assertEqual(self.bid('1NP2CP2SP', cards), '4D')
         self.assertEqual(self.bid('1NP2CP2SP4DP', 'SKJ982HAK6DA76CQ2'), '4N')
         self.assertEqual(self.bid('1NP2CP2SP4DP', 'SAQT4HQ93DK5CA873'), '4S')
+
+    def test_strong_responder_can_continue_after_no_shortage_slam_try_is_refused(self):
+        auction = Auction.parse('1NP2CP2SP4DP4SP')
+        strong = 'SAKQ4HKQJ9DAKQC87'
+        weak = 'SAQT4HQ93DK5CA873'
+
+        self.assertEqual(self.bid('1NP2CP2SP4DP4SP', strong), '4N')
+        self.assertEqual(self.bid('1NP2CP2HP4DP4HP', strong), '4N')
+        self.assertEqual(self.bid('1NP2CP2SP4DP4SP', weak), 'P')
+        trace = replay_auction(self.profile, auction)
+        self.assertEqual(trace.trump_state('ns').suit, 'S')
+        asked = replay_auction(self.profile, Auction.parse(
+            '1NP2CP2SP4DP4SP4NP'))
+        self.assertTrue(asked.state_exists(
+            {'key': 'keycard_context', 'trump_suit': 'S'}))
 
     def test_no_shortage_probe_can_reach_spade_slam(self):
         result = simulate_auction(self.profile, {

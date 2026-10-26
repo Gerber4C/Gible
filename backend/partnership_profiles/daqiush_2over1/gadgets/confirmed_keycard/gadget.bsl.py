@@ -46,6 +46,9 @@ class ConfirmedKeycard(Gadget):
             ask.description = 'Accept the no-shortage major slam try and ask agreed-major keycards.'
             asks.append(('stayman_' + trump + '_no_shortage',
                          '1NP2CP' + answer + 'P4DP4NP', trump))
+            asks.append(('stayman_' + trump + '_no_shortage_after_refusal',
+                         '1NP2CP' + answer + 'P4DP4' + answer[-1]
+                         + 'P4NP', trump))
             shortage_probe = '3S' if trump == 'H' else '3H'
             for shortage_answer in ('4C', '4D', '4H'):
                 asks.append(('stayman_' + trump + '_shortage_' + shortage_answer,

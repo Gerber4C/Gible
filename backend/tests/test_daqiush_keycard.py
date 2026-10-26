@@ -45,6 +45,13 @@ class DaqiushKeycardPrefixTests(unittest.TestCase):
                               Hand.parse('SA765HQJ9876D43C2'))
         self.assertEqual(splinter.call, '5C')
 
+    def test_refused_no_shortage_try_can_be_reopened_and_answered(self):
+        prefix = Auction.parse('1NP2CP2SP4DP4SP4NP')
+        self.assertEqual(
+            choose_bid(self.profile, prefix,
+                       Hand.parse('SA765HQJ9876D43C2')).call,
+            '5C')
+
     def test_undesignated_four_notrump_does_not_replay_as_keycard(self):
         trace = replay_auction(self.profile, Auction.parse('1NP4N'))
         self.assertFalse(trace.state_exists({'key': 'keycard_context'}))
