@@ -57,6 +57,18 @@ class DaqiushResampleFollowupTests(unittest.TestCase):
         self.assertEqual(strong.selected_candidate.public_meaning['agreed_suit'], 'S')
         self.assertIn('keycard_asking', strong.selected_candidate.public_meaning['call_act_types'])
 
+    def test_shortage_followup_keycard_answers_use_the_agreed_major(self):
+        prefix = Auction.parse('1NP2CP2SP3HP3NTP4DP4NP')
+        for cards, expected in (
+            ('SA765HQJ9876D43C2', '5C'),
+            ('S9765HQJ9876D43C2', '5D'),
+        ):
+            with self.subTest(cards=cards):
+                decision = choose_bid(self.profile, prefix, Hand.parse(cards))
+                self.assertEqual(decision.call, expected)
+                self.assertEqual(
+                    decision.selected_candidate.public_meaning['agreed_suit'], 'S')
+
     def test_heart_game_can_stop_after_four_hearts_shows_spade_shortage(self):
         self.assertEqual(self.bid('1NP2CP2HP3SP3NTP4HP',
                                   'SAQ3HAKT9DK76C862'), 'P')
@@ -65,6 +77,14 @@ class DaqiushResampleFollowupTests(unittest.TestCase):
         cards = 'SAQT4HQ93DK5CA873'
         self.assertEqual(self.bid('1NP2CP2SP', cards), '4D')
         self.assertEqual(self.bid('1NP2CP2SP4DP', 'SKJ982HAK6DA76CQ2'), '4N')
+        self.assertEqual(self.bid('1NP2CP2SP4DP', 'SAQT4HQ93DK5CA873'), '4S')
+
+    def test_no_shortage_keycard_ask_is_limited_to_the_public_top_class(self):
+        prefix = Auction.parse('1NP2CP2SP4DP')
+        weak = choose_bid(self.profile, prefix, Hand.parse('SAQT4HQ93DK5CA873'))
+        self.assertNotEqual(weak.call, '4N')
+        strong = choose_bid(self.profile, prefix, Hand.parse('SKJ982HAK6DA76CQ2'))
+        self.assertEqual(strong.call, '4N')
 
     def test_no_shortage_probe_can_reach_spade_slam(self):
         result = simulate_auction(self.profile, {
