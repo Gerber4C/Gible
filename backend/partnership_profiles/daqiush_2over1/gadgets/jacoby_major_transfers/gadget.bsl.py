@@ -94,6 +94,10 @@ def five_minor_five_major_invite(ctx, trump):
             and 7 <= shapely_combined_effective_points(ctx.hand) < 9)
 
 
+def five_card_invite_acceptance_not_calibrated(ctx):
+    return False
+
+
 def major_two_suit_invite(ctx):
     return (ctx.hand is not None and min(ctx.hand.length(s) for s in 'HS') >= 5
             and 5 <= shapely_combined_effective_points(ctx.hand) < 9)
@@ -446,7 +450,7 @@ class JacobyMajorTransfers(Gadget):
                 follow = self.call('jacoby_' + trump.lower() + '_five_invite_' + action + '_' + bid.lower())
                 follow.when = ordinary_prefix + '2NTP'
                 follow.bid = bid
-                follow.applies = lambda ctx, t=trump, fit=has_fit: ctx.hand is not None and (ctx.hand.length(t) >= 3) == fit
+                follow.applies = five_card_invite_acceptance_not_calibrated
                 follow.meaning.action = 'jacoby_five_invitation_' + action
                 follow.meaning.nature = ['natural']
                 follow.meaning.acts = [action] if bid == 'P' else [action, 'final_placement']

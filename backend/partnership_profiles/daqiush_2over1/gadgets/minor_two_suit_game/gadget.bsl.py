@@ -15,8 +15,8 @@ def six_five_minor_choice(ctx):
 
 
 def six_five_after_diamond_transfer(ctx):
-    return (ctx.hand is not None
-            and sorted(ctx.hand.length(s) for s in 'CD') == [5, 6])
+    return (ctx.hand is not None and ctx.hand.length('D') == 6
+            and ctx.hand.length('C') == 5)
 
 
 def six_five_transfer_strength(ctx):
@@ -43,25 +43,31 @@ class MinorTwoSuitGame(Gadget):
     author = Author('Daqiush')
 
     def build(self):
-        for bid, applies, action in (
-            ('4NT', lambda ctx: six_five_after_diamond_transfer(ctx)
-             and six_five_transfer_strength(ctx), 'select_minor'),
-            ('3H', lambda ctx: six_five_after_diamond_transfer(ctx)
-             and not six_five_transfer_strength(ctx), 'signoff'),
-        ):
-            route = self.call('six_five_after_diamond_transfer_' + action)
-            route.when = '1NP2NTP3DP'
-            route.bid = bid
-            route.applies = applies
-            route.meaning.action = 'six_five_minor_' + action
-            route.meaning.nature = ['artificial'] if bid == '4NT' else ['natural']
-            route.meaning.acts = ['inquiry', 'game_forcing'] if bid == '4NT' else ['signoff', 'final_placement']
-            route.meaning.target_suit = 'N' if bid == '4NT' else 'H'
-            if bid == '4NT':
-                route.meaning.forcing = 'game_forcing'
-            else:
-                route.meaning.purpose_completed = True
-            route.description = 'Use effective points to route a six-five minor hand after the diamond transfer.'
+        route = self.call('six_five_after_diamond_transfer_select_minor')
+        route.when = '1NP2NTP3DP'
+        route.bid = '4NT'
+        route.applies = (lambda ctx: six_five_after_diamond_transfer(ctx)
+                         and six_five_transfer_strength(ctx))
+        route.meaning.action = 'six_five_minor_select_minor'
+        route.meaning.nature = ['artificial']
+        route.meaning.acts = ['inquiry', 'game_forcing']
+        route.meaning.target_suit = 'N'
+        route.meaning.forcing = 'game_forcing'
+        route.description = 'Use effective points to ask opener to choose between six-five minor games.'
+
+        for prefix, label in (('1NP4NTP', 'direct'), ('1NP2NTP3DP4NP', 'after_diamond_transfer')):
+            for minor in 'CD':
+                answer = self.call('six_five_choose_' + label + '_' + minor.lower())
+                answer.when = prefix
+                answer.bid = '5' + minor
+                answer.applies = lambda ctx, s=minor: (
+                    ctx.hand is not None and preferred_minor(ctx) == s)
+                answer.meaning.action = 'chosen_minor_game'
+                answer.meaning.nature = ['natural']
+                answer.meaning.acts = ['signoff', 'final_placement']
+                answer.meaning.target_suit = minor
+                answer.meaning.purpose_completed = True
+                answer.description = 'Choose the minor with more support, then better controls.'
 
         choice = self.call('six_five_minor_game_choice')
         choice.when = '1NP'

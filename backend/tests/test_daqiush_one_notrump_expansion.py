@@ -91,8 +91,8 @@ class DaqiushOneNotrumpExpansionTests(unittest.TestCase):
         invite = 'SQ32HKJ763DQ42C76'
         game = 'SA32HKQJ76D432C76'
         self.assertEqual(self.bid('1NP2DP2HP', invite), '2N')
-        self.assertEqual(self.bid('1NP2DP2HP2NP', 'SAQ7HKJ8DA762CQ54'), '4H')
-        self.assertEqual(self.bid('1NP2DP2HP2NP', 'SAJ65HK762DQ73CKQ'), '3H')
+        self.assertIsNone(self.bid('1NP2DP2HP2NP', 'SAQ7HKJ8DA762CQ54'))
+        self.assertIsNone(self.bid('1NP2DP2HP2NP', 'SAJ65HK762DQ73CKQ'))
         self.assertEqual(self.bid('1NP2DP2HP', game), '3N')
         self.assertEqual(self.bid('1NP2DP2HP3NP', 'SAQ7HKJ8DA762CQ54'), '4H')
 
@@ -143,11 +143,23 @@ class DaqiushOneNotrumpExpansionTests(unittest.TestCase):
                 self.assertEqual(decision.selected_candidate.public_meaning['hcp_max'], 15)
         self.assertNotEqual(self.bid('1NP3CP3DP', 'SA2HK2DAQ76CKJ984'), '4N')
 
-    def test_six_five_minors_after_diamond_transfer_use_effective_point_split(self):
-        strong = 'SAKDAKQJ76CKQJ32'
-        weak = 'S2H3D987654CQJ432'
-        self.assertEqual(self.bid('1NP2NTP3DP', strong), '4N')
-        self.assertEqual(self.bid('1NP2NTP3DP', weak), '3H')
+    def test_six_diamonds_five_clubs_after_transfer_asks_for_minor_choice(self):
+        responder = 'SAKDAKQJ76CKQJ32'
+        self.assertEqual(self.bid('1NP2NTP3DP', responder), '4N')
+
+    def test_six_clubs_five_diamonds_do_not_use_the_diamond_transfer_route(self):
+        responder = 'SAKH3DAKQJ9CQJ876'
+        self.assertNotEqual(self.bid('1NP2NTP3DP', responder), '4N')
+
+    def test_weak_six_diamonds_five_clubs_with_heart_void_remains_blocked(self):
+        responder = 'S32D987654CQJ432'
+        self.assertNotEqual(self.bid('1NP2NTP3DP', responder), '3H')
+
+    def test_six_five_minor_choice_has_route_specific_opener_responses(self):
+        self.assertEqual(
+            self.bid('1NP2NTP3DP4NP', 'SAK2HK3DAQJ3CKQ82'), '5C')
+        self.assertEqual(
+            self.bid('1NP2NTP3DP4NP', 'SAK2HK43DAKQJ3C82'), '5D')
 
 
 if __name__ == '__main__':
