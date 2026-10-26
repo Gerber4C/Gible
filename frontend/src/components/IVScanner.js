@@ -4,10 +4,10 @@ import {
 } from "../api/gibleApi.js";
 
 const CATEGORY = {
-  block: { title: "Block", detail: "Auction has no supported next call" },
+  block: { title: "BLOCK 卡", detail: "Auction has no supported next call" },
   missed: { title: "丢 / Missed", detail: "Game or slam was available" },
-  down: { title: "宕 / Down", detail: "Chosen contract fails too often" },
-  wrong: { title: "错 / WRONG game", detail: "Selected/alternative success odds ratio < 0.8" },
+  down: { title: "宕 / LOSE", detail: "Chosen contract fails too often" },
+  wrong: { title: "错 / WRONG", detail: "Selected/alternative success odds ratio < 0.8" },
 };
 const FLAG = {
   contract_failure: "Down > 50%",
