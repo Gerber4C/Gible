@@ -254,15 +254,18 @@ h1{font-size:clamp(29px,3vw,43px);margin:7px 0 8px;letter-spacing:-.025em}
     const old=check.original_rates[flag],now=check.new_rates[flag],persist=check.retained_flags.includes(flag);
     const oldN=check.original_boards??"—",newN=check.new_boards??g.summary.dds_boards;
     const bar=v=>Math.max(0,Math.min(100,Math.round((v||0)*100)));
+    const wrongGame=flag==="wrong_game";
+    const display=v=>wrongGame?(v==null?"—":"OR "+Number(v).toFixed(2)):pct(v);
+    const track=(v,kind)=>wrongGame?"":'<div class="track'+(kind?" "+kind:"")+'"><i style="width:'+bar(v)+'%"></i></div>';
     return '<article class="warning-card"><div class="warning-head"><strong>#'+e(check.source_id)+' · '+
       e(flagNames[flag]||flag)+'</strong><span class="status '+(persist?"persist":"clear")+'">'+
       (persist?"仍超过阈值":"新样本未复现")+'</span></div>'+
       '<div class="card-foot">原进程 '+e(check.auction)+' · 定约 '+e(check.contract)+
       ' · 庄位 '+(check.declarer==="n"?"北":"南")+'</div>'+
-      '<div class="rates"><div><div class="rate-label"><span>原概率 · '+e(oldN)+' 牌局</span><b>'+pct(old)+'</b></div>'+
-      '<div class="track"><i style="width:'+bar(old)+'%"></i></div></div>'+
-      '<div><div class="rate-label"><span>新概率 · '+e(newN)+' 牌局</span><b>'+pct(now)+'</b></div>'+
-      '<div class="track fresh"><i style="width:'+bar(now)+'%"></i></div></div></div></article>';
+      '<div class="rates"><div><div class="rate-label"><span>原概率 · '+e(oldN)+' 牌局</span><b>'+display(old)+'</b></div>'+
+      track(old,"")+'</div>'+
+      '<div><div class="rate-label"><span>新概率 · '+e(newN)+' 牌局</span><b>'+display(now)+'</b></div>'+
+      track(now,"fresh")+'</div></div></article>';
   }
   function dealHtml(d){
     const blocked=d.status==="blocked";

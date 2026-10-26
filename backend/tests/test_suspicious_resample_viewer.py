@@ -40,6 +40,11 @@ class SuspiciousResampleViewerTests(unittest.TestCase):
         html = render_html(report)
         self.assertIn('打错局', html)
         self.assertIn('alternative_game_rates', html)
+        self.assertIn('const wrongGame=flag==="wrong_game";', html)
+        self.assertIn('"OR "+Number(v).toFixed(2)', html)
+        self.assertIn('const track=(v,kind)=>wrongGame?"":', html)
+        self.assertIn('track(old,"")', html)
+        self.assertIn('track(now,"fresh")', html)
 
     def test_shows_source_comparison_and_numbered_fresh_deals_safely(self):
         report = {

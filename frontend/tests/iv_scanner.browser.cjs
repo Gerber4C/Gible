@@ -37,6 +37,11 @@ const fs = require("node:fs/promises");
     await expect(page.locator(".iv-auction-row")).toHaveCount(2);
     await page.screenshot({ path: path.resolve(__dirname, "../../reports/block_scans/iv-scanner-preview.png") });
 
+    await page.locator(".iv-category-block").click();
+    await page.locator('input[aria-label="Search scanner findings"]').fill("");
+    await page.locator(".iv-case").first().click();
+    await expect(page.locator(".iv-ns-matrix")).toContainText("BLOCK 卡");
+
     await page.locator(".iv-fields input").nth(0).fill("10");
     await page.locator(".iv-fields input").nth(1).fill("10");
     await page.locator(".iv-fields input").nth(2).fill("1");

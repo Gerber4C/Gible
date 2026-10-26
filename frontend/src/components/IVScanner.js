@@ -73,6 +73,7 @@ function groupCasesByNsCell(cases, ewSampleCount = 0) {
 }
 
 function matrixCell(caseData, ewIndex) {
+  if (caseData.blocked || !caseData.contract) return "BLOCK 卡";
   const result = caseData.ew_results?.[ewIndex];
   if (result === "made") return "MAKE";
   if (result === "down") return "LOSE";
