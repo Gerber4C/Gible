@@ -43,6 +43,18 @@ class DaqiushResampleFollowupTests(unittest.TestCase):
             with self.subTest(auction=auction, cards=cards):
                 self.assertEqual(self.bid(auction, cards), expected)
 
+    def test_diamond_shortage_publicly_revalues_to_major_game(self):
+        decision = choose_bid(
+            self.profile,
+            Auction.parse('1NP2CP2SP3HP3NTP4DP'),
+            Hand.parse('SKQ96HA43DATCQT82'),
+        )
+        self.assertEqual(decision.call, '4S')
+        self.assertEqual(
+            decision.selected_candidate.public_meaning['action_type'],
+            'shortage_adjusted_game_signoff',
+        )
+
     def test_two_short_suits_show_lower_available_answer(self):
         cards = 'SA743H7DACAKQJ852'
         self.assertEqual(self.bid('1NP2CP2SP3HP3NTP', cards), '4D')
@@ -78,13 +90,6 @@ class DaqiushResampleFollowupTests(unittest.TestCase):
         self.assertEqual(self.bid('1NP2CP2SP', cards), '4D')
         self.assertEqual(self.bid('1NP2CP2SP4DP', 'SKJ982HAK6DA76CQ2'), '4N')
         self.assertEqual(self.bid('1NP2CP2SP4DP', 'SAQT4HQ93DK5CA873'), '4S')
-
-    def test_no_shortage_keycard_ask_is_limited_to_the_public_top_class(self):
-        prefix = Auction.parse('1NP2CP2SP4DP')
-        weak = choose_bid(self.profile, prefix, Hand.parse('SAQT4HQ93DK5CA873'))
-        self.assertNotEqual(weak.call, '4N')
-        strong = choose_bid(self.profile, prefix, Hand.parse('SKJ982HAK6DA76CQ2'))
-        self.assertEqual(strong.call, '4N')
 
     def test_no_shortage_probe_can_reach_spade_slam(self):
         result = simulate_auction(self.profile, {

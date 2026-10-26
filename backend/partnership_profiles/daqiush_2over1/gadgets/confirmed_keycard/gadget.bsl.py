@@ -17,13 +17,6 @@ def ordinary_keycard_answer(ctx, trump, counts, queen):
     return queen is None or ctx.hand.contains_rank(trump, 'Q') == queen
 
 
-def no_shortage_keycard_ready(ctx, trump):
-    """Require the public major-fit route and the opener's top strength class."""
-    return (ctx.hand is not None
-            and ctx.hand.length(trump) >= 4
-            and named_evaluator(ctx, 'absolute_maximum_' + trump) is True)
-
-
 class ConfirmedKeycard(Gadget):
     id = 'confirmed_keycard'
     namespace = 'daqiush_2over1'
@@ -39,7 +32,7 @@ class ConfirmedKeycard(Gadget):
             ask = self.call('stayman_' + answer.lower() + '_no_shortage_keycard_ask')
             ask.when = '1NP2CP' + answer + 'P4DP'
             ask.bid = '4NT'
-            ask.applies = lambda ctx, t=trump: no_shortage_keycard_ready(ctx, t)
+            ask.applies = lambda ctx, t=trump: named_evaluator(ctx, 'absolute_maximum_' + t) is True
             ask.meaning.action = 'rkcb_1430'
             ask.meaning.nature = ['artificial']
             ask.meaning.acts = ['inquiry', 'keycard_asking']
