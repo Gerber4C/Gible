@@ -82,15 +82,28 @@ Use this deterministic allocation algorithm:
    omitted stratum in `ungenerated_strata`;
 5. for 92 or more cells, assign the full sequence once, then assign every extra
    cell to the 68 normal shapes in lexicographic round-robin order;
-6. map that allocation to South cells sorted by SHA-256 of the versioned stable
-   key `north-stratum-v1:<south-hcp>:<south-base-shape-index>`; this spreads
-   exceptional strata across both South dimensions without using the run seed;
-7. only after assignment, shuffle execution order using the scan seed.
+6. turn the selected strata into quota slots, retaining an occurrence index for
+   repeated normal strata;
+7. build a bipartite graph between quota slots and South cells. At minimum an
+   edge requires `north_length[suit] + rotated_south_length[suit] <= 13` for all
+   four suits and compatible combined HCP bounds. Keep the compatibility
+   predicate isolated so any additional hard-feasibility rule discovered by the
+   exact counter can be added without changing quota semantics;
+8. order South cells by SHA-256 of the versioned stable key
+   `north-stratum-v1:<south-hcp>:<south-base-shape-index>`. Order quota slots by
+   ascending compatible-cell count, then stratum key and occurrence index. Run
+   a deterministic augmenting-path maximum matching with neighbors in the
+   hashed South-cell order;
+9. if no complete matching exists, raise an allocation error containing the
+   available/required cell counts and unmatched quota slots. Never assign an
+   incompatible pair and hope the card sampler repairs it;
+10. only after assignment, shuffle execution order using the scan seed.
 
 Thus 24- and 91-cell scans are accepted but marked incomplete; a 92-cell scan
 is the smallest complete scan. In the normal 529-cell grid, each exceptional
 stratum receives one cell and each normal shape receives seven or eight cells.
-Errors and summaries state both `available_cells` and `required_cells=92`.
+The matching is seed-independent and quota-preserving. Errors and summaries
+state both `available_cells` and `required_cells=92`.
 
 All `pairs_per_cell` partnerships in one cell use the same North named shape
 and opening mode. They also retain the existing within-cell HCP and K–R span
@@ -109,7 +122,7 @@ The sampler receives:
 - North mode: normal 15–17, 14 upgrade, or soft 18 downgrade;
 - South exact HCP;
 - optional North/South K–R anchors for later pairs in the same cell;
-- a deterministic random source and bounded retry budget.
+- a deterministic random source.
 
 ### Hard-constraint counting
 
@@ -175,6 +188,15 @@ This identifies a bad quota definition or implementation mismatch without
 hanging the scan. The former probabilistic final-predicate retry budget is
 removed because rare opening constraints are part of the counted population.
 
+At scan level, catch a cell-generation error, record the assigned stratum and
+stable South cell with `reason="generation_error: <diagnostic>"`, skip that
+cell's ungenerated pair slots, and continue scanning other cells. Return a
+strictly marked partial report with `coverage.north.complete=false` and a
+nonzero `summary.generation_errors`; do not raise after report construction and
+do not silently substitute another stratum or random deal. Allocation failure
+before execution still raises immediately because no quota-preserving schedule
+exists.
+
 The hardest currently known `5M4m22` stratum must generate ten valid N/S pairs
 within 30 seconds in a dedicated benchmark test on the project test host. This
 is a generous regression ceiling, not a target latency. Schedule construction
@@ -194,19 +216,43 @@ The report's `coverage.north` object has this explicit schema:
 - `required_cells`: `92`;
 - `available_cells`: number of requested South cells;
 - `complete`: whether all 92 strata were scheduled and generated;
-- `requested_strata`: ordered objects `{shape: [S,H,D,C], mode}` actually
-  assigned to cells;
+- `requested_strata`: ordered objects `{shape: [S,H,D,C], mode, cell, status}`
+  actually assigned to cells, including repeated normal strata in stable
+  South-cell order. `status` is `generated`, `partial`, or `failed`;
 - `observed_strata`: distinct generated `{shape, mode}` objects;
-- `cell_counts`: mapping from stable key `mode:S-H-D-C` to scheduled cell count;
-- `pair_counts`: the same keys mapped to generated N/S pair count;
+- `cell_counts`: mapping from every one of the 92 stable keys
+  `mode:S-H-D-C` to scheduled cell count, including zeroes;
+- `pair_counts`: the same complete key set mapped to generated N/S pair count;
 - `hcp_by_mode`: sorted observed North HCP values for each mode;
-- `ungenerated_strata`: ordered objects `{shape, mode, reason}`, using reason
-  `insufficient_cells` for a legal partial scan or the concrete generation
-  error for a failed assigned stratum.
+- `cell_failures`: authoritative ordered objects
+  `{shape, mode, cell, missing_pair_slots, reason}` for assigned cells that did
+  not generate all requested pairs;
+- `ungenerated_strata`: derived ordered objects `{shape, mode, cell, reason}`. Omitted
+  prefix strata use `cell=null` and `reason="insufficient_cells"`; failed
+  assigned cells are derived from `cell_failures` and carry the concrete error.
 
-`complete` is false whenever `available_cells < required_cells`, even if every
-assigned cell generated successfully. Cell counts measure quota fairness;
-pair counts measure generated sample volume and may increase after extension.
+Every non-null `cell` uses the same exact object form everywhere:
+
+```json
+{"target_hcp": 10, "base_shape_index": 4}
+```
+
+Matching diagnostics, requested strata, cell failures, ungenerated strata,
+coverage-cell metadata, extension, and IV projection all use those two integer
+fields as the common cell identity. Stable textual IDs may be derived as
+`"<target_hcp>:<base_shape_index>"` but never replace the object in stored
+summary schema.
+
+This two-field summary identity is distinct from a case-level
+`coverage_cell`, which also carries `base_shape`, `pair_slot`, `opener_shape`,
+and `opener_mode`. Use separate validators for those two forms so summary
+records cannot accumulate case-only fields and explicit cases are not rejected
+for carrying their required generation metadata.
+
+`complete` is false whenever `available_cells < required_cells`, any required
+stratum is omitted, or `cell_failures` is nonempty. Cell counts measure quota
+fairness; pair counts measure generated sample volume and may increase after
+extension.
 
 Existing South coverage fields remain intact. IV Scanner projected groups copy
 `opener_shape` and `opener_mode` from `coverage_cell`; pair records retain the
@@ -223,12 +269,34 @@ reconstructs the South constraints from the existing cell metadata. A normal
 mode remains a natural 15–17 population; extension must not pin it to the first
 pair's exact North HCP.
 
+Extension treats the persisted `requested_strata` schedule and `cell_failures`
+as authoritative even when a failed cell has zero cases. It retries exactly the
+missing pair slots of failed or partial explicit cells. A successful retry
+removes or shrinks the corresponding failure record and updates requested
+status; another failure preserves the record with the new concrete reason.
+
+For a zero-case cell, reconstruct South constraints from the validated top-level
+scan filters, not from a nonexistent first case: look up
+`filters.shapes[base_shape_index]`, rotate that base shape left by
+`(target_hcp + base_shape_index) % 4`, and use `target_hcp` as South's exact
+HCP. Recover North shape and mode from the authoritative requested record. If
+the saved filters are absent, malformed, or inconsistent with existing cases,
+explicit extension fails with a field-specific `ValueError`; it never guesses
+or falls back to legacy sampling.
+
+Both extension scopes run the same missing-sampling-slot repair pre-pass.
+`extend_process_pairs` retains the recovered cases and lets their auctions
+create the initially absent process groups, then applies its ordinary process
+top-up/discovery rules. Its `allow_new_processes` switch controls later
+exploratory discovery, not repair of persisted missing sampling slots.
+
 Added pairs obey the cell's aggregate HCP/K–R span limits. After extension,
-recompute `observed_strata`, `cell_counts`, `pair_counts`, `hcp_by_mode`,
-`ungenerated_strata`, and `complete` from all stored cases. Do not carry stale
-summary counts forward. Legacy cells without explicit North metadata retain the
-old extension path and remain labelled legacy; they are never relabelled as
-explicit.
+recompute `requested_strata` statuses, `observed_strata`, `cell_counts`,
+`pair_counts`, `hcp_by_mode`, `cell_failures`, `ungenerated_strata`, and
+`complete` from the requested schedule, all stored cases, and remaining failure
+records. Do not carry stale summary counts forward. Legacy cells without
+explicit North metadata retain the old extension path and remain labelled
+legacy; they are never relabelled as explicit.
 
 ## Verification
 
@@ -240,28 +308,33 @@ Tests must demonstrate:
    scheduled at least once;
 4. quotas among normal shapes differ by at most one cell after exceptional
    reservations;
-5. every generated N/S pair has 13 cards each, no duplicate card, exact shapes,
+5. the deterministic matching assigns every selected quota slot to a South
+   cell with four suit sums no greater than 13, including all 529 default cells;
+6. every one of the 529 assigned default constraints has a positive exact joint
+   DP completion count without drawing cards;
+7. every generated N/S pair has 13 cards each, no duplicate card, exact shapes,
    correct South HCP, and a North hand accepted by the authored 1NT predicate;
-6. later pairs in a cell respect the existing HCP and K–R span rules;
-7. the weighted branch selector uses completion counts, verified with exact
+8. later pairs in a cell respect the existing HCP and K–R span rules;
+9. the weighted branch selector uses completion counts, verified with exact
    small fixtures or deterministic boundary draws rather than flaky frequency
    assertions;
-8. fixed seeds reproduce identical N/S hands and schedules;
-9. impossible constraints fail promptly with the diagnostic context above;
-10. generated `1NT-Pass-3C-Pass` positions contain actual 3D, 3H, and 3S
+10. fixed seeds reproduce identical N/S hands and schedules;
+11. impossible constraints fail promptly with the diagnostic context above;
+12. generated `1NT-Pass-3C-Pass` positions contain actual 3D, 3H, and 3S
     opener responses;
-11. current report readers accept both new metadata and old reports;
-12. allocation boundary tests cover 24, 91, 92, and 529 cells and verify the
+13. current report readers accept both new metadata and old reports;
+14. allocation boundary tests cover 24, 91, 92, and 529 cells and verify the
     exact completeness and omitted-strata semantics;
-13. the hardest `5M4m22` case meets the 30-second ten-pair regression ceiling;
-14. DP completion counts safely exceed 64-bit range where appropriate;
-15. cold and warm caches produce the same hands for the same seed;
-16. coverage extension preserves mode semantics and recomputes every North
+15. the hardest `5M4m22` case meets the 30-second ten-pair regression ceiling;
+16. DP completion counts safely exceed 64-bit range where appropriate;
+17. cold and warm caches produce the same hands for the same seed;
+18. coverage extension preserves mode semantics and recomputes every North
     summary field;
-17. IV projection retains group and pair North-stratum metadata;
-18. exact legacy `schema_status` behavior is covered;
-19. the full backend regression suite introduces no failures beyond the
-    existing, separately recorded Meow fixture baseline.
+19. IV projection retains group and pair North-stratum metadata;
+20. exact legacy `schema_status` behavior is covered;
+21. the full backend regression suite introduces no failures beyond the
+    freshly captured live dirty-worktree baseline; failures that disappear are
+    allowed, and the comparison is by test identity rather than failure count.
 
 ## Non-goals
 
