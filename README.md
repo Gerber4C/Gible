@@ -135,6 +135,17 @@ when a second launcher exits. Other applications occupying these ports cause
 an actionable error instead of being stopped. Reused servers may belong to
 another checkout; stop the original launcher first when switching checkouts.
 
+On Windows, `kill.cmd` stops recognized Gible frontend/backend processes on
+ports 5173/8765. It leaves unrelated applications using those ports alone.
+Run `restart.cmd` to stop the old Gible services and then launch `gible.cmd`:
+
+```powershell
+.\kill.cmd
+.\restart.cmd
+```
+
+Use `kill.cmd -DryRun` to list the processes it would stop.
+
 Check the environment without starting services:
 
 ```bat

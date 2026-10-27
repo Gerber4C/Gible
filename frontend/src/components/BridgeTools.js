@@ -175,7 +175,7 @@ function RouteExperiment({ profileId, deal, dealer, vulnerability, calls, valid,
   return e("section", { className: "contract-analysis", "aria-label": "Route experiment" },
     e("div", { className: "contract-analysis-heading" },
       e("h3", null, "Compare bidding routes"),
-      e("p", null, "At the first response to 1NT, try calls on the same possible deals. Missing continuations count as blocked, not failed contracts. This report does not rank calls.")),
+      e("p", null, "At the first response to 1NT, try calls on the same possible deals. Missing continuations count as TD, not failed contracts. This report does not rank calls.")),
     e("div", { className: "contract-analysis-controls" },
       e("label", null, "First calls", e("input", { "aria-label": "First calls to compare",
         value: routes, onChange: (event) => { setRoutes(event.target.value); setResult(null); setError(""); },
@@ -195,13 +195,13 @@ function RouteExperiment({ profileId, deal, dealer, vulnerability, calls, valid,
         e("strong", null, route.first_call),
         e("span", null, route.status === "unavailable"
           ? `Route unavailable: ${route.reason}`
-          : `${route.completed}/${result.sample_count} completed · ${route.made} made, ${route.failed} failed · ${route.blocked} blocked`),
+          : `${route.completed}/${result.sample_count} completed · ${route.made} made, ${route.failed} failed · ${route.blocked} TD`),
         route.completion_interval_95 && e("span", null,
           `Making rate ${Math.round(route.completion_rate * 100)}% · 95% interval ${Math.round(route.completion_interval_95[0] * 100)}–${Math.round(route.completion_interval_95[1] * 100)}%`),
         route.contracts.map((contract) => e("span", { key: `${contract.contract}-${contract.declarer}` },
           `${contract.contract} ${contract.declarer.toUpperCase()}: ${contract.made}/${contract.count} made`)),
         route.block_reasons.map((blocked) => e("span", { key: blocked.reason },
-          `${blocked.count} blocked: ${blocked.reason}`)),
+          `${blocked.count} TD: ${blocked.reason}`)),
       ))),
     ),
   );
@@ -532,7 +532,7 @@ function AuctionPanel({ records, dealer, vulnerability, loading, invalid, blocke
           ))
         : !blocked && e("div", { className: "auction-empty" }, invalid ? "Fix the highlighted hands to begin. Show E/W hands to check hidden cards." : "Press \u25b6 to begin."),
       !loading && !invalid && blocked && e("div", { className: "auction-blocked", role: "status" },
-        e("strong", null, `Auction blocked${blocked.seat ? ` · ${seatNameShort(blocked.seat)}` : ""}`),
+        e("strong", null, `TD${blocked.seat ? ` · ${seatNameShort(blocked.seat)}` : ""}`),
         e("p", null, "No acceptable call. Review the profile rules or change the deal to continue."),
         e("ul", null, [...(blocked.diagnostics ?? []), ...axiomSummary(blocked.axioms)].map((line, index) =>
           e("li", { key: index }, line))),

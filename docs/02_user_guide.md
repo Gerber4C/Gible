@@ -16,6 +16,10 @@ gible.cmd
 
 Keep that CMD window open while using Gible. Press Enter or Ctrl+C to stop services started by this launcher. See the root README for prerequisites, runtime discovery, and macOS/Linux startup. It starts the backend on port `8765` and the frontend on port `5173`.
 
+On Windows, use `kill.cmd` to stop existing recognized Gible services, or
+`restart.cmd` to stop them and start a new `gible.cmd` session. The normal
+`gible.cmd` continues to reuse an already running service.
+
 Manual startup is also available:
 
 Backend:

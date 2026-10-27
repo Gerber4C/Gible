@@ -208,7 +208,7 @@ def scan_blocks(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description='Find blocked Gible auctions in filtered random deals.')
+    parser = argparse.ArgumentParser(description='Find TD calls in filtered random Gible deals.')
     parser.add_argument('--profile', default='daqiush_2over1')
     parser.add_argument('--dealer', default='ns', choices=(*SEATS, *DEALER_CHOICES))
     parser.add_argument('--vulnerability', default='none', choices=VULNERABILITIES)
@@ -256,7 +256,7 @@ def main(argv: list[str] | None = None) -> int:
                            encoding='utf-8')
     summary = report['summary']
     print(f"{summary['attempts']} dealt; {summary['auction_matches']} matched; "
-          f"{summary['blocked']} blocked at {len(report['block_points'])} points. "
+          f"{summary['blocked']} TD calls at {len(report['block_points'])} points. "
           f'Report: {args.output}')
     return 0
 

@@ -309,7 +309,7 @@ export default function App() {
       revealCalls(count);
       setSimulationLoading(false);
       setStatus(result.status === "blocked"
-        ? `Auction blocked${result.blocked?.seat ? ` · ${seatName(result.blocked.seat)}` : ""}. Review the auction diagnostics.`
+        ? `TD${result.blocked?.seat ? ` · ${seatName(result.blocked.seat)}` : ""}. Review the auction diagnostics.`
         : result.status === "limit" ? "Auction stopped at the call limit. Replay available calls."
         : "Auction ready.");
     } catch (error) {
