@@ -158,9 +158,6 @@ backend/partnership_profiles/<profile_id>/
     <gadget_id>/
   policies/
     *.policy.py
-  tests/
-    cases/
-    test_cases.md
 ```
 
 The current main profile is:
@@ -258,24 +255,13 @@ It returns the selected candidate or `None`.
 
 The platform can generate Markdown notes from loaded runtime objects. Text from `description` and `system_notes` improves readability, but executable behavior comes from structured fields.
 
-## Testing A Profile
+## Testing
 
-Run:
+Run the maintained backend regression suite from `backend/`:
 
 ```powershell
-python -m unittest tests.test_fixture_cases -q
+python -m pytest -q tests
 ```
 
-from:
-
-```text
-backend/
-```
-
-The human-readable fixture companion is:
-
-```text
-backend/partnership_profiles/meow_2over1/tests/test_cases.md
-```
-
-When test fixtures change, update that document too.
+The legacy Meow 2/1 fixture suite was removed because its historical
+expectations were no longer maintained.

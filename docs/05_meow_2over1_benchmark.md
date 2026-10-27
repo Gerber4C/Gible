@@ -279,11 +279,9 @@ The benchmark is covered by:
 - parser, legality, and matcher fixtures,
 - infrastructure tests for Policy Functions, Private Route memory, Frames, and generated system notes.
 
-The fixture companion is:
-
-```text
-backend/partnership_profiles/meow_2over1/tests/test_cases.md
-```
+The legacy fixture companion and executable Meow 2/1 system suite were removed
+because their historical expectations were no longer maintained. This document
+remains a historical benchmark description, not an active test contract.
 
 ## Roadmap Boundary
 

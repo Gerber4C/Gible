@@ -94,11 +94,8 @@ When Meow Li gives new design information, update the document that owns that to
   - Seeded batch discovery of blocked auctions, condition filters, and rare
     high-HCP test strata. Defines the stage-1 report handed to later review.
 
-The generated fixture companion is separate:
-
-- `backend/partnership_profiles/meow_2over1/tests/test_cases.md`
-  - Human-readable translation of YAML fixtures.
-  - Must be updated whenever fixture YAML changes.
+The legacy Meow 2/1 fixture suite and its generated companion were removed;
+maintained regression tests now live under `backend/tests/`.
 
 ## Maintenance Rules
 

@@ -41,33 +41,12 @@ backend/
 Command:
 
 ```powershell
-python -m unittest tests.test_fixture_cases -q
+python -m pytest -q tests
 ```
 
-## Fixture Files
-
-```text
-backend/partnership_profiles/meow_2over1/tests/cases/bidding.yaml
-backend/partnership_profiles/meow_2over1/tests/cases/full_auctions.yaml
-backend/partnership_profiles/meow_2over1/tests/cases/hands.yaml
-backend/partnership_profiles/meow_2over1/tests/cases/legality.yaml
-backend/partnership_profiles/meow_2over1/tests/cases/matcher.yaml
-```
-
-Current fixture coverage:
-
-- 177 curated single-call bidding cases.
-- 29 full-auction simulations.
-- 3 valid hand parser cases.
-- 7 invalid hand parser cases.
-- 5 legality cases.
-- 1 matcher case.
-
-## Human-Readable Companion
-
-`backend/partnership_profiles/meow_2over1/tests/test_cases.md` is the readable translation of the YAML fixtures. It uses suit symbols for hand readability.
-
-When a fixture changes, update `backend/partnership_profiles/meow_2over1/tests/test_cases.md` in the same checkpoint.
+The legacy Meow 2/1 fixture suite was removed because its historical expectations
+were no longer maintained. Current regression coverage lives in the individual
+tests under `backend/tests/`.
 
 ## What The Tests Cover
 
