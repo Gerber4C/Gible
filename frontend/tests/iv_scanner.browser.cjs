@@ -23,36 +23,37 @@ const fs = require("node:fs/promises");
     await page.waitForLoadState("networkidle");
     await page.getByRole("button", { name: "IV Scanner" }).click();
     await expect(page.getByRole("heading", { name: "IV Scanner" })).toBeVisible();
-    await expect(page.locator(".iv-category-block > span").first()).toHaveText("01 / 卡 / BLOCKED");
+    await expect(page.locator(".iv-category-block > span").first()).toHaveText("01 / 裁 / TD");
     await expect(page.locator(".iv-category-missed > span").first()).toHaveText("02 / 丢 / LOSE");
     await expect(page.locator(".iv-category-down > span").first()).toHaveText("03 / 宕 / SET");
     await expect(page.locator(".iv-category-wrong > span").first()).toHaveText("04 / 错 / WRONG");
-    await expect(page.locator(".iv-category-block strong")).toHaveText("304");
-    await expect(page.locator(".iv-category-missed strong")).toHaveText("106");
-    await expect(page.locator(".iv-category-down strong")).toHaveText("66");
-    await expect(page.locator(".iv-category-wrong strong")).toHaveText("7");
+    await expect(page.locator(".iv-category-block strong")).toHaveText("1674");
+    await expect(page.locator(".iv-category-missed strong")).toHaveText("1764");
+    await expect(page.locator(".iv-category-down strong")).toHaveText("493");
+    await expect(page.locator(".iv-category-wrong strong")).toHaveText("21");
     await page.locator(".iv-category-wrong").click();
-    await expect(page.locator(".iv-list-tools")).toContainText("7 findings");
-    await page.getByRole("searchbox", { name: "Search scanner findings" }).fill("169");
+    await expect(page.locator(".iv-list-tools")).toContainText("21 findings · 5 NS cells");
+    await page.getByRole("searchbox", { name: "Search scanner findings" }).fill("1431");
     await expect(page.locator(".iv-case")).toHaveCount(1);
     await page.locator(".iv-case").click();
-    await expect(page.locator(".iv-detail-heading")).toContainText("DEAL #169");
-    await expect(page.locator(".iv-ns-matrix")).toBeVisible();
-    await expect(page.locator(".iv-auction-row")).toHaveCount(2);
+    await expect(page.locator(".iv-pair-button")).toHaveCount(10);
+    await expect(page.locator(".iv-pair-button[aria-pressed='true']")).toContainText("#1431");
+    await expect(page.locator(".iv-warning-list")).toContainText("RATIO");
+    await expect(page.locator(".iv-ew-strip")).toBeVisible();
     await page.screenshot({ path: path.resolve(__dirname, "../../reports/block_scans/iv-scanner-preview.png") });
 
     await page.locator(".iv-category-block").click();
     await page.locator('input[aria-label="Search scanner findings"]').fill("");
     await page.locator(".iv-case").first().click();
-    await expect(page.locator(".iv-ns-matrix")).toContainText("BLOCK 卡");
+    await expect(page.locator(".iv-block-diagnostic")).toBeVisible();
 
     await page.locator(".iv-fields input").nth(0).fill("10");
     await page.locator(".iv-fields input").nth(1).fill("10");
     await page.locator(".iv-fields input").nth(2).fill("1");
     await page.getByRole("button", { name: "Start scan" }).click();
     await expect(page.locator(".iv-progress")).toBeVisible();
-    await expect(page.locator(".iv-progress-completed")).toBeVisible({ timeout: 120000 });
-    await expect(page.locator(".iv-progress-completed")).toContainText("3/3 pairs");
+    await expect(page.locator(".iv-progress-completed")).toBeVisible({ timeout: 240000 });
+    await expect(page.locator(".iv-progress-completed")).toContainText("23/23 pairs");
     const run = await page.evaluate(async (port) => {
       const response = await fetch(`http://127.0.0.1:${port || 8765}/api/scanner/runs/current`);
       return (await response.json()).run;
@@ -63,7 +64,7 @@ const fs = require("node:fs/promises");
       await fs.unlink(path.join(root, run.report_id.replace(/\.json$/, ".html")));
     }
     if (errors.length) throw new Error(errors.join("\n"));
-    console.log("PASS: IV Scanner navigation, four findings, filtering, deal detail, and background scan");
+    console.log("PASS: IV Scanner navigation, four findings, cell/pair filtering, pair detail, and background scan");
   } finally {
     await browser.close();
   }

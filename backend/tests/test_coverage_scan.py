@@ -1,13 +1,18 @@
+import math
 import random
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from engine.cards import Hand
 from engine.coverage_scan import (
     COVERAGE_SHAPES, _contract, classify_suspicious, sample_partnership, scan_coverage,
+    wrong_game_rates,
 )
 from engine.dds_adapter import deal_to_pbn
 from engine.hand_quality import assess_quality
 from engine.model import Author, Gadget, PartnershipProfile
+from engine.outcome_metrics import RULE_ID
 
 
 class CoverageSamplingTests(unittest.TestCase):
@@ -87,6 +92,7 @@ class CoverageSamplingTests(unittest.TestCase):
         self.assertEqual(report, scan_coverage(profile, **options))
         self.assertEqual(report['summary']['pairs'], 4)
         self.assertEqual(report['summary']['blocked'], 4)
+        self.assertEqual(report['wrong_game_rule'], RULE_ID)
         self.assertEqual(report['coverage']['responder_hcp'], [0, 22])
         self.assertEqual(report['coverage']['longest_suit'], [4, 8])
         self.assertEqual(len(report['coverage']['cells']), 4)
@@ -105,18 +111,77 @@ class CoverageSamplingTests(unittest.TestCase):
         profile = PartnershipProfile('test', 'Test', '1', Author('Test'),
                                      (gadget,), missing_call_behavior='block')
         report = scan_coverage(profile, seed=41, hcp_targets=(10,),
-                               shapes=((6, 3, 2, 2),), pairs_per_cell=2,
+                               shapes=((6, 3, 2, 2),), pairs_per_cell=3,
                                ew_samples=1)
-        first, second = report['cases']
+        first, second, third = report['cases']
         self.assertNotEqual((first['hands']['n'], first['hands']['s']),
                             (second['hands']['n'], second['hands']['s']))
-        for field in ('north_shape', 'south_shape', 'north_hcp', 'south_hcp'):
-            self.assertEqual(first[field], second[field])
-        self.assertLessEqual(abs(first['north_kr'] - second['north_kr']), 2)
-        self.assertLessEqual(abs(first['south_kr'] - second['south_kr']), 2)
+        for other in (second, third):
+            for field in ('north_shape', 'south_shape', 'north_hcp', 'south_hcp'):
+                self.assertEqual(first[field], other[field])
+            self.assertLessEqual(abs(first['north_kr'] - other['north_kr']), 2)
+            self.assertLessEqual(abs(first['south_kr'] - other['south_kr']), 2)
+        self.assertEqual([case['coverage_cell'] for case in report['cases']], [
+            {'target_hcp': 10, 'base_shape_index': 0,
+             'base_shape': [6, 3, 2, 2], 'pair_slot': slot}
+            for slot in range(3)
+        ])
+        all_cases = (report['cases'] + report['complete_cases']
+                     + report['limit_cases'])
+        self.assertEqual(sorted(case['id'] for case in all_cases), [1, 2, 3])
+
+    def test_call_limit_case_is_retained_and_does_not_run_dds(self):
+        gadget = Gadget.from_parts(
+            {'id': 'test', 'author': {'name': 'Test'}},
+            [{'id': 'opening', 'context': {'auction_pattern': ''},
+              'call': '1N', 'meaning': {'action_type': 'opening'}}],
+        )
+        profile = PartnershipProfile('test', 'Test', '1', Author('Test'),
+                                     (gadget,), missing_call_behavior='block')
+        simulation = SimpleNamespace(
+            calls=('1N', 'P'), status='limit', call_records=(), blocked=None,
+            compact_sequence=lambda: '1N P',
+        )
+        dds_calls = []
+
+        with patch('engine.coverage_scan.simulate_auction', return_value=simulation):
+            report = scan_coverage(
+                profile, seed=42, hcp_targets=(10,),
+                shapes=((6, 3, 2, 2),), pairs_per_cell=1, ew_samples=2,
+                solve_table=lambda deal: dds_calls.append(deal),
+            )
+
+        self.assertEqual(dds_calls, [])
+        self.assertEqual(report['cases'], [])
+        self.assertEqual(report['complete_cases'], [])
+        self.assertEqual(len(report['limit_cases']), 1)
+        case = report['limit_cases'][0]
+        self.assertEqual(case['status'], 'limit')
+        self.assertEqual(case['calls'], ['1N', 'P'])
+        self.assertEqual(case['auction'], '1N P')
+        self.assertIn('hands', case)
+        self.assertEqual(case['coverage_cell'], {
+            'target_hcp': 10, 'base_shape_index': 0,
+            'base_shape': [6, 3, 2, 2], 'pair_slot': 0,
+        })
 
 
 class SuspicionTests(unittest.TestCase):
+    def test_perfect_chosen_game_has_finite_completion_ratio(self):
+        def table(nt_tricks):
+            values = {strain: {seat: 6 for seat in 'ns'}
+                      for strain in ('S', 'H', 'D', 'C', 'NT')}
+            values['S']['n'] = 10
+            values['NT']['n'] = nt_tricks
+            return values
+
+        ratio, alternatives = wrong_game_rates(
+            '4S', 'n', [table(9), table(8)])
+
+        self.assertEqual(ratio, 2.0)
+        self.assertTrue(math.isfinite(ratio))
+        self.assertEqual(alternatives['3NT'], .5)
+
     def test_wrong_game_requires_failed_chosen_game_and_a_different_made_game(self):
         subject = {'id': 1, 'north_shape': (4, 3, 3, 3),
                    'south_shape': (6, 3, 2, 2), 'north_hcp': 16,
@@ -132,14 +197,13 @@ class SuspicionTests(unittest.TestCase):
             values['H']['n'] = heart_n
             return values
 
-        # 4S succeeds on 4/10 boards while 3NT succeeds on 6/10. The selected
-        # game's success odds are therefore 0.4/0.6, versus 0.6/0.4 for 3NT.
+        # 4S succeeds on 4/10 boards while 3NT succeeds on 6/10.
         boards = ([table(10)] * 4
                   + [table(9, nt_n=9, heart_n=10)] * 6)
         result = classify_suspicious(subject, [subject, neighbor],
                                      {1: boards[:5], 2: boards[5:]},
                                      min_boards=10)
-        self.assertAlmostEqual(result['rates']['wrong_game'], 4 / 9)
+        self.assertAlmostEqual(result['rates']['wrong_game'], 2 / 3)
         self.assertIn('wrong_game', result['flags'])
         self.assertEqual(result['alternative_game_rates']['3NT'], .6)
         self.assertEqual(result['alternative_game_rates']['4H'], .6)

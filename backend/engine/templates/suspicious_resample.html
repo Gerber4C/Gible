@@ -141,7 +141,7 @@ h1{font-size:clamp(29px,3vw,43px);margin:7px 0 8px;letter-spacing:-.025em}
 <main>
   <div class="wrap dashboard">
     <div class="metrics" id="metrics"></div>
-    <details class="method"><summary>怎样阅读这些概率与样本？</summary><p>每组新增 20 对不同的南北牌，每对牌随机补全两次东西牌，因此概率分母通常为 40 个 DDS 牌局，但独立的南北样本只有 20 对。每手牌的四门长度与原组一致；将原牌和新牌合在一起看，北家、南家的 HCP 与 K–R 各自都是最高分减最低分不超过 2，且北家实际选择开叫 1NT。“原概率／新概率”固定原来的定约和庄位比较；下方新牌的自动叫牌结果是另一项观察。DDS 是双明手筛查，不能直接当作实战完成率。原警报阈值：定约失败率大于 50%；未叫到可成的局、小满贯或大满贯，大于 30%；错局为所选局成功赔率除以最佳替代局成功赔率小于 0.8。</p></details>
+    <details class="method"><summary>怎样阅读这些概率与样本？</summary><p>每组新增 20 对不同的南北牌，每对牌随机补全两次东西牌，因此概率分母通常为 40 个 DDS 牌局，但独立的南北样本只有 20 对。每手牌的四门长度与原组一致；将原牌和新牌合在一起看，北家、南家的 HCP 与 K–R 各自都是最高分减最低分不超过 2，且北家实际选择开叫 1NT。“原概率／新概率”固定原来的定约和庄位比较；下方新牌的自动叫牌结果是另一项观察。DDS 是双明手筛查，不能直接当作实战完成率。警报规则：SET > 60%；未叫到可成的局、小满贯或大满贯，大于 30%；只有 best-other > 40% 才评估 chosen / best-other success probability ratio < 0.8。规则 ID：success_probability_ratio_0.8_best_above_0.4_set_above_0.6。</p></details>
     <div class="review-utilities" aria-label="建议审核工具">
       <strong>体系修改意见 · 审核草稿</strong>
       <button id="review-export" type="button">导出审核 JSON</button>
@@ -156,7 +156,7 @@ h1{font-size:clamp(29px,3vw,43px);margin:7px 0 8px;letter-spacing:-.025em}
         <select class="filter" id="status-filter" aria-label="筛选牌例组">
           <option value="all">全部类别</option><option value="persist">警报仍在</option>
           <option value="mixed">部分仍在</option><option value="clear">均未复现</option>
-          <option value="blocked">有叫牌阻塞</option>
+          <option value="blocked">有 TD</option>
         </select>
       </div>
       <div class="side-count" id="group-count"></div>
@@ -227,7 +227,7 @@ h1{font-size:clamp(29px,3vw,43px);margin:7px 0 8px;letter-spacing:-.025em}
     const all=groups.filter(g=>status(g)==="persist").length,clear=groups.filter(g=>status(g)==="clear").length;
     document.getElementById("metrics").innerHTML=[
       [s.resampled_groups,"已复采样类别",""],[all,"原警报全部仍在","warn"],
-      [clear,"原警报均未复现",""],[s.blocked,"新牌叫牌阻塞","warn"]
+      [clear,"原警报均未复现",""],[s.blocked,"新牌出现 TD","warn"]
     ].map(x=>'<div class="metric '+x[2]+'"><strong>'+e(x[0])+'</strong><span>'+x[1]+'</span></div>').join("");
     document.getElementById("hero-meta").innerHTML=
       '<span>原始种子 '+e(report.source_seed)+'</span><span>新种子 '+e(report.seed)+
@@ -246,7 +246,7 @@ h1{font-size:clamp(29px,3vw,43px);margin:7px 0 8px;letter-spacing:-.025em}
         '" data-group="'+e(g.id)+'" aria-current="'+(selected&&g.id===selected.id?"true":"false")+'">'+
         '<strong>'+e(g.id)+'</strong><span class="mini '+s+'">'+statusText(s)+'</span>'+
         '<small>原牌 #'+g.source_ids.map(e).join("、")+" · 警报 "+now+"/"+old+
-        (g.summary.blocked?" · 阻塞 "+e(g.summary.blocked):"")+" · "+
+        (g.summary.blocked?" · TD "+e(g.summary.blocked):"")+" · "+
         '<span class="review-mini">'+e(reviewDecisions[reviewFor(g.id).decision])+'</span></small></button>';
     }).join(""):'<div class="empty-list">没有符合条件的牌例组。</div>';
   }
@@ -255,7 +255,7 @@ h1{font-size:clamp(29px,3vw,43px);margin:7px 0 8px;letter-spacing:-.025em}
     const oldN=check.original_boards??"—",newN=check.new_boards??g.summary.dds_boards;
     const bar=v=>Math.max(0,Math.min(100,Math.round((v||0)*100)));
     const wrongGame=flag==="wrong_game";
-    const display=v=>wrongGame?(v==null?"—":"OR "+Number(v).toFixed(2)):pct(v);
+    const display=v=>wrongGame?(v==null?"—":"RATIO "+Number(v).toFixed(2)):pct(v);
     const track=(v,kind)=>wrongGame?"":'<div class="track'+(kind?" "+kind:"")+'"><i style="width:'+bar(v)+'%"></i></div>';
     return '<article class="warning-card"><div class="warning-head"><strong>#'+e(check.source_id)+' · '+
       e(flagNames[flag]||flag)+'</strong><span class="status '+(persist?"persist":"clear")+'">'+
@@ -277,12 +277,12 @@ h1{font-size:clamp(29px,3vw,43px);margin:7px 0 8px;letter-spacing:-.025em}
     return '<details class="deal" data-blocked="'+blocked+'"><summary>'+
       '<span class="deal-id">'+e(d.id)+'</span><span class="deal-info">北 '+e(d.north_hcp)+
       ' HCP / K–R '+e(d.north_kr)+' · 南 '+e(d.south_hcp)+' HCP / K–R '+e(d.south_kr)+'</span>'+
-      '<span class="deal-result '+(blocked?"blocked":"")+'">'+(blocked?"阻塞":e(d.contract||d.status))+'</span></summary>'+
+      '<span class="deal-result '+(blocked?"blocked":"")+'">'+(blocked?"TD":e(d.contract||d.status))+'</span></summary>'+
       '<div class="deal-body"><div class="hands">'+handHtml(d.hands.n,"北家")+handHtml(d.hands.s,"南家")+'</div>'+
       '<div class="auction" aria-label="叫牌进程">'+d.calls.map((c,i)=>callHtml(c,i)).join("")+'</div>'+
       (blocked?'<div class="diagnostic"><b>停在这里：</b>'+e(diag||"未找到可用叫品")+'</div>':
       '<div class="minor-note">所选定约在本副牌的 DDS 补样中宕牌：'+pct(failure)+
-      (wrong==null?'':' · 打错局 OR：'+Number(wrong).toFixed(2)+(alternatives?'（替代局成功率：'+alternatives+'）':''))+
+      (wrong==null?'':' · 打错局 RATIO：'+Number(wrong).toFixed(2)+(alternatives?'（替代局成功率：'+alternatives+'）':''))+
       '</div>')+'</div></details>';
   }
   function renderDeals(g){
@@ -290,7 +290,7 @@ h1{font-size:clamp(29px,3vw,43px);margin:7px 0 8px;letter-spacing:-.025em}
     const deals=g.deals.filter(d=>!blockedOnly||d.status==="blocked");
     document.getElementById("deal-count").textContent="显示 "+deals.length+" / "+g.deals.length+" 副";
     document.getElementById("deal-list").innerHTML=deals.length?deals.map(dealHtml).join(""):
-      '<div class="no-deals">这一组没有阻塞牌。</div>';
+      '<div class="no-deals">这一组没有 TD 牌。</div>';
   }
   function reviewHtml(g){
     const r=reviewFor(g.id);
@@ -328,7 +328,7 @@ h1{font-size:clamp(29px,3vw,43px);margin:7px 0 8px;letter-spacing:-.025em}
       '<div class="summary-strip"><span><b>'+e(sum.pairs)+'</b> 对新南北牌</span>'+
       '<span><b>'+e(sum.dds_boards)+'</b> 个 DDS 牌局</span>'+
       '<span><b>'+e(sum.complete)+'</b> 次叫完</span>'+
-      '<span><b>'+e(sum.blocked)+'</b> 次阻塞</span></div>'+
+      '<span><b>'+e(sum.blocked)+'</b> 次 TD</span></div>'+
       '<div class="constraints"><div class="constraint"><b>北家 · 1NT 开叫</b>'+
       '<span>♠ ♥ ♦ ♣ 长度 '+shape(n.shape)+'<br>HCP '+range(n.hcp)+' · K–R '+range(n.kr)+'</span></div>'+
       '<div class="constraint"><b>南家 · 应叫</b><span>♠ ♥ ♦ ♣ 长度 '+shape(south.shape)+
@@ -340,7 +340,7 @@ h1{font-size:clamp(29px,3vw,43px);margin:7px 0 8px;letter-spacing:-.025em}
       '<h3 class="section-title">新牌自动叫牌</h3><p class="section-lead">完成后的定约分布：</p>'+
       '<div class="contract-pills">'+contracts+'</div>'+
       '<div class="deal-toolbar"><span class="detail-sub" id="deal-count"></span>'+
-      '<label><input id="blocked-only" type="checkbox"> 只看阻塞牌</label></div>'+
+      '<label><input id="blocked-only" type="checkbox"> 只看 TD 牌</label></div>'+
       '<div class="deal-list" id="deal-list"></div>';
     document.getElementById("blocked-only").addEventListener("change",()=>renderDeals(g));
     renderDeals(g);

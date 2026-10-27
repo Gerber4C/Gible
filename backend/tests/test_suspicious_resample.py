@@ -1,9 +1,12 @@
 import unittest
+from copy import deepcopy
 
 from engine.model import Author, Gadget, PartnershipProfile
 from engine.suspicious_resample import (
-    _rates_for_contract, constraints_for_group, extend_ew_samples, resample_groups,
+    _rates_for_contract, _retained_flags, constraints_for_group,
+    extend_ew_samples, resample_groups,
 )
+from engine.outcome_metrics import RULE_ID
 from engine.suspicious_review_workflow import review_signature
 
 
@@ -17,7 +20,26 @@ class SuspiciousResampleTests(unittest.TestCase):
         self.assertEqual(rates['wrong_game'], 0.0)
         self.assertEqual(rates['alternative_game_rates']['3NT'], 1.0)
 
-    def test_wrong_game_source_alert_is_retained_below_odds_ratio_threshold(self):
+    def test_shared_set_wrong_and_best_other_boundaries_are_used(self):
+        self.assertEqual(
+            _retained_flags('4S', ['contract_failure'], {
+                'contract_failure': .60, 'alternative_game_rates': {}}), [])
+        self.assertEqual(
+            _retained_flags('4S', ['contract_failure'], {
+                'contract_failure': .600001, 'alternative_game_rates': {}}),
+            ['contract_failure'])
+        self.assertEqual(
+            _retained_flags('4S', ['wrong_game'], {
+                'wrong_game': .79, 'alternative_game_rates': {'3NT': .40}}), [])
+        self.assertEqual(
+            _retained_flags('4S', ['wrong_game'], {
+                'wrong_game': .80, 'alternative_game_rates': {'3NT': .9}}), [])
+        self.assertEqual(
+            _retained_flags('4S', ['wrong_game'], {
+                'wrong_game': .79, 'alternative_game_rates': {'3NT': .400001}}),
+            ['wrong_game'])
+
+    def test_wrong_game_source_alert_is_retained_below_success_ratio_threshold(self):
         opening = Gadget.from_parts(
             {'id': 'test', 'author': {'name': 'Test'}},
             [{'id': 'opening', 'context': {'auction_pattern': ''},
@@ -39,6 +61,51 @@ class SuspiciousResampleTests(unittest.TestCase):
         check = result['groups'][0]['source_checks'][0]
         self.assertEqual(check['new_rates']['wrong_game'], 0.0)
         self.assertEqual(check['retained_flags'], ['wrong_game'])
+        self.assertEqual(result['wrong_game_rule'], RULE_ID)
+
+    def test_legacy_source_flags_are_reclassified_before_grouping_without_mutation(self):
+        opening = Gadget.from_parts(
+            {'id': 'test', 'author': {'name': 'Test'}},
+            [{'id': 'opening', 'context': {'auction_pattern': ''},
+              'call': '1N', 'meaning': {'action_type': 'opening'}}],
+        )
+        profile = PartnershipProfile('test', 'Test', '1', Author('Test'),
+                                     (opening,), missing_call_behavior='block')
+        stale_wrong = self.source_case(1)
+        stale_wrong['analysis'] = {
+            'flags': ['wrong_game'],
+            'rates': {'contract_failure': .30, 'wrong_game': .20},
+            'alternative_game_rates': {'3NT': .75},
+            'dds_boards': 10,
+        }
+        preserved_missed = self.source_case(2)
+        preserved_missed['south_shape'] = [5, 4, 2, 2]
+        preserved_missed['analysis'] = {
+            'flags': ['wrong_game', 'missed_small_slam'],
+            'rates': {'contract_failure': .30, 'wrong_game': .20,
+                      'missed_small_slam': .40},
+            'alternative_game_rates': {'3NT': .75},
+            'dds_boards': 10,
+        }
+        source = {
+            'schema_version': 2, 'seed': 23,
+            'summary': {'suspicious': 2},
+            'complete_cases': [stale_wrong, preserved_missed],
+            'suspicious_cases': [stale_wrong, preserved_missed],
+        }
+        original = deepcopy(source)
+        table = {strain: {seat: 6 for seat in 'ns'}
+                 for strain in ('S', 'H', 'D', 'C', 'NT')}
+
+        result = resample_groups(source, profile, seed=101,
+                                 pairs_per_group=1, ew_samples=1,
+                                 solve_table=lambda hands: table)
+
+        self.assertEqual(result['summary']['source_groups'], 1)
+        self.assertEqual(result['groups'][0]['source_ids'], [2])
+        self.assertEqual(result['groups'][0]['source_checks'][0]['original_flags'],
+                         ['missed_small_slam'])
+        self.assertEqual(source, original)
 
     def source_case(self, case_id, *, north_hcp=16, north_kr=16.0):
         return {
@@ -132,6 +199,8 @@ class SuspiciousResampleTests(unittest.TestCase):
             old, ew_samples=10, workers=1, solve_table=lambda hands: table)
         new_case = expanded['groups'][0]['deals'][0]
         self.assertEqual(expanded['budget']['ew_samples'], 10)
+        self.assertEqual(old['wrong_game_rule'], RULE_ID)
+        self.assertEqual(expanded['wrong_game_rule'], RULE_ID)
         self.assertEqual(expanded['summary']['dds_boards'], 10)
         self.assertEqual(expanded['groups'][0]['source_checks'][0]['new_boards'], 10)
         self.assertEqual(new_case['id'], old_case['id'])

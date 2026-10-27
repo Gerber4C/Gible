@@ -107,14 +107,15 @@ deal from another run (for example, `seed 23, #0042`). The JSON `id` and
 A comparable
 class has exactly the same North and South lengths in each named suit, and
 the full range of each player's raw HCP and Kaplan–Rubens score is at most 2.
-For the displayed final contract, a DDS failure rate above 50% is flagged.
+For the displayed final contract, a DDS failure rate above 60% is flagged.
 If the auction stopped below game, small slam, or grand slam, a DDS rate
 above 30% for any makeable contract at that level is flagged. A **wrong game**
 warning applies only to an actual `3NT`, `4S`, `4H`, `5D`, or `5C` contract:
-the selected game's success odds divided by the best alternative game's
-success odds must be below 0.8. Success odds are `success / failure` across
-all DDS boards in the class; alternative-game rates are listed separately and
-can overlap. A class
+the selected game's completion probability divided by the best alternative
+game's completion probability must be below 0.8, and the best alternative
+itself must clear 40%. Completion probabilities are `success / all boards`
+across all DDS boards in the class; alternative-game rates are listed
+separately and can overlap. A class
 with fewer than `--min-class-boards` DDS boards or
 `--min-class-pairs` distinct North/South hands is marked insufficient rather
 than suspicious. Pairs within each quota cell are generated with the same
@@ -178,18 +179,19 @@ E/W completions per pair, and a reproducible seed. The default is ten E/W
 completions. Progress remains visible while the other pages are usable;
 completed reports are saved under `reports/block_scans/`.
 
-The four finding filters are: **Block**, no supported next call; **丢**, a game
+The four finding filters are: **TD**, no supported next call; **丢**, a game
 or slam is available more than 30% of comparable DDS boards but was not bid;
-**宕**, the chosen contract fails on more than 50%; and **错**, the selected
-game's success odds divided by the best alternative game's success odds is
-below 0.8. Success odds are `success / failure` across all comparable boards.
-Comparable hands have the same named-suit shapes and each seat's complete HCP
-and K–R spans stay within two points. The browser omits bulky DDS tables,
-merges findings from the same N/S cell, and shows the sampled N/S pairs against
-their E/W completions in a horizontally scrollable matrix. The selected
-auction is rendered in rows of four calls, alongside numbered N/S hands,
-warning rates, alternative games, and the number of DDS boards. The saved JSON
-and standalone HTML retain full evidence.
+**宕**, the chosen contract fails on more than 60%; and **错**, the chosen
+game's completion probability divided by the best alternative game's
+completion probability is below 0.8 while the best alternative itself clears
+40%. Comparable hands have the same named-suit shapes and each seat's complete
+HCP and K–R spans stay within two points. The browser omits bulky DDS tables,
+groups findings by sampling cell, and shows every N/S pair of a selected cell
+in a vertical rail; picking one pair shows that pair's exact hands, auction,
+diagnostics, warnings, and its own E/W outcome strip marked MAKE, SET, and
+LOSE. The selected auction is rendered in rows of four calls, alongside
+numbered N/S hands, warning rates, alternative games, and the number of DDS
+boards. The saved JSON and standalone HTML retain full evidence.
 
 ## Re-sample small suspicious classes
 

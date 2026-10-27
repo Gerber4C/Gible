@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 import threading
 import uuid
+from collections.abc import Mapping
 from datetime import datetime, timezone
 from pathlib import Path
 
 from .block_report_viewer import render_html
 from .coverage_scan import COVERAGE_SHAPES, scan_coverage
 from .loader import load_profile
+from .outcome_metrics import RULE_ID, board_result, reclassify_analysis
 
 
 REPORT_ROOT = Path(__file__).resolve().parents[2] / 'reports' / 'block_scans'
@@ -22,6 +25,18 @@ FLAG_CATEGORY = {
     'missed_grand_slam': 'missed',
     'wrong_game': 'wrong',
 }
+
+
+def _json_safe(value):
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, tuple):
+        return [_json_safe(item) for item in value]
+    return value
 
 
 def scan_options(request: dict) -> dict:
@@ -53,58 +68,144 @@ def scan_options(request: dict) -> dict:
     return settings
 
 
-def project_report(report: dict, report_id: str) -> dict:
-    """Strip DDS tables while keeping every actionable numbered case."""
-    if report.get('schema_version') != 2 or not isinstance(report.get('cases'), list):
-        raise ValueError('Expected a coverage scan report')
-    cases = []
-    counts = {'block': 0, 'missed': 0, 'down': 0, 'wrong': 0}
-    all_cases = sorted([*report['cases'], *report.get('complete_cases', [])],
-                       key=lambda item: item['id'])
-    for case in all_cases:
-        flags = case.get('analysis', {}).get('flags', ())
-        categories = (['block'] if 'blocked' in case else
-                      sorted({FLAG_CATEGORY[flag] for flag in flags
-                              if flag in FLAG_CATEGORY}))
-        if not categories:
-            continue
-        for category in categories:
-            counts[category] += 1
-        analysis = case.get('analysis', {})
+def _valid_hcp(value) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 37
+
+
+def _valid_shape(value) -> bool:
+    return (isinstance(value, (list, tuple)) and len(value) == 4
+            and all(isinstance(length, int) and not isinstance(length, bool)
+                    and length >= 0 for length in value)
+            and sum(value) == 13)
+
+
+def _cell_identity(case: dict) -> tuple[str, int | None, list[int] | None, int | None, bool]:
+    cell = case.get('coverage_cell')
+    if isinstance(cell, dict):
+        hcp = cell.get('target_hcp')
+        shape = cell.get('base_shape')
+        shape_index = cell.get('base_shape_index')
+        pair_slot = cell.get('pair_slot')
+        if (_valid_hcp(hcp) and _valid_shape(shape)
+                and isinstance(shape_index, int) and not isinstance(shape_index, bool)
+                and shape_index >= 0
+                and isinstance(pair_slot, int) and not isinstance(pair_slot, bool)
+                and pair_slot >= 0):
+            return f'{hcp}:{shape_index}', hcp, list(shape), pair_slot, False
+    hcp = case.get('south_hcp')
+    shape = case.get('south_shape')
+    if _valid_hcp(hcp) and _valid_shape(shape):
+        shape = list(shape)
+        return f"legacy:{hcp}:{'-'.join(map(str, shape))}", hcp, shape, None, False
+    return f"legacy-fallback:{case.get('id')}", (
+        hcp if _valid_hcp(hcp) else None), (
+        list(shape) if _valid_shape(shape) else None), None, True
+
+
+def _pair_projection(case: dict, status: str, pair_slot: int | None) -> dict:
+    analysis = (reclassify_analysis(case.get('contract'), case.get('analysis') or {})
+                if status == 'complete' and isinstance(case.get('contract'), str)
+                else dict(case.get('analysis') or {}))
+    flags = list(analysis.get('flags') or ()) if status == 'complete' else []
+    categories = (['block'] if status == 'blocked' else
+                  sorted({FLAG_CATEGORY[flag] for flag in flags
+                          if flag in FLAG_CATEGORY}))
+    hands = case.get('hands') or {}
+    pair = {
+        'id': case.get('id'), 'pair_slot': pair_slot, 'status': status,
+        'categories': categories,
+        'hands': {seat: hands[seat] for seat in 'ns' if seat in hands},
+        'north_hcp': case.get('north_hcp'), 'south_hcp': case.get('south_hcp'),
+        'north_kr': case.get('north_kr'), 'south_kr': case.get('south_kr'),
+        'north_shape': case.get('north_shape'), 'south_shape': case.get('south_shape'),
+        'auction': case.get('auction'), 'calls': case.get('calls'),
+    }
+    if status == 'blocked':
+        pair['blocked'] = case.get('blocked')
+    elif status == 'complete':
         contract = case.get('contract')
         declarer = case.get('declarer')
-        ew_results = []
-        if (isinstance(contract, str) and len(contract) >= 2
-                and declarer in 'ns' and isinstance(case.get('dds_tables'), list)):
-            level = int(contract[0])
-            strain = 'NT' if contract[1:] == 'NT' else contract[1]
-            for table in case['dds_tables']:
-                tricks = table.get(strain, {}).get(declarer)
-                ew_results.append('made' if isinstance(tricks, int) and tricks >= level + 6
-                                  else 'down')
-        cases.append({
-            'id': case['id'], 'categories': categories,
-            'hands': {seat: case['hands'][seat] for seat in 'ns'},
-            'north_hcp': case['north_hcp'], 'south_hcp': case['south_hcp'],
-            'north_kr': case['north_kr'], 'south_kr': case['south_kr'],
-            'north_shape': case['north_shape'], 'south_shape': case['south_shape'],
-            'auction': case['auction'], 'calls': case['calls'],
-            'contract': contract, 'declarer': declarer, 'ew_results': ew_results,
-            'blocked': case.get('blocked'), 'flags': list(flags),
-            'rates': analysis.get('rates', {}),
+        tables = case.get('dds_tables')
+        results = []
+        if (isinstance(contract, str) and declarer in ('n', 's')
+                and isinstance(tables, list)):
+            results = [board_result(contract, declarer, table) for table in tables]
+        pair.update({
+            'contract': contract, 'declarer': declarer, 'ew_results': results,
+            'flags': flags, 'rates': analysis.get('rates', {}),
             'alternative_game_rates': analysis.get('alternative_game_rates', {}),
             'wrong_game_comparison': analysis.get('wrong_game_comparison', {}),
             'class_pairs': analysis.get('class_pairs'),
             'dds_boards': analysis.get('dds_boards'),
         })
-    return {
+    return pair
+
+
+def project_report(report: dict, report_id: str) -> dict:
+    """Project actionable sampling cells while retaining all sibling pairs."""
+    if not isinstance(report, Mapping) or report.get('schema_version') != 2:
+        raise ValueError('Expected a coverage scan report')
+    budget = report.get('budget')
+    if not isinstance(budget, Mapping):
+        raise ValueError('Coverage scan budget must be a mapping')
+    collections = {
+        'cases': report.get('cases'),
+        'complete_cases': report.get('complete_cases', []),
+        'limit_cases': report.get('limit_cases', []),
+    }
+    if any(not isinstance(items, list)
+           or any(not isinstance(item, Mapping) for item in items)
+           for items in collections.values()):
+        raise ValueError('Coverage scan cases must be lists of mappings')
+    expected = budget.get('pairs_per_cell', 1)
+    if not isinstance(expected, int) or isinstance(expected, bool) or expected < 1:
+        expected = 1
+    grouped = {}
+    records = [*((case, 'blocked') for case in collections['cases']),
+               *((case, 'complete') for case in collections['complete_cases']),
+               *((case, 'limit') for case in collections['limit_cases'])]
+    for case, status in sorted(records, key=lambda item: item[0].get('id', 0)):
+        group_id, south_hcp, south_shape, pair_slot, fallback = _cell_identity(case)
+        group = grouped.setdefault(group_id, {
+            'id': group_id, 'south_hcp': south_hcp, 'south_shape': south_shape,
+            'fallback': fallback, 'pairs': [],
+        })
+        group['pairs'].append(_pair_projection(case, status, pair_slot))
+
+    groups = []
+    counts = {'block': 0, 'missed': 0, 'down': 0, 'wrong': 0}
+    suspicious = 0
+    for group in grouped.values():
+        pairs = sorted(group['pairs'], key=lambda pair: (
+            pair['pair_slot'] is None,
+            pair['pair_slot'] if pair['pair_slot'] is not None else pair['id']))
+        if pairs and all(pair['pair_slot'] is None for pair in pairs):
+            for slot, pair in enumerate(pairs):
+                pair['pair_slot'] = slot
+        warning_counts = {category: sum(category in pair['categories'] for pair in pairs)
+                          for category in counts}
+        if not any(warning_counts.values()) and not group['fallback']:
+            continue
+        for category, count in warning_counts.items():
+            counts[category] += count
+        suspicious += sum(pair['status'] == 'complete' and bool(pair['categories'])
+                          for pair in pairs)
+        groups.append({
+            'id': group['id'], 'south_hcp': group['south_hcp'],
+            'south_shape': group['south_shape'], 'warning_counts': warning_counts,
+            'actual_pair_count': len(pairs), 'expected_pair_count': expected,
+            'incomplete': len(pairs) != expected, 'pairs': pairs,
+        })
+    summary = dict(report.get('summary') or {})
+    summary['suspicious'] = suspicious
+    return _json_safe({
         'id': report_id, 'profile': report.get('profile'),
         'seed': report.get('seed'), 'filters': report.get('filters'),
-        'budget': report.get('budget'), 'summary': report.get('summary'),
-        'wrong_game_rule': report.get('wrong_game_rule', 'legacy_joint_failure_30pct'),
-        'counts': counts, 'cases': cases,
+        'budget': report.get('budget'), 'summary': summary,
+        'wrong_game_rule': RULE_ID,
+        'counts': counts, 'groups': groups,
         'method_note': report.get('method_note'),
-    }
+    })
 
 
 def _report_path(report_id: str, root: Path) -> Path:
@@ -132,7 +233,9 @@ def list_reports(root: Path = REPORT_ROOT) -> list[dict]:
             continue
         try:
             report = json.loads(path.read_text(encoding='utf-8'))
-            if report.get('schema_version') != 2 or not isinstance(report.get('cases'), list):
+            if (not isinstance(report, Mapping)
+                    or report.get('schema_version') != 2
+                    or not isinstance(report.get('cases'), list)):
                 continue
             projected = project_report(report, path.name)
         except (OSError, ValueError, KeyError, TypeError):

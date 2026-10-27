@@ -3,6 +3,7 @@ import json
 import re
 
 from engine.suspicious_resample_viewer import render_html
+from engine.outcome_metrics import RULE_ID
 
 
 class SuspiciousResampleViewerTests(unittest.TestCase):
@@ -41,10 +42,15 @@ class SuspiciousResampleViewerTests(unittest.TestCase):
         self.assertIn('打错局', html)
         self.assertIn('alternative_game_rates', html)
         self.assertIn('const wrongGame=flag==="wrong_game";', html)
-        self.assertIn('"OR "+Number(v).toFixed(2)', html)
+        self.assertIn('"RATIO "+Number(v).toFixed(2)', html)
         self.assertIn('const track=(v,kind)=>wrongGame?"":', html)
         self.assertIn('track(old,"")', html)
         self.assertIn('track(now,"fresh")', html)
+        self.assertIn('success probability ratio', html)
+        self.assertIn('SET > 60%', html)
+        self.assertIn(RULE_ID, html)
+        self.assertNotIn('odds ratio', html)
+        self.assertNotIn('Down > 50%', html)
 
     def test_shows_source_comparison_and_numbered_fresh_deals_safely(self):
         report = {

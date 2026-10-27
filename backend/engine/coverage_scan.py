@@ -22,6 +22,14 @@ from .deal_sampler import _hand_from_cards
 from .dds_adapter import calculate_available_table
 from .hand_quality import assess_quality
 from .legality import last_contract_state
+from .outcome_metrics import (
+    GAME_TARGETS,
+    RULE_ID,
+    available_level,
+    classify_rates,
+    game_success_ratio,
+    reached_game,
+)
 from .selector import choose_bid
 from .simulator import simulate_auction
 from .training_deals import _compact, _deal
@@ -149,76 +157,9 @@ def hand_kr(hand: Hand) -> float:
     return assess_quality(hand)['kr_points']
 
 
-def _available_level(table: Mapping, category: str) -> bool:
-    if category == 'game':
-        return (max(table['NT'][seat] for seat in 'ns') >= 9
-                or any(max(table[strain][seat] for seat in 'ns') >= 10 for strain in 'HS')
-                or any(max(table[strain][seat] for seat in 'ns') >= 11 for strain in 'DC'))
-    target = 12 if category == 'small_slam' else 13
-    return any(max(table[strain][seat] for seat in 'ns') >= target
-               for strain in ('S', 'H', 'D', 'C', 'NT'))
-
-
-def _reached_game(contract: str) -> bool:
-    level, strain = int(contract[0]), contract[1:]
-    return (level >= 6 or (strain == 'NT' and level >= 3)
-            or (strain in ('H', 'S') and level >= 4)
-            or (strain in ('C', 'D') and level >= 5))
-
-
-GAME_TARGETS = {'3NT': ('NT', 9), '4S': ('S', 10), '4H': ('H', 10),
-                '5D': ('D', 11), '5C': ('C', 11)}
-
-
-def wrong_game_rates(contract: str, declarer: str,
-                     boards: list[Mapping]) -> tuple[float | None, dict[str, float]]:
-    """Return the best alternative's success-odds ratio and success rates.
-
-    The selected game's odds are compared with each alternative game's odds
-    across all sampled boards. The smallest selected/alternative ratio is
-    returned, so a selected game is flagged when any other game is materially
-    more successful. Alternative rates may overlap because multiple games can
-    make on one board.
-    """
-    if contract not in GAME_TARGETS or not boards:
-        return None, {}
-    chosen_strain, chosen_tricks = GAME_TARGETS[contract]
-    alternatives = {name: target for name, target in GAME_TARGETS.items()
-                    if name != contract}
-    counts = dict.fromkeys(alternatives, 0)
-    selected_successes = 0
-    for table in boards:
-        if table[chosen_strain][declarer] >= chosen_tricks:
-            selected_successes += 1
-        for name, (strain, tricks) in alternatives.items():
-            if max(table[strain][seat] for seat in 'ns') >= tricks:
-                counts[name] += 1
-    denominator = len(boards)
-    if denominator == 0:
-        return None, {name: 0.0 for name in alternatives}
-
-    selected_rate = selected_successes / denominator
-    alternative_rates = {name: count / denominator
-                         for name, count in counts.items()}
-
-    def odds(rate: float) -> float:
-        if rate <= 0:
-            return 0.0
-        if rate >= 1:
-            return float('inf')
-        return rate / (1 - rate)
-
-    selected_odds = odds(selected_rate)
-    ratios = []
-    for rate in alternative_rates.values():
-        alternative_odds = odds(rate)
-        if alternative_odds == 0:
-            continue
-        if selected_odds == float('inf') and alternative_odds == float('inf'):
-            ratios.append(1.0)
-        else:
-            ratios.append(selected_odds / alternative_odds)
-    return (min(ratios) if ratios else None), alternative_rates
+_available_level = available_level
+_reached_game = reached_game
+wrong_game_rates = game_success_ratio
 
 
 def classify_suspicious(
@@ -260,25 +201,19 @@ def classify_suspicious(
     declarer = subject['declarer']
     counts = {
         'contract_failure': sum(table[strain][declarer] < level + 6 for table in boards),
-        'missed_game': sum(_available_level(table, 'game') for table in boards),
-        'missed_small_slam': sum(_available_level(table, 'small_slam') for table in boards),
-        'missed_grand_slam': sum(_available_level(table, 'grand_slam') for table in boards),
+        'missed_game': sum(available_level(table, 'game') for table in boards),
+        'missed_small_slam': sum(available_level(table, 'small_slam') for table in boards),
+        'missed_grand_slam': sum(available_level(table, 'grand_slam') for table in boards),
     }
     rates = {name: count / len(boards) for name, count in counts.items()}
-    rates['wrong_game'], alternative_rates = wrong_game_rates(
+    rates['wrong_game'], alternative_rates = game_success_ratio(
         subject['contract'], declarer, boards)
     result.update(status='assessed', rates=rates,
                   alternative_game_rates=alternative_rates)
-    if rates['contract_failure'] > .5:
-        result['flags'].append('contract_failure')
-    if not _reached_game(subject['contract']) and rates['missed_game'] > .3:
-        result['flags'].append('missed_game')
-    if rates['wrong_game'] is not None and rates['wrong_game'] < .8:
-        result['flags'].append('wrong_game')
-    if level < 6 and rates['missed_small_slam'] > .3:
-        result['flags'].append('missed_small_slam')
-    if level < 7 and rates['missed_grand_slam'] > .3:
-        result['flags'].append('missed_grand_slam')
+    result['flags'] = classify_rates(
+        subject['contract'], rates, alternative_rates,
+        existing_flags=result['flags'],
+    )
     return result
 
 
@@ -345,6 +280,7 @@ def scan_coverage(
 
     cases = []
     complete_cases = []
+    limit_cases = []
     class_records = []
     tables_by_id = {}
     points = Counter()
@@ -405,6 +341,12 @@ def scan_coverage(
             'north_shape': hand_shape(hands['n']), 'south_shape': south_shape,
             'calls': list(simulation.calls), 'auction': simulation.compact_sequence(),
             'history': _history(simulation),
+            'coverage_cell': {
+                'target_hcp': hcp,
+                'base_shape_index': shape_index,
+                'base_shape': list(base_shape),
+                'pair_slot': slot,
+            },
         }
         if simulation.status == 'blocked':
             case.update(blocked=simulation.blocked, review_status='unreviewed')
@@ -424,6 +366,9 @@ def scan_coverage(
             case['dds_tables'] = boards
             summary['dds_boards'] += len(boards)
             complete_cases.append(case)
+        elif simulation.status == 'limit':
+            case['status'] = 'limit'
+            limit_cases.append(case)
         if progress is not None:
             progress(summary.copy(), len(schedule))
 
@@ -442,6 +387,7 @@ def scan_coverage(
         'schema_version': 2,
         'profile': {'id': profile.id, 'name': profile.name, 'version': profile.version},
         'seed': seed,
+        'wrong_game_rule': RULE_ID,
         'filters': {'dealer': 'n', 'opening': '1N', 'vulnerability': 'none',
                     'hcp_targets': list(hcp_targets), 'shapes': [list(s) for s in shapes]},
         'budget': {'pairs_per_cell': pairs_per_cell, 'ew_samples': ew_samples,
@@ -464,6 +410,7 @@ def scan_coverage(
         ],
         'cases': cases,
         'complete_cases': complete_cases,
+        'limit_cases': limit_cases,
         'suspicious_cases': suspicious_cases,
         'solver': 'DDS via available adapter',
         'method_note': ('DDS double-dummy completion is a test proxy, not an '
@@ -492,7 +439,7 @@ def main(argv: list[str] | None = None) -> int:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n',
                            encoding='utf-8')
-    print(f"{report['summary']['pairs']} pairs; {report['summary']['blocked']} blocked; "
+    print(f"{report['summary']['pairs']} pairs; {report['summary']['blocked']} TD calls; "
           f"{report['summary']['suspicious']} suspicious; "
           f"{report['summary']['dds_boards']} DDS boards. Report: {args.output}")
     return 0

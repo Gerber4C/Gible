@@ -5,6 +5,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from engine.block_report_viewer import group_suspicious_cases, main, render_html
+from engine.outcome_metrics import RULE_ID
 
 
 class BlockReportViewerTests(unittest.TestCase):
@@ -48,7 +49,7 @@ class BlockReportViewerTests(unittest.TestCase):
             source.write_text(json.dumps(self.report()), encoding='utf-8')
             self.assertEqual(main([str(source)]), 0)
             self.assertTrue(source.with_suffix('.html').exists())
-            self.assertIn('Block report', source.with_suffix('.html').read_text(encoding='utf-8'))
+            self.assertIn('TD report', source.with_suffix('.html').read_text(encoding='utf-8'))
 
     def test_empty_cases_are_valid(self):
         report = self.report()
@@ -81,6 +82,41 @@ class BlockReportViewerTests(unittest.TestCase):
         self.assertEqual(json.loads(payload)['suspicious_cases'][0]['contract'], '1NT')
         self.assertIn('data-mode="suspicious"', html)
 
+    def test_coverage_viewer_reclassifies_stale_complete_cases_without_mutating_source(self):
+        report = self.report()
+        report['schema_version'] = 2
+        stale = {
+            'id': 2, 'north_shape': [4, 3, 3, 3],
+            'south_shape': [6, 3, 2, 2], 'north_hcp': 16,
+            'south_hcp': 11, 'north_kr': 16.0, 'south_kr': 12.0,
+            'contract': '4S', 'declarer': 'n', 'auction': '1NP4SPPP',
+            'analysis': {
+                'flags': ['contract_failure', 'wrong_game', 'missed_small_slam'],
+                'rates': {'contract_failure': .6, 'wrong_game': float('inf'),
+                          'missed_small_slam': .4},
+                'alternative_game_rates': {'3NT': .5},
+            },
+        }
+        report['complete_cases'] = [stale]
+        report['suspicious_cases'] = [stale]
+        report['summary'] = {'suspicious': 99}
+
+        html = render_html(report)
+        embedded = json.loads(re.search(r'const REPORT = (.*?);\n', html).group(1))
+
+        self.assertEqual(report['summary']['suspicious'], 99)
+        self.assertEqual(report['complete_cases'][0]['analysis']['flags'],
+                         ['contract_failure', 'wrong_game', 'missed_small_slam'])
+        self.assertEqual(embedded['wrong_game_rule'], RULE_ID)
+        self.assertEqual(embedded['summary']['suspicious'], 1)
+        self.assertEqual(embedded['complete_cases'][0]['analysis']['flags'],
+                         ['missed_small_slam'])
+        self.assertEqual(embedded['suspicious_cases'], embedded['complete_cases'])
+        self.assertIn('success probability ratio', html)
+        self.assertIn('SET > 60%', html)
+        self.assertNotIn('odds ratio', html)
+        self.assertNotIn('Down > 50%', html)
+
     def test_suspicious_groups_require_pairwise_shape_hcp_and_kr_match(self):
         base = {'north_shape': [4, 3, 3, 3], 'south_shape': [6, 3, 2, 2],
                 'north_hcp': 16, 'south_hcp': 11,
@@ -99,9 +135,12 @@ class BlockReportViewerTests(unittest.TestCase):
         report['schema_version'] = 2
         case = {'id': 1, 'north_shape': [4, 3, 3, 3],
                 'south_shape': [6, 3, 2, 2], 'north_hcp': 16,
-                'south_hcp': 11, 'north_kr': 16.0, 'south_kr': 12.0}
-        report['complete_cases'] = []
-        report['suspicious_cases'] = [case, {**case, 'id': 2, 'north_hcp': 17}]
+                'south_hcp': 11, 'north_kr': 16.0, 'south_kr': 12.0,
+                'contract': '4S',
+                'analysis': {'flags': ['missed_small_slam'],
+                             'rates': {'missed_small_slam': .5}}}
+        report['complete_cases'] = [case, {**case, 'id': 2, 'north_hcp': 17}]
+        report['suspicious_cases'] = []
         html = render_html(report)
         payload = re.search(r'const REPORT = (.*?);\n', html).group(1)
         self.assertEqual(json.loads(payload)['suspicious_groups'], [[1, 2]])

@@ -18,26 +18,43 @@ from .cards import Hand
 from .block_report_viewer import group_suspicious_cases
 from .constrained_deals import ConstrainedDealSampler, HandConstraints, _compact
 from .coverage_scan import (
-    _available_level, _contract, _history, _reached_game, complete_opponents,
-    wrong_game_rates,
+    _contract, _history, complete_opponents,
 )
 from .dds_adapter import available_solver_info, calculate_available_table
 from .hand_quality import assess_quality
+from .outcome_metrics import (
+    RULE_ID, available_level, classify_rates, game_success_ratio,
+    reached_game, reclassify_analysis,
+)
 from .selector import choose_bid
 from .simulator import simulate_auction
 
 
-THRESHOLDS = {'contract_failure': .5, 'missed_game': .3,
-              'missed_small_slam': .3, 'missed_grand_slam': .3,
-              'wrong_game': .8}
+def _retained_flags(contract: str, original_flags: list[str], rates: Mapping) -> list[str]:
+    current = set(classify_rates(
+        contract, rates, rates.get('alternative_game_rates') or {},
+    ))
+    return [flag for flag in original_flags if flag in current]
 
 
-def _flag_above_threshold(flag: str, rate: float | None) -> bool:
-    if rate is None:
-        return False
-    if flag == 'wrong_game':
-        return rate < THRESHOLDS[flag]
-    return rate > THRESHOLDS[flag]
+def _current_suspicious_cases(source: Mapping) -> list[Mapping]:
+    complete_cases = source.get('complete_cases')
+    if complete_cases is None:
+        return list(source['suspicious_cases'])
+    if not isinstance(complete_cases, list):
+        raise ValueError('source complete_cases must be a list')
+    current = []
+    for original in complete_cases:
+        if not isinstance(original, Mapping):
+            raise ValueError('source complete_cases must contain mappings')
+        case = dict(original)
+        analysis = case.get('analysis') or {}
+        if not isinstance(analysis, Mapping):
+            raise ValueError('source analysis must be a mapping')
+        case['analysis'] = reclassify_analysis(case.get('contract'), analysis)
+        if case['analysis'].get('flags'):
+            current.append(case)
+    return current
 
 
 def constraints_for_group(members: list[Mapping]) -> tuple[HandConstraints, HandConstraints]:
@@ -65,14 +82,14 @@ def constraints_for_group(members: list[Mapping]) -> tuple[HandConstraints, Hand
 def _rates_for_contract(contract: str, declarer: str, boards: list[Mapping]) -> dict:
     level = int(contract[0])
     strain = contract[1:]
-    wrong_rate, alternative_rates = wrong_game_rates(contract, declarer, boards)
+    wrong_rate, alternative_rates = game_success_ratio(contract, declarer, boards)
     return {
         'contract_failure': sum(table[strain][declarer] < level + 6 for table in boards) / len(boards),
-        'missed_game': (sum(_available_level(table, 'game') for table in boards) / len(boards)
-                        if not _reached_game(contract) else None),
-        'missed_small_slam': (sum(_available_level(table, 'small_slam') for table in boards) / len(boards)
+        'missed_game': (sum(available_level(table, 'game') for table in boards) / len(boards)
+                        if not reached_game(contract) else None),
+        'missed_small_slam': (sum(available_level(table, 'small_slam') for table in boards) / len(boards)
                               if level < 6 else None),
-        'missed_grand_slam': (sum(_available_level(table, 'grand_slam') for table in boards) / len(boards)
+        'missed_grand_slam': (sum(available_level(table, 'grand_slam') for table in boards) / len(boards)
                               if level < 7 else None),
         'wrong_game': wrong_rate,
         'alternative_game_rates': alternative_rates,
@@ -101,8 +118,9 @@ def resample_groups(
     if max_draws_per_group < pairs_per_group:
         raise ValueError('max_draws_per_group must be at least pairs_per_group')
 
-    originals = {item['id']: item for item in source['suspicious_cases']}
-    source_groups = group_suspicious_cases(source['suspicious_cases'])
+    suspicious_cases = _current_suspicious_cases(source)
+    originals = {item['id']: item for item in suspicious_cases}
+    source_groups = group_suspicious_cases(suspicious_cases)
     rng = random.Random(seed)
     groups = []
     skipped = 0
@@ -200,8 +218,8 @@ def resample_groups(
                 'original_rates': {flag: member['analysis']['rates'].get(flag)
                                    for flag in old_flags},
                 'new_rates': {flag: new_rates.get(flag) for flag in old_flags},
-                'retained_flags': [flag for flag in old_flags
-                                   if _flag_above_threshold(flag, new_rates.get(flag))],
+                'retained_flags': _retained_flags(
+                    member['contract'], old_flags, new_rates),
             })
         groups.append(group)
         if progress is not None:
@@ -209,6 +227,7 @@ def resample_groups(
 
     return {
         'schema_version': 1, 'kind': 'suspicious_resample',
+        'wrong_game_rule': RULE_ID,
         'source_seed': source.get('seed'), 'seed': seed,
         'profile': {'id': profile.id, 'name': profile.name,
                     'version': profile.version},
@@ -320,8 +339,8 @@ def extend_ew_samples(
             check['new_boards'] = len(all_boards)
             check['new_rates'] = {flag: new_rates.get(flag)
                                   for flag in check['original_flags']}
-            check['retained_flags'] = [flag for flag in check['original_flags']
-                                       if _flag_above_threshold(flag, new_rates.get(flag))]
+            check['retained_flags'] = _retained_flags(
+                check['contract'], check['original_flags'], new_rates)
     updated['budget']['ew_samples'] = ew_samples
     updated['summary']['dds_boards'] = sum(
         group['summary']['dds_boards'] for group in updated['groups'])
@@ -368,7 +387,7 @@ def main(argv: list[str] | None = None) -> int:
             max_draws_per_group=args.max_draws_per_group,
             progress=lambda group, total: print(
                 f'{group["id"]}/{total}: {group["summary"]["pairs"]} pairs, '
-                f'{group["summary"]["blocked"]} blocked, '
+                f'{group["summary"]["blocked"]} TD calls, '
                 f'{group["summary"]["dds_boards"]} DDS boards', flush=True),
         )
     args.output.parent.mkdir(parents=True, exist_ok=True)

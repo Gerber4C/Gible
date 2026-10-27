@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Block report · Gible</title>
+  <title>TD report · Gible</title>
   <style>
     :root {
       color-scheme: light;
@@ -169,10 +169,10 @@
 </head>
 <body>
   <div class="shell">
-    <aside class="rail" aria-label="阻塞进程列表">
+    <aside class="rail" aria-label="TD 进程列表">
       <div class="brand"><div class="brand-mark">G</div><div><div class="brand-name">Gible</div><div class="brand-sub">Bidding audit deck</div></div></div>
-      <div id="mode-switch" class="mode-switch" hidden><button class="active" type="button" data-mode="blocked">阻塞</button><button type="button" data-mode="suspicious">可疑</button><button type="button" data-mode="all">全部牌例</button></div>
-      <div class="rail-heading"><strong id="rail-title">阻塞进程</strong><span id="point-total"></span></div>
+      <div id="mode-switch" class="mode-switch" hidden><button class="active" type="button" data-mode="blocked">TD</button><button type="button" data-mode="suspicious">可疑</button><button type="button" data-mode="all">全部牌例</button></div>
+      <div class="rail-heading"><strong id="rail-title">TD 进程</strong><span id="point-total"></span></div>
       <div class="search-wrap"><input id="search" class="search" type="search" placeholder="搜索牌号、叫牌或座位" aria-label="搜索牌例"></div>
       <div id="stratum-segments" class="segments" role="group" aria-label="样本类型">
         <button class="segment active" data-stratum="all" type="button">全部</button>
@@ -183,7 +183,7 @@
       <div id="rail-foot" class="rail-foot">本报告保留原始发牌种子与每副牌的完整叫牌轨迹。稀有层是人为加权的测试样本。</div>
     </aside>
     <main class="workspace">
-      <div class="title-row"><div><div class="kicker">Gible / Auction diagnostics</div><h1 id="report-title">阻塞牌例图谱</h1><p id="profile-line" class="profile-line"></p></div></div>
+      <div class="title-row"><div><div class="kicker">Gible / Auction diagnostics</div><h1 id="report-title">TD 牌例图谱</h1><p id="profile-line" class="profile-line"></p></div></div>
       <div id="summary" class="summary" aria-label="扫描摘要"></div>
       <div id="empty" class="empty" hidden></div>
       <article id="case-detail" class="case-detail" data-testid="case-detail" hidden>
@@ -192,10 +192,10 @@
           <section class="panel"><div class="panel-heading"><h3>四家手牌</h3><span>♠  ♥  ♦  ♣</span></div><div id="board" class="board" data-testid="board"></div></section>
           <div class="right-stack">
             <section class="panel"><div class="panel-heading"><h3>叫牌进程</h3><span id="auction-count"></span></div><div id="auction-grid" class="auction-grid" data-testid="auction-grid"></div></section>
-            <section class="panel"><div class="panel-heading"><h3 id="diagnostic-heading">阻塞诊断</h3><span id="blocked-seat"></span></div><div id="diagnostics" class="diagnostics"></div></section>
+            <section class="panel"><div class="panel-heading"><h3 id="diagnostic-heading">TD 诊断</h3><span id="blocked-seat"></span></div><div id="diagnostics" class="diagnostics"></div></section>
           </div>
         </div>
-        <p id="report-note" class="note">这是一份测试证据：阻塞不等于该牌应叫某一口。下一步须核对体系文件，再决定如何补规则。</p>
+        <p id="report-note" class="note">这是一份测试证据：TD 不等于该牌应叫某一口。下一步须核对体系文件，再决定如何补规则。</p>
       </article>
     </main>
   </div>
@@ -285,9 +285,9 @@
           byId('summary').replaceChildren(
             metric(summary.pairs ?? 0, '已发牌'),
             metric(summary.complete ?? 0, '完成叫牌'),
-            metric(summary.blocked ?? 0, '阻塞牌例', true),
+            metric(summary.blocked ?? 0, 'TD 牌例', true),
             metric(summary.limit ?? 0, '达到叫牌上限'),
-            metric(points.length, '不同阻塞进程')
+            metric(points.length, '不同 TD 进程')
           );
           return;
         }
@@ -297,11 +297,11 @@
           byId('mode-switch').hidden = false;
           byId('stratum-segments').hidden = true;
           byId('report-title').textContent = '叫牌扫描图谱';
-          byId('rail-foot').textContent = '北家统一开叫 1NT；南家按点力和牌型配额发牌。可疑率由 DDS 双明手在同类牌中估计，并非实战完成率。';
+          byId('rail-foot').textContent = '北家统一开叫 1NT；南家按点力和牌型配额发牌。警报规则：SET > 60%；只有 best-other > 40% 才评估 chosen / best-other success probability ratio < 0.8。';
           byId('summary').replaceChildren(
             metric(summary.pairs ?? 0, '南北牌组'),
             metric(`${limits.cells?.length ?? 0} / ${(REPORT.filters?.hcp_targets?.length || 0) * (REPORT.filters?.shapes?.length || 0)}`, '点力 × 牌型格子'),
-            metric(summary.blocked ?? 0, '阻塞牌组', true),
+            metric(summary.blocked ?? 0, 'TD 牌组', true),
             metric(summary.complete ?? 0, '完成叫牌'),
             metric(summary.suspicious ?? 0, '可疑牌例', true),
             metric(suspiciousPoints.length, '可疑类别'),
@@ -313,15 +313,15 @@
         byId('summary').replaceChildren(
           metric(summary.attempts ?? 0, '发牌尝试'),
           metric(summary.auction_matches ?? 0, '符合条件的叫牌'),
-          metric(summary.blocked ?? 0, '阻塞牌例', true),
-          metric(points.length, '不同阻塞进程')
+          metric(summary.blocked ?? 0, 'TD 牌例', true),
+          metric(points.length, '不同 TD 进程')
         );
         const rare = summary.strata?.rare_hcp;
         if (rare) byId('summary').append(metric(`${rare.attempts ?? 0} / ${rare.auction_matches ?? 0}`, '稀有层尝试 / 匹配'));
       }
       function renderPoints() {
         const shown = visiblePoints();
-        byId('rail-title').textContent = state.mode === 'all' ? '全部牌例' : state.mode === 'suspicious' ? '可疑类别' : '阻塞进程';
+        byId('rail-title').textContent = state.mode === 'all' ? '全部牌例' : state.mode === 'suspicious' ? '可疑类别' : 'TD 进程';
         byId('point-total').textContent = `${shown.length} / ${activePoints().length}`;
         if (!shown.some(point => keyOf(point) === state.selected)) {
           state.selected = shown.length ? keyOf(shown[0]) : null;
@@ -336,7 +336,7 @@
         }
         const list = byId('point-list');
         list.replaceChildren();
-        if (!shown.length) list.append(elt('p','rail-foot','没有匹配的阻塞进程。'));
+        if (!shown.length) list.append(elt('p','rail-foot','没有匹配的 TD 进程。'));
         for (const point of shown) {
           const item = elt('button','point' + (keyOf(point) === state.selected ? ' active' : ''));
           item.type = 'button';
@@ -345,14 +345,14 @@
           const top = elt('div','point-top');
           top.append(elt('span','point-auction',state.mode === 'all' ? `${dealNumber(point.case)} · ${readable(point.auction)}` :
                      state.mode === 'suspicious' ? `北 ${point.case.north_shape.join('–')} · 南 ${point.case.south_shape.join('–')}` : readable(point.auction)),
-                     elt('span','point-count',state.mode === 'blocked' ? point.count : state.mode === 'suspicious' ? `${point.count} 副` : point.case.contract || (point.case.status === 'limit' ? 'LIMIT' : point.case.blocked ? 'BLOCK 卡' : 'PASSOUT')));
+                     elt('span','point-count',state.mode === 'blocked' ? point.count : state.mode === 'suspicious' ? `${point.count} 副` : point.case.contract || (point.case.status === 'limit' ? 'LIMIT' : point.case.blocked ? 'TD' : 'PASSOUT')));
           const counts = point.strata || {};
           const detail = state.mode === 'all'
-            ? `${point.case.blocked ? '阻塞' : point.case.status === 'limit' ? '达到上限' : '完成'} · 南家 ${point.case.south_hcp} HCP · ${point.case.south_shape.join('–')}`
+            ? `${point.case.blocked ? 'TD' : point.case.status === 'limit' ? '达到上限' : '完成'} · 南家 ${point.case.south_hcp} HCP · ${point.case.south_shape.join('–')}`
             : state.mode === 'suspicious'
             ? `牌号 ${point.cases.map(dealNumber).join('、')} · HCP/K–R 各差 ≤2`
-            : coverage ? `阻塞：${names[point.seat] || point.seat}家 · 第 ${point.first_trial} 副首次出现`
-            : `阻塞：${names[point.seat] || point.seat}家 · 普通 ${counts.natural || 0} / 稀有 ${counts.rare_hcp || 0}`;
+            : coverage ? `TD：${names[point.seat] || point.seat}家 · 第 ${point.first_trial} 副首次出现`
+            : `TD：${names[point.seat] || point.seat}家 · 普通 ${counts.natural || 0} / 稀有 ${counts.rare_hcp || 0}`;
           item.append(top, elt('div','point-bottom',detail));
           item.addEventListener('click', () => { state.selected = keyOf(point); state.index = 0; renderPoints(); });
           list.append(item);
@@ -408,7 +408,7 @@
         }
         for (const row of cells) for (const info of row) {
           const cell = elt('div','auction-cell' + (!info ? ' blank' : info.blocked ? ' block' : ''));
-          if (info?.blocked) cell.append(elt('strong','bid','BLOCK 卡'));
+          if (info?.blocked) cell.append(elt('strong','bid','TD'));
           else if (info) { cell.append(bidNode(info.call)); if (info.source) cell.append(elt('span','source',info.source)); }
           grid.append(cell);
         }
@@ -427,7 +427,7 @@
         }
         if (!item.blocked) {
           const analysis = item.analysis || {};
-          const labels = {contract_failure:'所叫定约宕掉', wrong_game:'打错局：所选局/最佳替代局成功赔率比 < 0.8', missed_game:'有可打成局却未叫到',
+          const labels = {contract_failure:'所叫定约 SET > 60%', wrong_game:'打错局：chosen / best-other success probability ratio < 0.8（仅 best-other > 40%）', missed_game:'有可打成局却未叫到',
                           missed_small_slam:'有可打小满贯却未叫到',
                           missed_grand_slam:'有可打大满贯却未叫到'};
           byId('diagnostic-heading').textContent = 'DDS 可疑指标';
@@ -438,7 +438,7 @@
             const row = elt('div','rate-row');
             const value = analysis.rates?.[flag];
             row.append(elt('span','',labels[flag]),
-              elt('strong','',flag === 'wrong_game' ? `OR ${Number(value || 0).toFixed(2)}` : `${Math.round((value || 0)*100)}%`));
+              elt('strong','',flag === 'wrong_game' ? `RATIO ${Number(value || 0).toFixed(2)}` : `${Math.round((value || 0)*100)}%`));
             panel.append(row);
           }
           if ((analysis.flags || []).includes('wrong_game')) {
@@ -452,7 +452,7 @@
           if (analysis.class_pairs === 1) panel.append(elt('p','diagnostic','本例只有 1 组独立南北牌；百分比来自这组牌的多次东西补全，证据较薄。'));
           return;
         }
-        byId('diagnostic-heading').textContent = '阻塞诊断';
+        byId('diagnostic-heading').textContent = 'TD 诊断';
         panel.replaceChildren(elt('p','diagnostic-title',`${names[item.blocked?.seat] || item.blocked?.seat}家轮到叫牌，进程停止`));
         const diagnostics = item.blocked?.diagnostics || [];
         for (const message of diagnostics) panel.append(elt('p','diagnostic',message));
@@ -468,7 +468,7 @@
           const empty = byId('empty');
           empty.hidden = false;
           empty.replaceChildren(elt('strong','',point ? '此进程尚无保存的牌例' : '没有匹配的牌例'),
-            document.createTextNode(point ? '扫描报告保留了这个阻塞进程的次数，但未保存对应手牌。重新扫描时提高 --max-cases。' : '调整左侧筛选条件，或使用扫描器生成含 block 的报告。'));
+            document.createTextNode(point ? '扫描报告保留了这个 TD 进程的次数，但未保存对应手牌。重新扫描时提高 --max-cases。' : '调整左侧筛选条件，或使用扫描器生成含 TD 的报告。'));
           return;
         }
         if (state.index >= subset.length) state.index = subset.length - 1;
@@ -476,7 +476,7 @@
         byId('empty').hidden = true;
         byId('case-detail').hidden = false;
         byId('case-title').textContent = `${dealNumber(item)} · ` + (item.blocked
-          ? `${readable(item.auction)}  →  ${names[item.blocked.seat] || item.blocked.seat}家阻塞`
+          ? `${readable(item.auction)}  →  ${names[item.blocked.seat] || item.blocked.seat}家 TD`
           : `${readable(item.auction)}  →  ${item.status === 'limit' ? '达到叫牌上限' : item.contract || '流局'}${item.analysis?.flags?.length ? ' 可疑' : ''}`);
         const meta = byId('case-meta');
         meta.replaceChildren(document.createTextNode(`牌号 ${dealNumber(item)} · 第 ${item.trial} 次发牌 · ${names[item.dealer]}家开叫 · `));
@@ -487,7 +487,7 @@
           ? '这份报告记录南北两家自动叫牌的结果；东西两家不叫。它没有运行 DDS，也不评估定约完成率。'
           : !item.blocked
           ? '可疑率用于定位需要复核的叫牌进程。样本由人为配额发牌，DDS 为双明手代理结果；不能直接推断真实牌局胜率。'
-          : '这是一份测试证据：阻塞不等于该牌应叫某一口。下一步须核对体系文件，再决定如何补规则。';
+          : '这是一份测试证据：TD 不等于该牌应叫某一口。下一步须核对体系文件，再决定如何补规则。';
         byId('case-position').textContent = `${state.index + 1} / ${subset.length}`;
         byId('prev').disabled = state.index === 0;
         byId('next').disabled = state.index === subset.length - 1;

@@ -1,0 +1,1301 @@
+{
+  "id": "iv-scanner-fixture-pairs.json",
+  "profile": {
+    "id": "daqiush_2over1",
+    "name": "Daqiush 2/1",
+    "version": "0.1.0"
+  },
+  "seed": 23,
+  "filters": {
+    "dealer": "n",
+    "opening": "1N",
+    "vulnerability": "none"
+  },
+  "budget": {
+    "pairs_per_cell": 10,
+    "ew_samples": 3
+  },
+  "summary": {
+    "pairs": 20,
+    "complete": 18,
+    "blocked": 1,
+    "limit": 1,
+    "dds_boards": 54,
+    "suspicious": 4,
+    "unassessed": 0
+  },
+  "wrong_game_rule": "success_probability_ratio_0.8_best_above_0.4_set_above_0.6",
+  "counts": {
+    "block": 1,
+    "missed": 2,
+    "down": 1,
+    "wrong": 1
+  },
+  "groups": [
+    {
+      "id": "10:0",
+      "south_hcp": 10,
+      "south_shape": [
+        6,
+        3,
+        2,
+        2
+      ],
+      "warning_counts": {
+        "block": 1,
+        "missed": 1,
+        "down": 1,
+        "wrong": 1
+      },
+      "actual_pair_count": 10,
+      "expected_pair_count": 10,
+      "incomplete": false,
+      "pairs": [
+        {
+          "id": 1,
+          "pair_slot": 0,
+          "status": "complete",
+          "categories": [],
+          "hands": {
+            "n": "SKQJTH32AD32AC32A",
+            "s": "SKQJAHKQJDAKQCJ32"
+          },
+          "north_hcp": 15,
+          "south_hcp": 10,
+          "north_kr": 15.5,
+          "south_kr": 11.2,
+          "north_shape": [
+            4,
+            3,
+            3,
+            3
+          ],
+          "south_shape": [
+            6,
+            3,
+            2,
+            2
+          ],
+          "auction": "1NP3NPPP",
+          "calls": [
+            "1N",
+            "P",
+            "3N",
+            "P",
+            "P",
+            "P"
+          ],
+          "contract": "3NT",
+          "declarer": "s",
+          "flags": [],
+          "rates": {},
+          "alternative_game_rates": {},
+          "class_pairs": 10,
+          "dds_boards": 3,
+          "ew_results": [
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "pair_slot": 1,
+          "status": "complete",
+          "categories": [
+            "wrong"
+          ],
+          "hands": {
+            "n": "SQJT9H2AKD2AKC2AK",
+            "s": "SKQJAHKQJDAKQCJ32"
+          },
+          "north_hcp": 15,
+          "south_hcp": 10,
+          "north_kr": 15.5,
+          "south_kr": 11.2,
+          "north_shape": [
+            4,
+            3,
+            3,
+            3
+          ],
+          "south_shape": [
+            6,
+            3,
+            2,
+            2
+          ],
+          "auction": "1NP2HP2SP4SPPP",
+          "calls": [
+            "1N",
+            "P",
+            "2H",
+            "P",
+            "2S",
+            "P",
+            "4S",
+            "P",
+            "P",
+            "P"
+          ],
+          "contract": "4S",
+          "declarer": "n",
+          "flags": [
+            "wrong_game"
+          ],
+          "rates": {
+            "contract_failure": 0.3,
+            "wrong_game": 0.75,
+            "missed_game": 0.1,
+            "missed_small_slam": 0.1,
+            "missed_grand_slam": 0.1
+          },
+          "alternative_game_rates": {
+            "3NT": 0.6,
+            "4H": 0.2,
+            "5C": 0.1,
+            "5D": 0.05
+          },
+          "class_pairs": 10,
+          "dds_boards": 3,
+          "ew_results": [
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "SET",
+              "lose": false,
+              "missed_target": null
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "pair_slot": 2,
+          "status": "complete",
+          "categories": [
+            "down"
+          ],
+          "hands": {
+            "n": "SJT98HAKQDAKQCAKQ",
+            "s": "SKQJAHKQJDAKQCJ32"
+          },
+          "north_hcp": 15,
+          "south_hcp": 10,
+          "north_kr": 15.5,
+          "south_kr": 11.2,
+          "north_shape": [
+            4,
+            3,
+            3,
+            3
+          ],
+          "south_shape": [
+            6,
+            3,
+            2,
+            2
+          ],
+          "auction": "1NP2HP2SP3SP4SPPP",
+          "calls": [
+            "1N",
+            "P",
+            "2H",
+            "P",
+            "2S",
+            "P",
+            "3S",
+            "P",
+            "4S",
+            "P",
+            "P",
+            "P"
+          ],
+          "contract": "4S",
+          "declarer": "n",
+          "flags": [
+            "contract_failure"
+          ],
+          "rates": {
+            "contract_failure": 0.62,
+            "wrong_game": null,
+            "missed_game": 0.05,
+            "missed_small_slam": 0.05,
+            "missed_grand_slam": 0.05
+          },
+          "alternative_game_rates": {},
+          "class_pairs": 10,
+          "dds_boards": 3,
+          "ew_results": [
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "SET",
+              "lose": true,
+              "missed_target": "small slam"
+            },
+            {
+              "outcome": "SET",
+              "lose": false,
+              "missed_target": null
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "pair_slot": 3,
+          "status": "complete",
+          "categories": [
+            "missed"
+          ],
+          "hands": {
+            "n": "ST987HKQJDKQJCKQJ",
+            "s": "SKQJAHKQJDAKQCJ32"
+          },
+          "north_hcp": 15,
+          "south_hcp": 10,
+          "north_kr": 15.5,
+          "south_kr": 11.2,
+          "north_shape": [
+            4,
+            3,
+            3,
+            3
+          ],
+          "south_shape": [
+            6,
+            3,
+            2,
+            2
+          ],
+          "auction": "1NP2HP2SPPP",
+          "calls": [
+            "1N",
+            "P",
+            "2H",
+            "P",
+            "2S",
+            "P",
+            "P",
+            "P"
+          ],
+          "contract": "2S",
+          "declarer": "s",
+          "flags": [
+            "missed_game"
+          ],
+          "rates": {
+            "contract_failure": 0.2,
+            "wrong_game": null,
+            "missed_game": 0.45,
+            "missed_small_slam": 0.1,
+            "missed_grand_slam": 0.05
+          },
+          "alternative_game_rates": {},
+          "class_pairs": 10,
+          "dds_boards": 3,
+          "ew_results": [
+            {
+              "outcome": "MAKE",
+              "lose": true,
+              "missed_target": "game"
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "pair_slot": 4,
+          "status": "blocked",
+          "categories": [
+            "block"
+          ],
+          "hands": {
+            "n": "S9876HQJTDQJTCQJT",
+            "s": "SQJTKHQJTDKQJCT2A"
+          },
+          "north_hcp": 15,
+          "south_hcp": 10,
+          "north_kr": 15.5,
+          "south_kr": 11.2,
+          "north_shape": [
+            4,
+            3,
+            3,
+            3
+          ],
+          "south_shape": [
+            6,
+            3,
+            2,
+            2
+          ],
+          "auction": "1NP2HP2SP3DP",
+          "calls": [
+            "1N",
+            "P",
+            "2H",
+            "P",
+            "2S",
+            "P",
+            "3D"
+          ],
+          "blocked": {
+            "seat": "s",
+            "diagnostics": [
+              "No authored call for 1N P 2H P 2S P 3D"
+            ]
+          }
+        },
+        {
+          "id": 6,
+          "pair_slot": 5,
+          "status": "limit",
+          "categories": [],
+          "hands": {
+            "n": "S8765HJT9DJT9CJT9",
+            "s": "SJT9QHJT9DQJTC9AK"
+          },
+          "north_hcp": 15,
+          "south_hcp": 10,
+          "north_kr": 15.5,
+          "south_kr": 11.2,
+          "north_shape": [
+            4,
+            3,
+            3,
+            3
+          ],
+          "south_shape": [
+            6,
+            3,
+            2,
+            2
+          ],
+          "auction": "1NP2CP2DP2HP2SP2NP3CP3DP3HP3SP3NP",
+          "calls": [
+            "1N",
+            "P",
+            "2C",
+            "P",
+            "2D",
+            "P",
+            "2H",
+            "P",
+            "2S",
+            "P",
+            "2N",
+            "P",
+            "3C",
+            "P",
+            "3D",
+            "P",
+            "3H",
+            "P",
+            "3S",
+            "P",
+            "3N",
+            "P"
+          ]
+        },
+        {
+          "id": 7,
+          "pair_slot": 6,
+          "status": "complete",
+          "categories": [],
+          "hands": {
+            "n": "S7654HT98DT98CT98",
+            "s": "ST98JHT98DJT9C8KQ"
+          },
+          "north_hcp": 15,
+          "south_hcp": 10,
+          "north_kr": 15.5,
+          "south_kr": 11.2,
+          "north_shape": [
+            4,
+            3,
+            3,
+            3
+          ],
+          "south_shape": [
+            6,
+            3,
+            2,
+            2
+          ],
+          "auction": "1NP3NPPP",
+          "calls": [
+            "1N",
+            "P",
+            "3N",
+            "P",
+            "P",
+            "P"
+          ],
+          "contract": "3NT",
+          "declarer": "n",
+          "flags": [],
+          "rates": {},
+          "alternative_game_rates": {},
+          "class_pairs": 10,
+          "dds_boards": 3,
+          "ew_results": [
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            }
+          ]
+        },
+        {
+          "id": 8,
+          "pair_slot": 7,
+          "status": "complete",
+          "categories": [],
+          "hands": {
+            "n": "S6543H987D987C987",
+            "s": "S987TH987DT98C7QJ"
+          },
+          "north_hcp": 15,
+          "south_hcp": 10,
+          "north_kr": 15.5,
+          "south_kr": 11.2,
+          "north_shape": [
+            4,
+            3,
+            3,
+            3
+          ],
+          "south_shape": [
+            6,
+            3,
+            2,
+            2
+          ],
+          "auction": "1NP2DP2HP4HPPP",
+          "calls": [
+            "1N",
+            "P",
+            "2D",
+            "P",
+            "2H",
+            "P",
+            "4H",
+            "P",
+            "P",
+            "P"
+          ],
+          "contract": "4H",
+          "declarer": "n",
+          "flags": [],
+          "rates": {},
+          "alternative_game_rates": {},
+          "class_pairs": 10,
+          "dds_boards": 3,
+          "ew_results": [
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            }
+          ]
+        },
+        {
+          "id": 9,
+          "pair_slot": 8,
+          "status": "complete",
+          "categories": [],
+          "hands": {
+            "n": "S5432H876D876C876",
+            "s": "S8769H876D987C6JT"
+          },
+          "north_hcp": 15,
+          "south_hcp": 10,
+          "north_kr": 15.5,
+          "south_kr": 11.2,
+          "north_shape": [
+            4,
+            3,
+            3,
+            3
+          ],
+          "south_shape": [
+            6,
+            3,
+            2,
+            2
+          ],
+          "auction": "1NP3NPPP",
+          "calls": [
+            "1N",
+            "P",
+            "3N",
+            "P",
+            "P",
+            "P"
+          ],
+          "contract": "3NT",
+          "declarer": "s",
+          "flags": [],
+          "rates": {},
+          "alternative_game_rates": {},
+          "class_pairs": 10,
+          "dds_boards": 3,
+          "ew_results": [
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            }
+          ]
+        },
+        {
+          "id": 10,
+          "pair_slot": 9,
+          "status": "complete",
+          "categories": [],
+          "hands": {
+            "n": "S432AH765D765C765",
+            "s": "S7658H765D876C5T9"
+          },
+          "north_hcp": 15,
+          "south_hcp": 10,
+          "north_kr": 15.5,
+          "south_kr": 11.2,
+          "north_shape": [
+            4,
+            3,
+            3,
+            3
+          ],
+          "south_shape": [
+            6,
+            3,
+            2,
+            2
+          ],
+          "auction": "1NP2HP2SPPP",
+          "calls": [
+            "1N",
+            "P",
+            "2H",
+            "P",
+            "2S",
+            "P",
+            "P",
+            "P"
+          ],
+          "contract": "2S",
+          "declarer": "n",
+          "flags": [],
+          "rates": {},
+          "alternative_game_rates": {},
+          "class_pairs": 10,
+          "dds_boards": 3,
+          "ew_results": [
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "12:1",
+      "south_hcp": 12,
+      "south_shape": [
+        5,
+        4,
+        3,
+        1
+      ],
+      "warning_counts": {
+        "block": 0,
+        "missed": 1,
+        "down": 0,
+        "wrong": 0
+      },
+      "actual_pair_count": 10,
+      "expected_pair_count": 10,
+      "incomplete": false,
+      "pairs": [
+        {
+          "id": 11,
+          "pair_slot": 0,
+          "status": "complete",
+          "categories": [],
+          "hands": {
+            "n": "S32AKH654D654C654",
+            "s": "S6547H654D765C498"
+          },
+          "north_hcp": 15,
+          "south_hcp": 10,
+          "north_kr": 15.5,
+          "south_kr": 11.2,
+          "north_shape": [
+            4,
+            3,
+            3,
+            3
+          ],
+          "south_shape": [
+            6,
+            3,
+            2,
+            2
+          ],
+          "auction": "1NP3NPPP",
+          "calls": [
+            "1N",
+            "P",
+            "3N",
+            "P",
+            "P",
+            "P"
+          ],
+          "contract": "3NT",
+          "declarer": "s",
+          "flags": [],
+          "rates": {},
+          "alternative_game_rates": {},
+          "class_pairs": 10,
+          "dds_boards": 3,
+          "ew_results": [
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            }
+          ]
+        },
+        {
+          "id": 12,
+          "pair_slot": 1,
+          "status": "complete",
+          "categories": [
+            "missed"
+          ],
+          "hands": {
+            "n": "S2AKQH543D543C543",
+            "s": "S5436H543D654C387"
+          },
+          "north_hcp": 15,
+          "south_hcp": 10,
+          "north_kr": 15.5,
+          "south_kr": 11.2,
+          "north_shape": [
+            4,
+            3,
+            3,
+            3
+          ],
+          "south_shape": [
+            6,
+            3,
+            2,
+            2
+          ],
+          "auction": "1NP2DP2HPPP",
+          "calls": [
+            "1N",
+            "P",
+            "2D",
+            "P",
+            "2H",
+            "P",
+            "P",
+            "P"
+          ],
+          "contract": "2H",
+          "declarer": "s",
+          "flags": [
+            "missed_game"
+          ],
+          "rates": {
+            "contract_failure": 0.2,
+            "wrong_game": null,
+            "missed_game": 0.45,
+            "missed_small_slam": 0.1,
+            "missed_grand_slam": 0.05
+          },
+          "alternative_game_rates": {},
+          "class_pairs": 10,
+          "dds_boards": 3,
+          "ew_results": [
+            {
+              "outcome": "MAKE",
+              "lose": true,
+              "missed_target": "game"
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            }
+          ]
+        },
+        {
+          "id": 13,
+          "pair_slot": 2,
+          "status": "complete",
+          "categories": [],
+          "hands": {
+            "n": "SAKQJH432D432C432",
+            "s": "S4325H432D543C276"
+          },
+          "north_hcp": 15,
+          "south_hcp": 10,
+          "north_kr": 15.5,
+          "south_kr": 11.2,
+          "north_shape": [
+            4,
+            3,
+            3,
+            3
+          ],
+          "south_shape": [
+            6,
+            3,
+            2,
+            2
+          ],
+          "auction": "1NP3NPPP",
+          "calls": [
+            "1N",
+            "P",
+            "3N",
+            "P",
+            "P",
+            "P"
+          ],
+          "contract": "3NT",
+          "declarer": "s",
+          "flags": [],
+          "rates": {},
+          "alternative_game_rates": {},
+          "class_pairs": 10,
+          "dds_boards": 3,
+          "ew_results": [
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            }
+          ]
+        },
+        {
+          "id": 14,
+          "pair_slot": 3,
+          "status": "complete",
+          "categories": [],
+          "hands": {
+            "n": "SAKQJH432D432C432",
+            "s": "S32A4H32AD432CA65"
+          },
+          "north_hcp": 15,
+          "south_hcp": 10,
+          "north_kr": 15.5,
+          "south_kr": 11.2,
+          "north_shape": [
+            4,
+            3,
+            3,
+            3
+          ],
+          "south_shape": [
+            6,
+            3,
+            2,
+            2
+          ],
+          "auction": "1NP3NPPP",
+          "calls": [
+            "1N",
+            "P",
+            "3N",
+            "P",
+            "P",
+            "P"
+          ],
+          "contract": "3NT",
+          "declarer": "s",
+          "flags": [],
+          "rates": {},
+          "alternative_game_rates": {},
+          "class_pairs": 10,
+          "dds_boards": 3,
+          "ew_results": [
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            }
+          ]
+        },
+        {
+          "id": 15,
+          "pair_slot": 4,
+          "status": "complete",
+          "categories": [],
+          "hands": {
+            "n": "SAKQJH432D432C432",
+            "s": "S2AK3H2AKD32ACK54"
+          },
+          "north_hcp": 15,
+          "south_hcp": 10,
+          "north_kr": 15.5,
+          "south_kr": 11.2,
+          "north_shape": [
+            4,
+            3,
+            3,
+            3
+          ],
+          "south_shape": [
+            6,
+            3,
+            2,
+            2
+          ],
+          "auction": "1NP3NPPP",
+          "calls": [
+            "1N",
+            "P",
+            "3N",
+            "P",
+            "P",
+            "P"
+          ],
+          "contract": "3NT",
+          "declarer": "s",
+          "flags": [],
+          "rates": {},
+          "alternative_game_rates": {},
+          "class_pairs": 10,
+          "dds_boards": 3,
+          "ew_results": [
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            }
+          ]
+        },
+        {
+          "id": 16,
+          "pair_slot": 5,
+          "status": "complete",
+          "categories": [],
+          "hands": {
+            "n": "SAKQJH432D432C432",
+            "s": "SAKQ2HAKQD2AKCQ43"
+          },
+          "north_hcp": 15,
+          "south_hcp": 10,
+          "north_kr": 15.5,
+          "south_kr": 11.2,
+          "north_shape": [
+            4,
+            3,
+            3,
+            3
+          ],
+          "south_shape": [
+            6,
+            3,
+            2,
+            2
+          ],
+          "auction": "1NP3NPPP",
+          "calls": [
+            "1N",
+            "P",
+            "3N",
+            "P",
+            "P",
+            "P"
+          ],
+          "contract": "3NT",
+          "declarer": "s",
+          "flags": [],
+          "rates": {},
+          "alternative_game_rates": {},
+          "class_pairs": 10,
+          "dds_boards": 3,
+          "ew_results": [
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            }
+          ]
+        },
+        {
+          "id": 17,
+          "pair_slot": 6,
+          "status": "complete",
+          "categories": [],
+          "hands": {
+            "n": "SAKQJH432D432C432",
+            "s": "SKQJAHKQJDAKQCJ32"
+          },
+          "north_hcp": 15,
+          "south_hcp": 10,
+          "north_kr": 15.5,
+          "south_kr": 11.2,
+          "north_shape": [
+            4,
+            3,
+            3,
+            3
+          ],
+          "south_shape": [
+            6,
+            3,
+            2,
+            2
+          ],
+          "auction": "1NP3NPPP",
+          "calls": [
+            "1N",
+            "P",
+            "3N",
+            "P",
+            "P",
+            "P"
+          ],
+          "contract": "3NT",
+          "declarer": "s",
+          "flags": [],
+          "rates": {},
+          "alternative_game_rates": {},
+          "class_pairs": 10,
+          "dds_boards": 3,
+          "ew_results": [
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            }
+          ]
+        },
+        {
+          "id": 18,
+          "pair_slot": 7,
+          "status": "complete",
+          "categories": [],
+          "hands": {
+            "n": "SAKQJH432D432C432",
+            "s": "SKQJAHKQJDAKQCJ32"
+          },
+          "north_hcp": 15,
+          "south_hcp": 10,
+          "north_kr": 15.5,
+          "south_kr": 11.2,
+          "north_shape": [
+            4,
+            3,
+            3,
+            3
+          ],
+          "south_shape": [
+            6,
+            3,
+            2,
+            2
+          ],
+          "auction": "1NP3NPPP",
+          "calls": [
+            "1N",
+            "P",
+            "3N",
+            "P",
+            "P",
+            "P"
+          ],
+          "contract": "3NT",
+          "declarer": "s",
+          "flags": [],
+          "rates": {},
+          "alternative_game_rates": {},
+          "class_pairs": 10,
+          "dds_boards": 3,
+          "ew_results": [
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            }
+          ]
+        },
+        {
+          "id": 19,
+          "pair_slot": 8,
+          "status": "complete",
+          "categories": [],
+          "hands": {
+            "n": "SAKQJH432D432C432",
+            "s": "SKQJAHKQJDAKQCJ32"
+          },
+          "north_hcp": 15,
+          "south_hcp": 10,
+          "north_kr": 15.5,
+          "south_kr": 11.2,
+          "north_shape": [
+            4,
+            3,
+            3,
+            3
+          ],
+          "south_shape": [
+            6,
+            3,
+            2,
+            2
+          ],
+          "auction": "1NP3NPPP",
+          "calls": [
+            "1N",
+            "P",
+            "3N",
+            "P",
+            "P",
+            "P"
+          ],
+          "contract": "3NT",
+          "declarer": "s",
+          "flags": [],
+          "rates": {},
+          "alternative_game_rates": {},
+          "class_pairs": 10,
+          "dds_boards": 3,
+          "ew_results": [
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            }
+          ]
+        },
+        {
+          "id": 20,
+          "pair_slot": 9,
+          "status": "complete",
+          "categories": [],
+          "hands": {
+            "n": "SAKQJH432D432C432",
+            "s": "SKQJAHKQJDAKQCJ32"
+          },
+          "north_hcp": 15,
+          "south_hcp": 10,
+          "north_kr": 15.5,
+          "south_kr": 11.2,
+          "north_shape": [
+            4,
+            3,
+            3,
+            3
+          ],
+          "south_shape": [
+            6,
+            3,
+            2,
+            2
+          ],
+          "auction": "1NP3NPPP",
+          "calls": [
+            "1N",
+            "P",
+            "3N",
+            "P",
+            "P",
+            "P"
+          ],
+          "contract": "3NT",
+          "declarer": "s",
+          "flags": [],
+          "rates": {},
+          "alternative_game_rates": {},
+          "class_pairs": 10,
+          "dds_boards": 3,
+          "ew_results": [
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            },
+            {
+              "outcome": "MAKE",
+              "lose": false,
+              "missed_target": null
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "method_note": "Fixture for the deterministic Pair-rail browser test."
+}
