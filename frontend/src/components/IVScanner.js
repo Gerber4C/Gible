@@ -270,6 +270,9 @@ export function IVScanner({ profileId }) {
   const [ewSamples, setEwSamples] = React.useState(10);
   const [seed, setSeed] = React.useState(23);
   const loadedRun = React.useRef(null);
+  const loadedRunId = React.useRef(null);
+  const reportIdRef = React.useRef("");
+  const manualReport = React.useRef(false);
 
   async function refreshReports(preferredId) {
     const result = await listScannerReports();
@@ -303,6 +306,8 @@ export function IVScanner({ profileId }) {
     return () => { active = false; };
   }, [reportId]);
 
+  React.useEffect(() => { reportIdRef.current = reportId; }, [reportId]);
+
   React.useEffect(() => {
     let active = true;
     async function poll() {
@@ -311,10 +316,25 @@ export function IVScanner({ profileId }) {
         if (!active) return;
         const next = result.run;
         setRun(next);
-        if (next?.status === "completed" && next.profile === profileId
-            && next.report_id && loadedRun.current !== next.id) {
-          loadedRun.current = next.id;
-          await refreshReports(next.report_id);
+        // Load the report as soon as the backend publishes a (partial) one,
+        // and refresh it as the run advances, so findings stream in live.
+        if (next?.profile === profileId && next.report_id) {
+          const key = `${next.id}:${next.snapshot_pairs || 0}`;
+          const following = !manualReport.current
+            || reportIdRef.current === next.report_id;
+          if (following && loadedRun.current !== key) {
+            loadedRun.current = key;
+            const data = await readScannerReport(next.report_id);
+            if (!active) return;
+            if (loadedRunId.current !== next.id) {
+              loadedRunId.current = next.id;
+              setSelectedGroupId(null);
+              setSelectedPairId(null);
+            }
+            setReport(data);
+            setReportId(next.report_id);
+            refreshReports(next.report_id).catch(() => {});
+          }
         }
       } catch (failure) {
         if (active) setError(failure.message);
@@ -327,6 +347,8 @@ export function IVScanner({ profileId }) {
 
   async function startScan() {
     setError("");
+    manualReport.current = false;
+    loadedRun.current = null;
     try {
       const result = await startScannerRun({
         profile: profileId, seed: Number(seed),
@@ -442,7 +464,7 @@ export function IVScanner({ profileId }) {
         e("div", { className: "iv-results-top" },
           e("div", null, e("span", { className: "iv-eyebrow" }, "02 / INSPECT"), e("h3", null, "Findings")),
           e("label", null, "Report", e("select", { value: reportId,
-            onChange: (event) => { setReportId(event.target.value); setCategory("all"); setSearch(""); } },
+            onChange: (event) => { manualReport.current = true; setReportId(event.target.value); setCategory("all"); setSearch(""); } },
             reports.length === 0 && e("option", { value: "" }, "No saved scans"),
             reports.map((item) => e("option", { key: item.id, value: item.id },
               `${item.id} · ${item.summary?.pairs ?? 0} pairs`)),

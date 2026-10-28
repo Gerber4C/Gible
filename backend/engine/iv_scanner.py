@@ -394,7 +394,8 @@ class ScannerJobs:
                              'profile': options['profile'],
                              'planned_pairs': options['planned_pairs'],
                              'completed_pairs': 0, 'dds_boards': 0,
-                             'report_id': None, 'error': None}
+                             'report_id': None, 'snapshot_pairs': 0,
+                             'error': None}
             snapshot = dict(self._current)
         threading.Thread(target=self._run, args=(job_id, options, profile),
                          daemon=True, name='iv-scanner').start()
@@ -408,21 +409,35 @@ class ScannerJobs:
                                          completed_pairs=summary['pairs'],
                                          planned_pairs=total,
                                          dds_boards=summary['dds_boards'])
+
+        timestamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+        stem = f"iv-scan-{options['profile']}-{timestamp}-{job_id}"
+        self.root.mkdir(parents=True, exist_ok=True)
+        json_path = self.root / f'{stem}.json'
+        html_path = self.root / f'{stem}.html'
+        temporary = self.root / f'{stem}.json.tmp'
+
+        def snapshot(report: dict) -> None:
+            # Atomic write so the browser never reads a half-written report.
+            temporary.write_text(
+                json.dumps(report, ensure_ascii=False) + '\n',
+                encoding='utf-8')
+            temporary.replace(json_path)
+            with self._lock:
+                if self._current and self._current['id'] == job_id:
+                    self._current.update(
+                        report_id=json_path.name,
+                        snapshot_pairs=(report.get('summary') or {}).get('pairs', 0))
+
         try:
             report = scan_coverage(
                 profile, seed=options['seed'],
                 hcp_targets=tuple(range(options['hcp_min'], options['hcp_max'] + 1)),
                 shapes=options['shapes'], pairs_per_cell=options['pairs_per_cell'],
-                ew_samples=options['ew_samples'], progress=progress)
-            timestamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
-            stem = f"iv-scan-{options['profile']}-{timestamp}-{job_id}"
-            self.root.mkdir(parents=True, exist_ok=True)
-            json_path = self.root / f'{stem}.json'
-            html_path = self.root / f'{stem}.html'
-            temporary = self.root / f'{stem}.json.tmp'
-            temporary.write_text(json.dumps(report, ensure_ascii=False) + '\n',
-                                 encoding='utf-8')
-            temporary.replace(json_path)
+                ew_samples=options['ew_samples'], progress=progress,
+                snapshot=snapshot,
+                snapshot_every=options.get('snapshot_every', 20))
+            snapshot(report)
             html_path.write_text(render_html(report), encoding='utf-8')
             with self._lock:
                 self._current.update(status='completed',

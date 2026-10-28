@@ -300,6 +300,48 @@ class IVScannerTests(unittest.TestCase):
         self.assertEqual(projected['coverage'],
                          {'north': {'schema_status': 'legacy'}})
 
+    def test_scanner_job_publishes_a_partial_report_before_completion(self):
+        import time
+        from unittest.mock import patch
+        from engine.iv_scanner import ScannerJobs
+
+        def fake_scan(profile, *, seed, hcp_targets, shapes, pairs_per_cell,
+                      ew_samples, progress, snapshot, snapshot_every):
+            report = {
+                'schema_version': 2,
+                'profile': {'id': 'daqiush_2over1', 'name': 'x', 'version': '1'},
+                'seed': seed, 'filters': {}, 'coverage': {},
+                'budget': {'pairs_per_cell': pairs_per_cell,
+                           'ew_samples': ew_samples,
+                           'min_class_boards': 1, 'min_class_pairs': 1},
+                'summary': {'pairs': 1, 'complete': 0, 'blocked': 0,
+                            'limit': 0, 'dds_boards': 0, 'suspicious': 0,
+                            'unassessed': 0, 'generation_errors': 0},
+                'cases': [], 'complete_cases': [], 'limit_cases': [],
+            }
+            progress(report['summary'], 3)
+            snapshot(report)
+            time.sleep(0.2)
+            return report
+
+        with tempfile.TemporaryDirectory() as directory:
+            jobs = ScannerJobs(root=Path(directory))
+            with patch('engine.iv_scanner.scan_coverage', side_effect=fake_scan):
+                jobs.start({'profile': 'daqiush_2over1', 'seed': 1,
+                            'hcp_min': 0, 'hcp_max': 0,
+                            'pairs_per_cell': 1, 'ew_samples': 1})
+                report_id = None
+                for _ in range(200):
+                    status = jobs.status() or {}
+                    if status.get('report_id'):
+                        report_id = status['report_id']
+                        break
+                    time.sleep(0.01)
+            self.assertIsNotNone(report_id)
+            path = Path(directory) / report_id
+            self.assertTrue(path.exists())
+            self.assertEqual(json.loads(path.read_text())['summary']['pairs'], 1)
+
 
 if __name__ == '__main__':
     unittest.main()
