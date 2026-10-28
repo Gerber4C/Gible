@@ -262,6 +262,8 @@ def cue_allowed_above(trump: str, call: str) -> bool:
 def partner_hcp_bounds(trace, partner: str) -> tuple[int, int]:
     """Collect the public HCP interval a seat has promised so far."""
 
+    from .slam_intent import PARTNER_DEFAULT_MIN
+
     low, high = 0, 37
     for entry in trace.applied_meanings:
         if entry.get('seat') != partner or entry.get('call') == 'P':
@@ -271,6 +273,10 @@ def partner_hcp_bounds(trace, partner: str) -> tuple[int, int]:
             low = max(low, meaning['hcp_min'])
         if meaning.get('hcp_max') is not None:
             high = min(high, meaning['hcp_max'])
+        acts = meaning.get('call_act_types', ())
+        if 'game_forcing' in acts or meaning.get('forcing') == 'game_forcing':
+            # A game-forcing call guarantees at least opening values.
+            low = max(low, PARTNER_DEFAULT_MIN)
     return low, high
 
 
@@ -293,7 +299,7 @@ def hand_would_bid_observed(profile, auction, hand: Hand, partner: str) -> bool:
 def sample_process_hands(profile, auction, trace, actor_hand: Hand,
                          partner: str, *, count: int = 40, seed=None,
                          max_attempts: int = 4000,
-                         max_seconds: float = 10.0) -> tuple[Hand, ...]:
+                         max_seconds: float = 8.0) -> tuple[Hand, ...]:
     """Infer partner's range by simulating what hands would bid this way.
 
     Candidate hands are drawn inside partner's public HCP interval, then kept
