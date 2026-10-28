@@ -236,6 +236,39 @@ below for traceability.
 | S12 | Define the exact nonforcing-RKCB branch `1NT–2C–2X–3m–3NT–4m–4NT`: which hands may Pass and which must answer? Do not treat this as ordinary forcing keycard by default. |
 | S13 | Give contexts distinguishing the three 5NT meanings (choose trumps, top honors, all first-round controls) and 1/2/3 versus 0/1/2 responses. Define counter-invitations for unknown required kings. |
 
+## 4b. Cue public strength and continuation policy — owner update (2026-10-27)
+
+A cue-bid publishes strength derived from the same player's previous call:
+
+- **Forced by serious 3NT:** the range is unchanged from the previous call;
+  the cue carries no new strength information.
+- **Voluntary cue:** the K-R floor rises by 2 (the cue promises two more K-R
+  points than the previous call). The ceiling is unchanged. If the previous
+  band is narrower than those two points, the cue instead publishes the upper
+  half of the original band (bisect, take the higher half).
+- The partner's actual K-R range is otherwise **inferred by simulation**:
+  sample hands under the public evidence, replay this process, keep only hands
+  that would make the call, and read the needed percentile. See
+  `docs/11_axioms.md`, "同伴实力范围的模拟推断".
+
+Continuation at a cue position with partner strength still unknown:
+
+- If the slam qualifies even with no extra partner strength and the
+  partnership keycards are sufficient (never missing two aces, never one ace
+  plus the trump queen), ask 4NT.
+- If the slam fails even with the partner's +2 K-R extra strength and enough
+  keycards, place game. That game carries signoff meaning; partner may
+  override it by simulating a qualifying slam.
+- Otherwise continue cue-bidding.
+- Major trump: cueing above 4M is allowed only when the sampled expected score
+  beats stopping in 4M/5M/6M. Minor trump: never cue above 5m to hunt a small
+  slam.
+- Prefer cheap deterministic tests; fall back to DDS only when nothing cheaper
+  decides.
+
+Implementation core: `backend/engine/cue_slam_policy.py`. Selector wiring and
+`public_evidence` completion on the cue gadgets remain to be done.
+
 ## 5. Original owner notes — preserved verbatim
 
 ```text

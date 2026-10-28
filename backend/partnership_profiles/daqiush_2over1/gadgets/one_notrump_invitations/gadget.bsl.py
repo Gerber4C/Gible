@@ -497,7 +497,11 @@ class OneNotrumpInvitations(Gadget):
 
             for bid, applies, act in (
                 ('P', lambda ctx: ctx.hand is not None and ctx.hand.hcp <= 15, 'reject'),
-                ('3NT', lambda ctx: ctx.hand is not None and ctx.hand.hcp >= 16, 'accept'),
+                ('3NT', lambda ctx, a=answer: (
+                    ctx.hand is not None and ctx.hand.hcp >= 16
+                    and not (a == '2H' and ctx.hand.length('H') >= 5)
+                    and not (a == '2S' and ctx.hand.length('S') >= 5)),
+                 'accept'),
             ):
                 placement = self.call('natural_invite_' + answer.lower() + '_' + act)
                 placement.when = prefix + '2NTP'
@@ -511,6 +515,44 @@ class OneNotrumpInvitations(Gadget):
                     placement.meaning.acts = ['accept', 'final_placement']
                     placement.meaning.purpose_completed = True
                 placement.description = 'Accept or decline natural notrump game invitation.'
+
+            if answer in ('2H', '2S'):
+                major = answer[-1]
+                five_card = self.call(
+                    'natural_invite_' + answer.lower() + '_five_card_major')
+                five_card.when = prefix + '2NTP'
+                five_card.bid = '3' + major
+                five_card.applies = (
+                    lambda ctx, m=major: (ctx.hand is not None
+                                          and ctx.hand.hcp >= 16
+                                          and ctx.hand.length(m) >= 5))
+                five_card.meaning.action = 'natural_invitation_accept_five_card_major'
+                five_card.meaning.nature = ['natural']
+                five_card.meaning.acts = ['accept', 'descriptive']
+                five_card.meaning.target_suit = major
+                five_card.description = (
+                    'Accept the invitation and show a five-card major.')
+
+                for bid, applies, action in (
+                    ('3NT', lambda ctx, m=major: (ctx.hand is not None
+                                                  and ctx.hand.length(m) < 3),
+                     'choice_notrump'),
+                    ('4' + major, lambda ctx, m=major: (ctx.hand is not None
+                                                        and ctx.hand.length(m) >= 3),
+                     'choice_major_game'),
+                ):
+                    choice = self.call('natural_invite_' + answer.lower()
+                                       + '_five_card_major_' + action)
+                    choice.when = prefix + '2NTP3' + major + 'P'
+                    choice.bid = bid
+                    choice.applies = applies
+                    choice.meaning.action = 'natural_invitation_' + action
+                    choice.meaning.nature = ['natural']
+                    choice.meaning.acts = ['accept', 'final_placement']
+                    choice.meaning.target_suit = 'N' if bid == '3NT' else major
+                    choice.meaning.purpose_completed = True
+                    choice.description = (
+                        'Choose the final game after opener shows a five-card major.')
 
         for answer in ('2D', '2H', '2S'):
             prefix = '1NP2CP' + answer + 'P'

@@ -434,10 +434,15 @@ def allocate_opener_strata(cells: Iterable[object]) -> dict[str, object]:
 
     slots = _selected_slots(len(south_cells))
     stable_cells = tuple(sorted(south_cells, key=_stable_cell_order))
-    neighbors = {
-        slot: tuple(cell for cell in stable_cells if _compatible(slot, cell))
-        for slot in slots
-    }
+    # Compatibility depends only on the stratum, so duplicate normal-shape
+    # slots (which dominate a 529-cell schedule) share one nested scan.
+    compatible_cells = {}
+    for slot in slots:
+        stratum = slot.stratum
+        if stratum not in compatible_cells:
+            compatible_cells[stratum] = tuple(
+                cell for cell in stable_cells if _compatible(slot, cell))
+    neighbors = {slot: compatible_cells[slot.stratum] for slot in slots}
     ordered_slots = tuple(sorted(
         slots,
         key=lambda slot: (len(neighbors[slot]), stratum_key(slot.stratum),

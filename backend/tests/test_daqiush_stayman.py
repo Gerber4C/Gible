@@ -35,6 +35,18 @@ class DaqiushStaymanTests(unittest.TestCase):
         self.assertEqual(self.bid('1NP2CP2HP3NP', 'SAJ65HK762DAQ3CK3'), '4S')
         self.assertEqual(self.bid('1NP2CP2HP3NP', 'SAQ7HKJ83DA762CQ5'), 'P')
 
+    def test_natural_two_notrump_invite_accept_shows_five_card_major(self):
+        # After 1NT-2C-2H-2NT, a maximum with five hearts accepts via 3H,
+        # showing the fifth heart; four hearts accepts with 3NT.
+        self.assertEqual(self.bid('1NP2CP2HP2NTP', 'SAKQH98765DAKC432'), '3H')
+        self.assertEqual(self.bid('1NP2CP2HP2NTP', 'SAKQHQJ98DA32C432'), '3N')
+        self.assertEqual(self.bid('1NP2CP2HP2NTP', 'SAKQH98765DAQC432'), 'P')
+        # Spades are symmetric after 1NT-2C-2S-2NT.
+        self.assertEqual(self.bid('1NP2CP2SP2NTP', 'SAKQJ9H432DKQJC54'), '3S')
+        # Responder then chooses the final game.
+        self.assertEqual(self.bid('1NP2CP2HP2NTP3HP', 'S432H432DAKQC5432'), '4H')
+        self.assertEqual(self.bid('1NP2CP2HP2NTP3HP', 'S5432H43DAKQJC432'), '3N')
+
     def test_inviting_four_spades_after_heart_reply_is_nonforcing(self):
         responder = 'SKQ72H932DA43C862'
         self.assertEqual(self.bid('1NP', responder), '2C')
