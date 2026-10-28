@@ -16,6 +16,21 @@ from engine.outcome_metrics import RULE_ID, assess_auction_groups
 
 
 class CoverageSamplingTests(unittest.TestCase):
+    def test_scan_emits_incremental_snapshots(self):
+        from engine.loader import load_profile
+        profile = load_profile('daqiush_2over1')
+        snapshots = []
+        report = scan_coverage(
+            profile, seed=7, hcp_targets=(0, 1), shapes=((4, 4, 3, 2),),
+            pairs_per_cell=1, ew_samples=1, min_class_boards=1,
+            min_class_pairs=1, snapshot=snapshots.append, snapshot_every=1)
+        # Two trials -> two partial reports, each a valid growing snapshot.
+        self.assertEqual(len(snapshots), 2)
+        self.assertLessEqual(len(snapshots[0]['complete_cases']),
+                             len(snapshots[1]['complete_cases']))
+        self.assertEqual(snapshots[0]['summary']['generation_errors'], 0)
+        self.assertEqual(report['summary']['pairs'], 2)
+
     def test_extreme_responder_hcp_and_shapes_are_constructed_as_full_deals(self):
         rng = random.Random(64)
         for hcp, shape in ((0, (4, 3, 3, 3)), (22, (8, 3, 1, 1)),

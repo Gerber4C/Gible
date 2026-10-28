@@ -102,6 +102,15 @@ This is still a real 529-cell profile scan, not a unit-test shortcut. For
 stronger outcome rates, raise `--pairs-per-cell`, `--ew-samples`, and the two
 class minima together.
 
+The scanner writes as it runs. The terminal shows a live line with attempts,
+pairs, blocked auctions, DDS boards, errors, elapsed time and a rough
+time-to-finish estimate. Every `--snapshot-every` attempts (default 25) it also
+atomically rewrites `--output` with the results gathered so far, so you can open
+the JSON or the HTML viewer mid-run instead of waiting for the whole scan. A
+snapshot is a normal report for the trials completed so far; the final write
+replaces it with the complete report. Use a small `--snapshot-every` (for
+example 10) when you want to inspect very early.
+
 The exact-counter feasibility check constructs all 529 allocated constraints,
 does not call DDS, and requires a positive joint completion count for every
 one. It is intentionally opt-in:

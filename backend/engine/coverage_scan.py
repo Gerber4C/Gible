@@ -11,6 +11,7 @@ import itertools
 import json
 import random
 import argparse
+import time
 from collections import Counter
 from functools import cache
 from pathlib import Path
@@ -257,6 +258,98 @@ def _envelope(minimum, maximum, slot):
     return (max(0.0, maximum - 2), min(37.0, minimum + 2))
 
 
+def _build_report(*, profile, seed, hcp_targets, shapes, pairs_per_cell,
+                  ew_samples, min_class_boards, min_class_pairs, explicit,
+                  summary, cases, complete_cases, limit_cases, points,
+                  point_first, observed_hcp, observed_longest,
+                  observed_top_two, observed_shapes, observed_cells,
+                  generated_pairs, north_hcp_by_mode, cell_failures,
+                  assignments):
+    """Assemble the report from the current scan state without mutating it.
+
+    Snapshot callers rely on this being side-effect free so a mid-run report
+    can be written while the scan keeps extending the same live lists.
+    """
+
+    report_summary = dict(summary)
+    report_summary['unassessed'] = 0
+    analyzed = [dict(case) for case in complete_cases]
+    suspicious_cases = []
+    flagged_groups = 0
+    for members, analysis in assess_auction_groups(
+            analyzed, min_boards=min_class_boards,
+            min_pairs=min_class_pairs):
+        if analysis is None:
+            analysis = {'status': 'insufficient_data',
+                        'class_pairs': len(members), 'dds_boards': 0,
+                        'flags': [], 'rates': {}}
+        for case in members:
+            case['analysis'] = {
+                **analysis,
+                'flags': list(analysis.get('flags') or ()),
+                'rates': dict(analysis.get('rates') or {}),
+                'alternative_game_rates': dict(
+                    analysis.get('alternative_game_rates') or {}),
+            }
+            if analysis['status'] != 'assessed':
+                report_summary['unassessed'] += 1
+        if analysis['flags']:
+            flagged_groups += 1
+            suspicious_cases.extend(members)
+    report_summary['suspicious'] = flagged_groups
+
+    coverage_south = {
+        'responder_hcp': sorted(observed_hcp),
+        'longest_suit': sorted(observed_longest),
+        'top_two_suits': sorted(observed_top_two),
+        'longest_top_two_pairs': [list(pair) for pair in sorted(
+            {(longest, top_two) for _, longest, top_two in observed_cells})],
+        'cells': [list(cell) for cell in sorted(observed_cells)],
+        'exact_shapes': [list(shape) for shape in sorted(observed_shapes)],
+    }
+    coverage_north = (
+        build_north_summary(
+            cells=_south_cell_records(hcp_targets, shapes),
+            assignments=assignments,
+            generated_pairs=dict(generated_pairs),
+            north_hcp_by_mode=north_hcp_by_mode,
+            cell_failures=cell_failures,
+        ) if explicit else {'schema_status': 'legacy'}
+    )
+    return {
+        'schema_version': 2,
+        'profile': {'id': profile.id, 'name': profile.name,
+                    'version': profile.version},
+        'seed': seed,
+        'wrong_game_rule': RULE_ID,
+        'filters': {'dealer': 'n', 'opening': '1N',
+                    'vulnerability': 'none',
+                    'hcp_targets': list(hcp_targets),
+                    'shapes': [list(s) for s in shapes]},
+        'budget': {'pairs_per_cell': pairs_per_cell,
+                   'ew_samples': ew_samples,
+                   'min_class_boards': min_class_boards,
+                   'min_class_pairs': min_class_pairs},
+        'coverage': {**coverage_south, 'north': coverage_north},
+        'summary': report_summary,
+        'block_points': [
+            {'auction': auction, 'seat': seat, 'count': count,
+             'first_trial': point_first[(auction, seat)],
+             'strata': {'coverage': count}}
+            for (auction, seat), count in sorted(
+                points.items(), key=lambda item: (-item[1], item[0]))
+        ],
+        'cases': cases,
+        'complete_cases': analyzed,
+        'limit_cases': limit_cases,
+        'suspicious_cases': suspicious_cases,
+        'solver': 'DDS via available adapter',
+        'method_note': ('DDS double-dummy completion is a test proxy, not an '
+                        'estimate of single-dummy declarer success. Synthetic '
+                        'coverage frequencies are not population frequencies.'),
+    }
+
+
 def scan_coverage(
     profile,
     *,
@@ -269,6 +362,8 @@ def scan_coverage(
     min_class_pairs: int = 1,
     solve_table: Callable = calculate_available_table,
     progress: Callable[[dict, int], None] | None = None,
+    snapshot: Callable[[dict], None] | None = None,
+    snapshot_every: int = 25,
 ) -> dict:
     """Cover the complete Daqiush 1NT opener space and South quota cells."""
     if pairs_per_cell < 1 or ew_samples < 1 or min_class_boards < 1 or min_class_pairs < 1:
@@ -318,6 +413,24 @@ def scan_coverage(
     north_hcp_by_mode = {'normal': set(), 'upgrade_14': set(), 'soft_18': set()}
     cell_failures = []
     failed_cells = set()
+
+    # Shared mutable state; snapshots read it without mutating the live scan.
+    state = {
+        'profile': profile, 'seed': seed, 'hcp_targets': hcp_targets,
+        'shapes': shapes, 'pairs_per_cell': pairs_per_cell,
+        'ew_samples': ew_samples, 'min_class_boards': min_class_boards,
+        'min_class_pairs': min_class_pairs, 'explicit': explicit,
+        'summary': summary, 'cases': cases,
+        'complete_cases': complete_cases, 'limit_cases': limit_cases,
+        'points': points, 'point_first': point_first,
+        'observed_hcp': observed_hcp, 'observed_longest': observed_longest,
+        'observed_top_two': observed_top_two,
+        'observed_shapes': observed_shapes,
+        'observed_cells': observed_cells,
+        'generated_pairs': generated_pairs,
+        'north_hcp_by_mode': north_hcp_by_mode,
+        'cell_failures': cell_failures, 'assignments': assignments,
+    }
 
     for trial, (cell, stratum, slot) in enumerate(schedule, 1):
         hcp = cell['target_hcp']
@@ -436,77 +549,10 @@ def scan_coverage(
             limit_cases.append(case)
         if progress is not None:
             progress(summary.copy(), len(schedule))
+        if snapshot is not None and trial % snapshot_every == 0:
+            snapshot(_build_report(**state))
 
-    suspicious_cases = []
-    flagged_groups = 0
-    for members, analysis in assess_auction_groups(
-            complete_cases, min_boards=min_class_boards,
-            min_pairs=min_class_pairs):
-        if analysis is None:
-            analysis = {'status': 'insufficient_data',
-                        'class_pairs': len(members), 'dds_boards': 0,
-                        'flags': [], 'rates': {}}
-        for case in members:
-            case['analysis'] = {
-                **analysis,
-                'flags': list(analysis.get('flags') or ()),
-                'rates': dict(analysis.get('rates') or {}),
-                'alternative_game_rates': dict(
-                    analysis.get('alternative_game_rates') or {}),
-            }
-            if analysis['status'] != 'assessed':
-                summary['unassessed'] += 1
-        if analysis['flags']:
-            flagged_groups += 1
-            suspicious_cases.extend(members)
-    summary['suspicious'] = flagged_groups
-
-    coverage_south = {
-        'responder_hcp': sorted(observed_hcp),
-        'longest_suit': sorted(observed_longest),
-        'top_two_suits': sorted(observed_top_two),
-        'longest_top_two_pairs': [list(pair) for pair in sorted(
-            {(longest, top_two) for _, longest, top_two in observed_cells})],
-        'cells': [list(cell) for cell in sorted(observed_cells)],
-        'exact_shapes': [list(shape) for shape in sorted(observed_shapes)],
-    }
-    coverage_north = (
-        build_north_summary(
-            cells=_south_cell_records(hcp_targets, shapes),
-            assignments=assignments,
-            generated_pairs=dict(generated_pairs),
-            north_hcp_by_mode=north_hcp_by_mode,
-            cell_failures=cell_failures,
-        ) if explicit else {'schema_status': 'legacy'}
-    )
-    return {
-        'schema_version': 2,
-        'profile': {'id': profile.id, 'name': profile.name, 'version': profile.version},
-        'seed': seed,
-        'wrong_game_rule': RULE_ID,
-        'filters': {'dealer': 'n', 'opening': '1N', 'vulnerability': 'none',
-                    'hcp_targets': list(hcp_targets), 'shapes': [list(s) for s in shapes]},
-        'budget': {'pairs_per_cell': pairs_per_cell, 'ew_samples': ew_samples,
-                   'min_class_boards': min_class_boards,
-                   'min_class_pairs': min_class_pairs},
-        'coverage': {**coverage_south, 'north': coverage_north},
-        'summary': summary,
-        'block_points': [
-            {'auction': auction, 'seat': seat, 'count': count,
-             'first_trial': point_first[(auction, seat)],
-             'strata': {'coverage': count}}
-            for (auction, seat), count in sorted(
-                points.items(), key=lambda item: (-item[1], item[0]))
-        ],
-        'cases': cases,
-        'complete_cases': complete_cases,
-        'limit_cases': limit_cases,
-        'suspicious_cases': suspicious_cases,
-        'solver': 'DDS via available adapter',
-        'method_note': ('DDS double-dummy completion is a test proxy, not an '
-                        'estimate of single-dummy declarer success. Synthetic '
-                        'coverage frequencies are not population frequencies.'),
-    }
+    return _build_report(**state)
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description='Balanced North-1NT coverage and DDS audit')
@@ -517,17 +563,49 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--min-class-boards', type=int, default=10)
     parser.add_argument('--min-class-pairs', type=int, default=1)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--snapshot-every', type=int, default=25)
     args = parser.parse_args(argv)
     from .loader import load_profile
+
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    stats = {'started': time.perf_counter(), 'done': 0, 'total': 0}
+
+    def _write(report):
+        temporary = args.output.with_name(args.output.name + '.tmp')
+        temporary.write_text(
+            json.dumps(report, ensure_ascii=False, indent=2) + '\n',
+            encoding='utf-8')
+        temporary.replace(args.output)
+
+    def _progress(summary, total):
+        stats['total'] = total
+        stats['done'] = summary.get('pairs', 0) + summary.get(
+            'generation_errors', 0)
+        elapsed = time.perf_counter() - stats['started']
+        rate = stats['done'] / elapsed if elapsed else 0.0
+        remaining = (total - stats['done']) / rate if rate else 0.0
+        print(
+            f"\r{stats['done']}/{total} attempts | pairs {summary['pairs']} | "
+            f"blocked {summary['blocked']} | dds {summary['dds_boards']} | "
+            f"errors {summary['generation_errors']} | "
+            f"{elapsed:5.1f}s elapsed, ~{remaining:4.1f}s left   ",
+            end='', flush=True)
+
+    def _snapshot(report):
+        _write(report)
+        print(f"\r[saved partial report: {args.output}]", flush=True)
+
     report = scan_coverage(
         load_profile(args.profile), seed=args.seed,
         pairs_per_cell=args.pairs_per_cell, ew_samples=args.ew_samples,
         min_class_boards=args.min_class_boards,
         min_class_pairs=args.min_class_pairs,
+        progress=_progress,
+        snapshot=_snapshot,
+        snapshot_every=max(1, args.snapshot_every),
     )
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n',
-                           encoding='utf-8')
+    _write(report)
+    print()
     print(f"{report['summary']['pairs']} pairs; {report['summary']['blocked']} TD calls; "
           f"{report['summary']['suspicious']} suspicious; "
           f"{report['summary']['dds_boards']} DDS boards. Report: {args.output}")
