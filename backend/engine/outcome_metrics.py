@@ -80,6 +80,124 @@ def game_success_ratio(contract: str, declarer: str,
     return selected_successes / len(boards) / best_other, alternative_rates
 
 
+def rates_for_boards(contract: str, declarer: str,
+                     boards: list[Mapping]) -> tuple[dict, dict[str, float]]:
+    """Compute every aggregate completion rate for one pool of DDS boards."""
+    level = int(contract[0])
+    strain = contract[1:]
+    wrong_ratio, alternative_rates = game_success_ratio(contract, declarer, boards)
+    rates = {
+        'contract_failure': sum(
+            table[strain][declarer] < level + 6 for table in boards) / len(boards),
+        'missed_game': sum(available_level(table, 'game') for table in boards) / len(boards),
+        'missed_small_slam': sum(
+            available_level(table, 'small_slam') for table in boards) / len(boards),
+        'missed_grand_slam': sum(
+            available_level(table, 'grand_slam') for table in boards) / len(boards),
+        'wrong_game': wrong_ratio,
+    }
+    return rates, alternative_rates
+
+
+def assess_boards(contract: str, declarer: str, boards: list[Mapping], *,
+                  pair_count: int, min_boards: int = 10,
+                  min_pairs: int = 1) -> dict:
+    """Assess one auction group by pooling every member pair's DDS boards."""
+    result = {'status': 'insufficient_data', 'class_pairs': pair_count,
+              'dds_boards': len(boards), 'flags': [], 'rates': {}}
+    if (not boards or pair_count < min_pairs
+            or len(boards) < min_boards):
+        return result
+    rates, alternative_rates = rates_for_boards(contract, declarer, boards)
+    result.update(status='assessed', rates=rates,
+                  alternative_game_rates=alternative_rates)
+    result['flags'] = classify_rates(contract, rates, alternative_rates)
+    return result
+
+
+def _is_valid_hcp(value) -> bool:
+    return (isinstance(value, int) and not isinstance(value, bool)
+            and 0 <= value <= 37)
+
+
+def _is_valid_shape(value) -> bool:
+    return (isinstance(value, (list, tuple)) and len(value) == 4
+            and all(isinstance(length, int) and not isinstance(length, bool)
+                    and length >= 0 for length in value)
+            and sum(value) == 13)
+
+
+def case_cell_key(case: Mapping) -> str:
+    """Stable sampling-cell identity shared by scans, reports, and viewers."""
+    cell = case.get('coverage_cell')
+    if isinstance(cell, Mapping):
+        hcp = cell.get('target_hcp')
+        shape = cell.get('base_shape')
+        shape_index = cell.get('base_shape_index')
+        if (_is_valid_hcp(hcp) and _is_valid_shape(shape)
+                and isinstance(shape_index, int) and not isinstance(shape_index, bool)
+                and shape_index >= 0):
+            return f'{hcp}:{shape_index}'
+    hcp = case.get('south_hcp')
+    shape = case.get('south_shape')
+    if _is_valid_hcp(hcp) and _is_valid_shape(shape):
+        return f"legacy:{hcp}:{'-'.join(map(str, shape))}"
+    return f"legacy-fallback:{case.get('id')}"
+
+
+def case_process_key(case: Mapping) -> tuple[str, ...]:
+    """Identity of one bidding process: the complete call sequence if known."""
+    calls = case.get('calls')
+    if isinstance(calls, (list, tuple)) and calls:
+        return tuple(str(call) for call in calls)
+    return (str(case.get('auction') or ''),)
+
+
+def _case_sort_key(case: Mapping):
+    value = case.get('id')
+    return (0, value) if isinstance(value, int) else (1, str(value))
+
+
+def assess_auction_groups(
+    complete_cases: list[Mapping],
+    *,
+    min_boards: int = 10,
+    min_pairs: int = 1,
+) -> list[tuple[list[Mapping], dict | None]]:
+    """Pool reports by sampling cell and identical bidding process.
+
+    Every N/S pair in one sampling cell already shares both named-suit shapes
+    and near-identical HCP/K–R values. Pairs that also produce the same
+    complete call sequence are one assessment unit: their DDS boards are
+    pooled and all member pairs receive the same rates and flags. A cell with
+    different call sequences splits into one unit per process.
+    """
+    grouped: dict[tuple, list[Mapping]] = {}
+    for case in complete_cases:
+        contract = case.get('contract')
+        declarer = case.get('declarer')
+        if not isinstance(contract, str) or declarer not in ('n', 's'):
+            continue
+        key = (case_cell_key(case), case_process_key(case), contract, declarer)
+        grouped.setdefault(key, []).append(case)
+    results = []
+    for members in grouped.values():
+        members.sort(key=_case_sort_key)
+        boards = [table for member in members
+                  for table in member.get('dds_tables') or ()
+                  if isinstance(table, Mapping)]
+        analysis = (assess_boards(
+            members[0]['contract'], members[0]['declarer'], boards,
+            pair_count=len(members), min_boards=min_boards,
+            min_pairs=min_pairs,
+        ) if boards else None)
+        results.append((members, analysis))
+    results.sort(key=lambda item: _case_sort_key(item[0][0]))
+    return results
+
+
+
+
 def classify_rates(contract: str, rates: Mapping, alternative_rates: Mapping,
                    existing_flags=(), *, recompute_missed: bool = True) -> list[str]:
     """Classify validated aggregate rates while preserving unrelated flags."""

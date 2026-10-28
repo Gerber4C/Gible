@@ -3,26 +3,107 @@ import {
   listScannerReports, readScannerReport, scannerRunStatus, startScannerRun,
 } from "../api/gibleApi.js";
 import {
-  filterScannerGroups, pairBadges, pairMatches, selectPairForGroup,
+  DEFAULT_THRESHOLDS, filterScannerGroups, groupCategories,
+  pairFlags, pairMatches, paginateGroups, selectPairForGroup, wrongGameScores,
 } from "../lib/ivScanner.js";
 
 const CATEGORY = {
   block: { title: "裁 / TD", detail: "Auction has no supported next call" },
   missed: { title: "丢 / LOSE", detail: "Game or slam was available" },
-  down: { title: "宕 / SET", detail: "Selected contract sets more than 60% of comparable boards" },
-  wrong: { title: "错 / WRONG", detail: "chosen / best-other success ratio < 0.8 (best-other > 40%)" },
+  down: { title: "宕 / SET", detail: "Selected contract sets too often" },
+  wrong: { title: "错 / WRONG", detail: "chosen / best-other success ratio below threshold" },
 };
 const FLAG = {
-  contract_failure: "SET > 60%",
-  missed_game: "Missed game > 30%",
-  missed_small_slam: "Missed small slam > 30%",
-  missed_grand_slam: "Missed grand slam > 30%",
-  wrong_game: "WRONG: chosen / best-other success ratio < 0.8",
+  contract_failure: "SET · chosen contract fails",
+  missed_game: "LOSE · game available",
+  missed_small_slam: "LOSE · small slam available",
+  missed_grand_slam: "LOSE · grand slam available",
+  wrong_game: "WRONG · chosen / best-other success ratio",
 };
 const SUITS = [["S", "♠"], ["H", "♥"], ["D", "♦"], ["C", "♣"]];
 const FULL_SCAN_SHAPES = 23;
+const OVERVIEW_PAGE_SIZE = 100;
 
 const pct = (value) => value == null ? "—" : `${(value * 100).toFixed(0)}%`;
+
+const THRESHOLD_CONTROLS = [
+  { key: "set", label: "SET 宕 failure", min: 0.4, max: 0.8, step: 0.01,
+    inputStep: 0.01, unit: "percent" },
+  { key: "missed", label: "LOSE 丢 availability", min: 0.1, max: 0.5, step: 0.01,
+    inputStep: 0.01, unit: "percent" },
+  { key: "wrong", label: "WRONG 错 success ratio", min: 0.5, max: 1, step: 0.01,
+    inputStep: 0.01, unit: "ratio" },
+  { key: "wrongFloor", label: "WRONG best-other floor", min: 0.2, max: 0.6,
+    step: 0.01, inputStep: 0.01, unit: "percent" },
+];
+
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+function thresholdDisplay(control, value) {
+  return control.unit === "percent"
+    ? Math.round(value * 100)
+    : Number(value).toFixed(2);
+}
+
+function thresholdValue(control, raw) {
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return null;
+  const value = control.unit === "percent" ? parsed / 100 : parsed;
+  return Number(clamp(value, control.min, control.max).toFixed(4));
+}
+
+function ThresholdControl({ control, value, onUpdate }) {
+  const [draft, setDraft] = React.useState(() => thresholdDisplay(control, value));
+  React.useEffect(() => {
+    setDraft(thresholdDisplay(control, value));
+  }, [control, value]);
+  const commit = (raw) => {
+    const next = thresholdValue(control, raw);
+    if (next != null) onUpdate(control.key, next);
+    setDraft(thresholdDisplay(control, next == null ? value : next));
+  };
+  const step = (direction) => {
+    const next = Number(clamp(
+      value + direction * control.inputStep, control.min, control.max).toFixed(4));
+    onUpdate(control.key, next);
+  };
+  return e("div", { className: "iv-threshold" },
+    e("span", null, control.label),
+    e("input", {
+      type: "range", min: control.min, max: control.max, step: control.step,
+      value, "aria-label": control.label,
+      onChange: (event) => onUpdate(control.key, Number(event.target.value)),
+    }),
+    e("div", { className: "iv-threshold-value" },
+      e("button", {
+        type: "button", className: "iv-step",
+        "aria-label": `Decrease ${control.label}`,
+        onClick: () => step(-1),
+      }, "←"),
+      e("input", {
+        type: "number",
+        min: control.unit === "percent" ? Math.round(control.min * 100) : control.min,
+        max: control.unit === "percent" ? Math.round(control.max * 100) : control.max,
+        step: control.unit === "percent" ? 1 : 0.01,
+        value: draft, "aria-label": `${control.label} value`,
+        onChange: (event) => setDraft(event.target.value),
+        onBlur: (event) => commit(event.target.value),
+        onKeyDown: (event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            commit(event.currentTarget.value);
+          }
+        },
+      }),
+      e("button", {
+        type: "button", className: "iv-step",
+        "aria-label": `Increase ${control.label}`,
+        onClick: () => step(1),
+      }, "→"),
+      e("em", null, control.unit === "percent" ? "%" : "ratio"),
+    ),
+  );
+}
 
 function compactSuits(hand = "") {
   const fields = hand.match(/^S(.*?)H(.*?)D(.*?)C(.*)$/);
@@ -44,16 +125,38 @@ function handCard(seat, caseData) {
   );
 }
 
-function auctionRows(calls = []) {
+function auctionRows(pair) {
+  const tiles = (pair.calls || []).map((call) => ({ call }));
+  if (pair.status === "blocked") {
+    tiles.push({ td: true, seat: pair.blocked?.seat });
+  }
   const rows = [];
-  for (let index = 0; index < calls.length; index += 4) rows.push(calls.slice(index, index + 4));
+  for (let index = 0; index < tiles.length; index += 4) rows.push(tiles.slice(index, index + 4));
   return rows;
 }
 
-function warningValue(flag, value) {
-  return flag === "wrong_game" && value != null
-    ? `RATIO ${Number(value).toFixed(2)}`
-    : pct(value);
+function auctionTile(tile, index) {
+  if (tile.td) {
+    const seat = tile.seat?.toUpperCase() || "?";
+    return e("span", {
+      key: index, className: "iv-call-td",
+      "aria-label": `TD at ${seat}`, title: `TD · ${seat} to call`,
+    }, "TD");
+  }
+  return e("span", { key: index }, tile.call);
+}
+
+function warningDetail(flag, pair, thresholds) {
+  const rates = pair.rates || {};
+  if (flag === "contract_failure") {
+    return `${pct(rates.contract_failure)} set · alert above ${pct(thresholds.set)}`;
+  }
+  if (flag === "wrong_game") {
+    const { ratio, bestOther } = wrongGameScores(pair);
+    const ratioText = ratio == null ? "—" : Number(ratio).toFixed(2);
+    return `RATIO ${ratioText} · below ${Number(thresholds.wrong).toFixed(2)}; best-other ${pct(bestOther)} above ${pct(thresholds.wrongFloor)}`;
+  }
+  return `${pct(rates[flag])} available · alert above ${pct(thresholds.missed)}`;
 }
 
 function pairRailButton(pair, selected, onSelect) {
@@ -68,10 +171,6 @@ function pairRailButton(pair, selected, onSelect) {
       e("span", null, pair.contract
         || (pair.status === "blocked" ? "TD" : pair.status === "limit" ? "LIMIT" : "—"))),
     e("span", { className: "iv-pair-auction" }, pair.auction || "No calls recorded"),
-    e("span", { className: "iv-badges" },
-      pairBadges(pair).map((badge) => e("b", {
-        key: badge, className: `iv-badge iv-badge-${badge.toLowerCase()}`,
-      }, badge))),
   );
 }
 
@@ -96,10 +195,11 @@ function ewResultStrip(pair) {
               }, "LOSE")))))))));
 }
 
-function pairDetail(pair, group) {
+function pairDetail(pair, group, thresholds) {
   if (!pair) return e("div", { className: "iv-empty-detail" },
     "Select a sampling cell, then pick one of its N/S pairs to inspect that pair's hands and auction.");
   const rates = pair.rates || {};
+  const flags = pairFlags(pair, thresholds);
   const alternatives = Object.entries(pair.alternative_game_rates || {})
     .filter(([, rate]) => rate > 0);
   const slot = (pair.pair_slot ?? 0) + 1;
@@ -121,9 +221,9 @@ function pairDetail(pair, group) {
     e("div", { className: "iv-detail-section" },
       e("h4", null, "Auction"),
       e("div", { className: "iv-auction-rows" },
-        auctionRows(pair.calls || []).map((row, rowIndex) => e("div", {
+        auctionRows(pair).map((row, rowIndex) => e("div", {
           className: "iv-auction-row", key: rowIndex,
-        }, row.map((call, index) => e("span", { key: index }, call))))),
+        }, row.map((tile, index) => auctionTile(tile, index))))),
     ),
     pair.status === "limit" && e("div", { className: "iv-detail-section iv-block-diagnostic" },
       e("h4", null, "Call limit"),
@@ -131,12 +231,12 @@ function pairDetail(pair, group) {
     pair.status === "blocked" && e("div", { className: "iv-detail-section iv-block-diagnostic" },
       e("h4", null, `TD · ${pair.blocked?.seat?.toUpperCase() || "?"}`),
       (pair.blocked?.diagnostics || []).map((line, index) => e("p", { key: index }, line))),
-    pair.flags?.length > 0 && e("div", { className: "iv-detail-section" },
+    flags.length > 0 && e("div", { className: "iv-detail-section" },
       e("h4", null, "Warnings"),
       e("div", { className: "iv-warning-list" },
-        pair.flags.map((flag) => e("div", { key: flag },
+        flags.map((flag) => e("div", { key: flag },
           e("strong", null, FLAG[flag] || flag),
-          e("span", null, warningValue(flag, rates[flag])),
+          e("span", null, warningDetail(flag, pair, thresholds)),
         )),
       ),
       alternatives.length > 0 && e("p", { className: "iv-alternatives" },
@@ -144,7 +244,7 @@ function pairDetail(pair, group) {
         alternatives.map(([name, rate]) => `${name} ${pct(rate)}`).join(" · "),
       ),
       e("p", { className: "iv-evidence" },
-        `${pair.class_pairs ?? "—"} similar N/S pairs · ${pair.dds_boards ?? "—"} DDS boards. Rates use all boards in that class.`),
+        `${pair.class_pairs ?? "—"} N/S pairs in this auction group · ${pair.dds_boards ?? "—"} DDS boards. Rates use all pooled boards.`),
     ),
     ewResultStrip(pair),
   );
@@ -158,9 +258,12 @@ export function IVScanner({ profileId }) {
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState("");
   const [category, setCategory] = React.useState("all");
+  const [view, setView] = React.useState("findings");
+  const [page, setPage] = React.useState(1);
   const [selectedGroupId, setSelectedGroupId] = React.useState(null);
   const [selectedPairId, setSelectedPairId] = React.useState(null);
   const [search, setSearch] = React.useState("");
+  const [thresholds, setThresholds] = React.useState(DEFAULT_THRESHOLDS);
   const [hcpMin, setHcpMin] = React.useState(0);
   const [hcpMax, setHcpMax] = React.useState(22);
   const [pairs, setPairs] = React.useState(2);
@@ -236,27 +339,57 @@ export function IVScanner({ profileId }) {
     }
   }
 
-  const filteredGroups = React.useMemo(
-    () => filterScannerGroups(report?.groups || [], category, search),
-    [report, category, search]);
-  const selectedGroup = filteredGroups.find((group) => group.id === selectedGroupId)
-    || filteredGroups[0] || null;
+  const counts = React.useMemo(() => {
+    const result = { block: 0, missed: 0, down: 0, wrong: 0 };
+    (report?.groups || []).forEach((group) => {
+      groupCategories(group, thresholds).forEach((key) => { result[key] += 1; });
+    });
+    return result;
+  }, [report, thresholds]);
+  const flaggedGroups = React.useMemo(
+    () => (report?.groups || []).filter(
+      (group) => groupCategories(group, thresholds).length > 0),
+    [report, thresholds]);
+  const findingsGroups = React.useMemo(
+    () => filterScannerGroups(flaggedGroups, category, search, thresholds),
+    [flaggedGroups, category, search, thresholds]);
+  const overviewSource = React.useMemo(() => {
+    if (view !== "overview") return [];
+    const groups = filterScannerGroups(
+      report?.groups || [], "all", search, thresholds);
+    return [...groups].sort((left, right) => (
+      String(left.parent_id).localeCompare(String(right.parent_id))
+      || String(left.auction).localeCompare(String(right.auction))
+      || left.id.localeCompare(right.id)));
+  }, [report, view, search, thresholds]);
+  const pagination = React.useMemo(
+    () => paginateGroups(overviewSource, page, OVERVIEW_PAGE_SIZE),
+    [overviewSource, page]);
+  const visibleGroups = view === "overview" ? pagination.items : findingsGroups;
+  const matchingPairs = React.useMemo(
+    () => findingsGroups.reduce((sum, group) => sum + (group.pairs || []).filter(
+      (pair) => pairMatches(pair, category, search, thresholds)).length, 0),
+    [findingsGroups, category, search, thresholds]);
+  const selectedGroup = visibleGroups.find((group) => group.id === selectedGroupId)
+    || visibleGroups[0] || null;
+  const selectionCategory = view === "overview" ? "all" : category;
   const selectedPair = selectedGroup
     ? (selectedGroup.pairs || []).find((pair) => pair.id === selectedPairId)
-      || selectPairForGroup(selectedGroup, category, search)
+      || selectPairForGroup(selectedGroup, selectionCategory, search, thresholds)
     : null;
 
   React.useEffect(() => {
-    const group = filteredGroups.find((item) => item.id === selectedGroupId)
-      || filteredGroups[0] || null;
-    setSelectedPairId(selectPairForGroup(group, category, search)?.id ?? null);
-    if (group && group.id !== selectedGroupId) setSelectedGroupId(group.id);
-  }, [report, category, search, selectedGroupId]);
+    setPage(1);
+  }, [report, view, category, search, thresholds]);
 
-  const matchingPairs = filteredGroups.reduce(
-    (sum, group) => sum + (group.pairs || []).filter(
-      (pair) => pairMatches(pair, category, search)).length,
-    0);
+  React.useEffect(() => {
+    const group = visibleGroups.find((item) => item.id === selectedGroupId)
+      || visibleGroups[0] || null;
+    setSelectedPairId(selectPairForGroup(
+      group, selectionCategory, search, thresholds)?.id ?? null);
+    if (group && group.id !== selectedGroupId) setSelectedGroupId(group.id);
+  }, [visibleGroups, selectedGroupId, selectionCategory, search, thresholds]);
+
   const running = run?.status === "running" || run?.status === "queued";
   const planned = (Number(hcpMax) - Number(hcpMin) + 1) * FULL_SCAN_SHAPES * Number(pairs);
 
@@ -318,29 +451,85 @@ export function IVScanner({ profileId }) {
         report && e("div", { className: "iv-summary-line" },
           `${report.summary?.pairs ?? 0} N/S pairs · ${report.summary?.dds_boards ?? 0} DDS boards · `,
           `${report.summary?.unassessed ?? 0} completed cases without enough comparable boards`),
+        report && e("div", { className: "iv-thresholds", role: "group",
+          "aria-label": "Alarm thresholds" },
+          e("div", { className: "iv-thresholds-head" },
+            e("span", { className: "iv-eyebrow" }, "ALARM THRESHOLDS"),
+            e("span", null, "TD has no threshold"),
+            e("button", { type: "button",
+              onClick: () => setThresholds(DEFAULT_THRESHOLDS) }, "Reset")),
+          e("div", { className: "iv-threshold-grid" },
+            THRESHOLD_CONTROLS.map((control) => e(ThresholdControl, {
+              key: control.key, control,
+              value: thresholds[control.key],
+              onUpdate: (key, next) => setThresholds((current) => ({
+                ...current, [key]: next,
+              })),
+            }))),
+        ),
+        report && e("div", { className: "iv-view-switch", role: "group",
+          "aria-label": "Findings view" },
+          e("button", {
+            type: "button", className: view === "findings" ? "active" : "",
+            "aria-pressed": view === "findings",
+            onClick: () => setView("findings"),
+          }, "Findings"),
+          e("button", {
+            type: "button", className: view === "overview" ? "active" : "",
+            "aria-pressed": view === "overview",
+            onClick: () => { setView("overview"); setCategory("all"); },
+          }, "Overview · 总览"),
+        ),
         e("div", { className: "iv-categories" },
           Object.entries(CATEGORY).map(([key, item], index) => e("button", {
             key, className: `iv-category iv-category-${key} ${category === key ? "selected" : ""}`,
-            onClick: () => setCategory(category === key ? "all" : key),
+            onClick: () => {
+              setView("findings");
+              setCategory(category === key ? "all" : key);
+            },
             "aria-pressed": category === key,
           }, e("span", null, `0${index + 1} / ${item.title}`),
-          e("strong", null, report?.counts?.[key] ?? "—"),
+          e("strong", null, counts[key]),
           e("small", null, item.detail))),
         ),
         e("div", { className: "iv-inspection" },
           e("div", { className: "iv-list" },
             e("div", { className: "iv-list-tools" },
-              e("span", null, busy ? "Loading…" : `${matchingPairs} findings · ${filteredGroups.length} NS cells`),
+              e("span", null, busy ? "Loading…" : (
+                view === "overview"
+                  ? `all ${pagination.total} cell·process groups · page ${pagination.page}/${pagination.pages}`
+                  : `${findingsGroups.length} findings · ${matchingPairs} N/S pairs`)),
               e("input", { type: "search", placeholder: "Find deal #, auction, hand", value: search,
                 "aria-label": "Search scanner findings", onChange: (event) => setSearch(event.target.value) }),
-              category !== "all" && e("button", { onClick: () => setCategory("all") }, "Show all"),
+              category !== "all" && view === "findings" && e("button", {
+                onClick: () => setCategory("all"),
+              }, "Show all"),
+            ),
+            view === "overview" && e("div", { className: "iv-pager" },
+              e("button", {
+                type: "button", "aria-label": "Previous overview page",
+                disabled: pagination.page <= 1,
+                onClick: () => setPage((current) => Math.max(1, current - 1)),
+              }, "‹ Prev"),
+              e("span", null,
+                `Page ${pagination.page} / ${pagination.pages} · `
+                + `${pagination.start}–${pagination.end} of ${pagination.total}`),
+              e("button", {
+                type: "button", "aria-label": "Next overview page",
+                disabled: pagination.page >= pagination.pages,
+                onClick: () => setPage((current) => (
+                  Math.min(pagination.pages, current + 1))),
+              }, "Next ›"),
             ),
             e("div", { className: "iv-list-scroll" },
-              filteredGroups.length === 0 && e("p", { className: "iv-empty-list" },
-                report ? "No matching findings in this report." : "Choose or run a scan to see findings."),
-              filteredGroups.map((group) => {
-                const groupCategories = [...new Set(
-                  (group.pairs || []).flatMap((pair) => pair.categories || []))].sort();
+              visibleGroups.length === 0 && e("p", { className: "iv-empty-list" },
+                report
+                  ? (view === "overview"
+                    ? "No cell·process groups match this search."
+                    : "No findings match the current filters and thresholds.")
+                  : "Choose or run a scan to see findings."),
+              visibleGroups.map((group) => {
+                const categories = groupCategories(group, thresholds);
                 const first = group.pairs?.[0];
                 return e("button", {
                   key: group.id,
@@ -348,13 +537,17 @@ export function IVScanner({ profileId }) {
                   onClick: () => setSelectedGroupId(group.id),
                 },
                   e("span", { className: "iv-case-top" },
-                    e("strong", null, `${group.actual_pair_count}${group.incomplete ? `/${group.expected_pair_count}` : ""} NS pair${group.actual_pair_count === 1 ? "" : "s"}`),
+                    e("strong", null, `${group.actual_pair_count} NS pair${group.actual_pair_count === 1 ? "" : "s"}`),
                     e("span", null, `${report?.budget?.ew_samples ?? "—"} EW samples`)),
                   e("span", { className: "iv-case-tags" },
-                    groupCategories.map((key) => e("b", { key, className: `iv-tag iv-tag-${key}` }, CATEGORY[key]?.title || key)),
-                    group.incomplete && e("b", { className: "iv-tag iv-tag-block" }, "INCOMPLETE")),
+                    categories.map((key) => e("b", { key, className: `iv-tag iv-tag-${key}` }, CATEGORY[key]?.title || key)),
+                    categories.length === 0 && view === "overview" && e("b", {
+                      className: "iv-tag iv-tag-clean",
+                    }, "CLEAN"),
+                    group.incomplete && e("b", { className: "iv-tag iv-tag-block" },
+                      `CELL ${group.actual_pair_count}/${group.expected_pair_count}`)),
                   e("span", { className: "iv-case-auction" },
-                    `South ${group.south_hcp ?? "?"} HCP · ${(group.south_shape || []).join("–") || "?"} · ${first?.auction || "—"}`),
+                    `South ${group.south_hcp ?? "?"} HCP · ${(group.south_shape || []).join("–") || "?"} · ${group.auction || first?.auction || "—"}`),
                 );
               }),
             ),
@@ -367,11 +560,12 @@ export function IVScanner({ profileId }) {
               selectedGroup.pairs.map((pair) => pairRailButton(
                 pair, pair.id === selectedPair?.id,
                 (pairId) => setSelectedPairId(pairId)))),
-            e("div", { className: "iv-pair-detail" }, pairDetail(selectedPair, selectedGroup)),
+            e("div", { className: "iv-pair-detail" },
+              pairDetail(selectedPair, selectedGroup, thresholds)),
           ),
         ),
         e("p", { className: "iv-method" },
-          "DDS compares complete four-hand deals. These rates are diagnostic samples, not estimates of actual declarer play. Similar hands share named-suit shapes and a maximum HCP/K–R span of 2 per seat."),
+          "DDS compares complete four-hand deals. Pairs in one sampling cell with the same complete auction pool their DDS boards; different auctions become separate cells. These rates are diagnostic samples, not estimates of actual declarer play."),
       ),
     ),
   );

@@ -44,6 +44,20 @@ class DaqiushJacobyTests(unittest.TestCase):
     def test_six_minor_five_major_invite_uses_description_proxy(self):
         self.assertEqual(self.bid('1NP2DP2HP', 'S3HKQJ76D4CQ98765'), '3H')
 
+    def test_three_notrump_choice_keeps_flat_4333_without_major_support(self):
+        self.assertEqual(self.bid('1NP2HP2SP3NP', 'SAKQHJT98DAK2C432'), 'P')
+        self.assertEqual(self.bid('1NP2HP2SP3NP', 'SAKQHJT98DAK32C42'), '4S')
+        self.assertEqual(self.bid('1NP2DP2HP3NP', 'SAKQJHJT9DAK2C432'), 'P')
+        self.assertEqual(self.bid('1NP2DP2HP3NP', 'SAKQJHJT9DAK32C42'), '4H')
+        self.assertEqual(self.bid('1NP2HP2SP3NP', 'SAKHJT98DAK32C432'), 'P')
+
+    def test_second_minor_continuation_supports_the_transferred_major(self):
+        self.assertEqual(self.bid('1NP2HP2SP3DP', 'SAKQHJT98DAK2C432'), '3S')
+        self.assertEqual(self.bid('1NP2HP2SP3DP', 'SAKQHJT98DAK32C42'), '3S')
+        self.assertEqual(self.bid('1NP2DP2HP3CP', 'SAKQJHJT9DAK2C432'), '3H')
+        self.assertEqual(self.bid('1NP2HP2SP3DP3SP', 'SAKQJ9H432D9876C2'), '4S')
+        self.assertEqual(self.bid('1NP2DP2HP3CP3HP', 'S2HAKQJ9D432C9876'), '4H')
+
     def test_confirmed_six_card_slam_interest_transfers_but_game_only_uses_texas(self):
         self.assertEqual(self.bid('1NP', 'SA62HAQJT72DJ7CJ4'), '2D')
         self.assertEqual(self.bid('1NP', 'SAQJT72HA62DJ7CJ4'), '2H')

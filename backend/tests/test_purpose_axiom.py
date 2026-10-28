@@ -73,6 +73,14 @@ class PurposeAxiomTests(unittest.TestCase):
         decision = self.choose('1NP4CP4HP4NP5CP', 'SA2HAKQ976DA32C42', purpose)
         self.assertEqual(decision.call, '6H')
 
+    def test_keycard_plan_places_seven_with_a_grand_candidate(self):
+        purpose = {'kind': 'keycard_slam', 'owner': 's', 'source_index': 6,
+                   'source_call': '4N', 'trump': 'H', 'own_keycards': 4,
+                   'owns_trump_queen': True, 'grand_candidate': True,
+                   'combined_min': 37, 'status': 'active'}
+        decision = self.choose('1NP4CP4HP4NP5CP', 'SA2HAKQ976DA32C42', purpose)
+        self.assertEqual(decision.call, '7H')
+
     def test_keycard_plan_assumes_queen_when_no_below_game_ask_fits(self):
         purpose = {'kind': 'keycard_slam', 'owner': 's', 'source_index': 6,
                    'source_call': '4N', 'trump': 'H', 'own_keycards': 4,

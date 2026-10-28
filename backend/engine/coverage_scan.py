@@ -14,6 +14,7 @@ import argparse
 from collections import Counter
 from functools import cache
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Callable, Mapping
 
 from .auction import Auction
@@ -21,12 +22,23 @@ from .cards import Hand, SUITS
 from .deal_sampler import _hand_from_cards
 from .dds_adapter import calculate_available_table
 from .hand_quality import assess_quality
+from .joint_deal_sampler import (
+    JointConstraintError,
+    JointPartnershipPlan,
+    OpenerModeConstraints,
+    sample_conditioned_partnership,
+)
 from .legality import last_contract_state
+from .opener_coverage import (
+    REQUIRED_CELLS,
+    allocate_opener_strata,
+    build_north_summary,
+    rotate_responder_shape,
+)
 from .outcome_metrics import (
-    GAME_TARGETS,
     RULE_ID,
+    assess_auction_groups,
     available_level,
-    classify_rates,
     game_success_ratio,
     reached_game,
 )
@@ -55,6 +67,55 @@ COVERAGE_SHAPES = (
 OPENING_SHAPES = (
     (4, 3, 3, 3), (4, 4, 3, 2), (5, 3, 3, 2),
 )
+
+
+def _opening_assessment(profile):
+    """Return the authored ``opening_assessment`` predicate, or None."""
+    for item in profile.all_evaluator_specs:
+        if item.id == 'opening_assessment':
+            definition = item.definition
+
+            def assess(hand):
+                return definition(SimpleNamespace(
+                    hand=hand, hand_quality=assess_quality(hand)))
+
+            return assess
+    return None
+
+
+def _has_explicit_opener_coverage(profile) -> bool:
+    return _opening_assessment(profile) is not None
+
+
+def _south_cell_records(hcp_targets, shapes):
+    return [
+        {'target_hcp': hcp, 'base_shape_index': index,
+         'base_shape': list(shape)}
+        for hcp in hcp_targets
+        for index, shape in enumerate(shapes)
+    ]
+
+
+def build_coverage_schedule(hcp_targets, shapes, pairs_per_cell: int) -> dict:
+    """Build the seed-independent opener-stratum schedule without drawing."""
+    cells = _south_cell_records(hcp_targets, shapes)
+    allocation = allocate_opener_strata(cells)
+    assignments = dict(allocation['assignments'])
+    entries = []
+    for cell in cells:
+        identity = (cell['target_hcp'], cell['base_shape_index'])
+        stratum = assignments[identity]
+        for slot in range(pairs_per_cell):
+            entries.append({
+                'target_hcp': identity[0],
+                'base_shape_index': identity[1],
+                'base_shape': cell['base_shape'],
+                'pair_slot': slot,
+                'opener_shape': list(stratum.shape),
+                'opener_mode': stratum.mode,
+            })
+    return {'entries': entries, **allocation}
+
 
 
 def _sample_hand(rng: random.Random, available: tuple, shape: tuple[int, ...],
@@ -162,60 +223,6 @@ _reached_game = reached_game
 wrong_game_rates = game_success_ratio
 
 
-def classify_suspicious(
-    subject: Mapping,
-    records: list[Mapping],
-    tables: Mapping[int, list[Mapping]],
-    *,
-    min_boards: int = 10,
-    min_pairs: int = 2,
-) -> dict:
-    """Estimate outcomes within a same-shape class whose full spans are <=2."""
-    dimensions = ('north_hcp', 'south_hcp', 'north_kr', 'south_kr')
-    candidates = [record for record in records
-                  if record['id'] != subject['id']
-                  and record['north_shape'] == subject['north_shape']
-                  and record['south_shape'] == subject['south_shape']
-                  and all(abs(record[key] - subject[key]) <= 2 for key in dimensions)]
-    candidates.sort(key=lambda record: (
-        max(abs(record[key] - subject[key]) for key in dimensions),
-        sum(abs(record[key] - subject[key]) for key in dimensions),
-        record['id']))
-    neighbors = [subject]
-    bounds = {key: [subject[key], subject[key]] for key in dimensions}
-    for record in candidates:
-        if not all(max(bounds[key][1], record[key]) - min(bounds[key][0], record[key]) <= 2
-                   for key in dimensions):
-            continue
-        neighbors.append(record)
-        for key in dimensions:
-            bounds[key][0] = min(bounds[key][0], record[key])
-            bounds[key][1] = max(bounds[key][1], record[key])
-    boards = [table for record in neighbors for table in tables.get(record['id'], ())]
-    result = {'status': 'insufficient_data', 'class_pairs': len(neighbors),
-              'dds_boards': len(boards), 'flags': [], 'rates': {}}
-    if len(neighbors) < min_pairs or len(boards) < min_boards:
-        return result
-    level = int(subject['contract'][0])
-    strain = subject['contract'][1:]
-    declarer = subject['declarer']
-    counts = {
-        'contract_failure': sum(table[strain][declarer] < level + 6 for table in boards),
-        'missed_game': sum(available_level(table, 'game') for table in boards),
-        'missed_small_slam': sum(available_level(table, 'small_slam') for table in boards),
-        'missed_grand_slam': sum(available_level(table, 'grand_slam') for table in boards),
-    }
-    rates = {name: count / len(boards) for name, count in counts.items()}
-    rates['wrong_game'], alternative_rates = game_success_ratio(
-        subject['contract'], declarer, boards)
-    result.update(status='assessed', rates=rates,
-                  alternative_game_rates=alternative_rates)
-    result['flags'] = classify_rates(
-        subject['contract'], rates, alternative_rates,
-        existing_flags=result['flags'],
-    )
-    return result
-
 
 def _history(simulation) -> list[dict]:
     history = []
@@ -244,6 +251,12 @@ def _contract(calls: tuple[str, ...], *, dealer: str = 'n',
     return state.call[0] + ('NT' if strain == 'N' else strain), declarer
 
 
+def _envelope(minimum, maximum, slot):
+    if slot == 0 or minimum is None or maximum is None:
+        return (0.0, 37.0)
+    return (max(0.0, maximum - 2), min(37.0, minimum + 2))
+
+
 def scan_coverage(
     profile,
     *,
@@ -253,24 +266,27 @@ def scan_coverage(
     pairs_per_cell: int = 2,
     ew_samples: int = 10,
     min_class_boards: int = 10,
-    min_class_pairs: int = 2,
+    min_class_pairs: int = 1,
     solve_table: Callable = calculate_available_table,
     progress: Callable[[dict, int], None] | None = None,
 ) -> dict:
-    """Cover South HCP/shapes with North 1NT, then evaluate completed auctions.
-
-    Each independent N/S pair is auctioned once; E/W are completed anew for
-    each DDS board. Synthetic sampling weights are test coverage, not bridge
-    population frequencies.
-    """
+    """Cover the complete Daqiush 1NT opener space and South quota cells."""
     if pairs_per_cell < 1 or ew_samples < 1 or min_class_boards < 1 or min_class_pairs < 1:
         raise ValueError('all sampling and class minimum counts must be positive')
+
     rng = random.Random(seed)
-    cells = [(hcp, tuple(shape), index) for hcp in hcp_targets
-             for index, shape in enumerate(shapes)]
-    rng.shuffle(cells)
-    schedule = [(hcp, shape, index, slot) for hcp, shape, index in cells
-                for slot in range(pairs_per_cell)]
+    south_records = _south_cell_records(hcp_targets, shapes)
+    explicit = _has_explicit_opener_coverage(profile)
+    allocation = allocate_opener_strata(south_records) if explicit else None
+    assignments = dict(allocation['assignments']) if explicit else {}
+    rng.shuffle(south_records)
+    schedule = []
+    for cell in south_records:
+        identity = (cell['target_hcp'], cell['base_shape_index'])
+        stratum = assignments.get(identity) if explicit else None
+        for slot in range(pairs_per_cell):
+            schedule.append((cell, stratum, slot))
+
     empty_auction = Auction.parse('', dealer='n', vulnerability='none')
 
     def opener_eligible(hand):
@@ -278,43 +294,90 @@ def scan_coverage(
                           {'dealer': 'n', 'seat': 'n', 'vulnerability': 'none',
                            'scoring': 'IMP'}).call == '1N'
 
+    opening_assessment = _opening_assessment(profile) if explicit else None
+
     cases = []
     complete_cases = []
     limit_cases = []
-    class_records = []
-    tables_by_id = {}
     points = Counter()
     point_first = {}
     summary = {'pairs': 0, 'complete': 0, 'blocked': 0, 'limit': 0,
-               'dds_boards': 0, 'suspicious': 0, 'unassessed': 0}
+               'dds_boards': 0, 'suspicious': 0, 'unassessed': 0,
+               'generation_errors': 0}
     observed_hcp = set()
     observed_longest = set()
     observed_top_two = set()
     observed_shapes = set()
     observed_cells = set()
     anchor_quality = {}
-    for trial, (hcp, base_shape, shape_index, slot) in enumerate(schedule, 1):
-        # Keep the two independent pairs in each quota cell comparable while
-        # rotating suit placement and North's 1NT shape across cells.
-        rotation = (hcp + shape_index) % 4
-        rotated = base_shape[rotation:] + base_shape[:rotation]
-        opener_shape = (OPENING_SHAPES[(hcp * len(shapes) + shape_index) % len(OPENING_SHAPES)]
-                        if hcp <= 19 else (4, 3, 3, 3))
-        opener_hcp = 15 + ((hcp + shape_index) % 3) if hcp <= 19 else 15
+    north_min = {}
+    north_max = {}
+    south_min = {}
+    south_max = {}
+    generated_pairs = Counter()
+    north_hcp_by_mode = {'normal': set(), 'upgrade_14': set(), 'soft_18': set()}
+    cell_failures = []
+    failed_cells = set()
+
+    for trial, (cell, stratum, slot) in enumerate(schedule, 1):
+        hcp = cell['target_hcp']
+        shape_index = cell['base_shape_index']
+        base_shape = tuple(cell['base_shape'])
+        identity = (hcp, shape_index)
         key = (hcp, base_shape)
+        if identity in failed_cells:
+            continue
+        rotated = rotate_responder_shape(base_shape, hcp, shape_index)
         try:
-            hands = sample_partnership(
-                rng, hcp, rotated, opener_eligible=opener_eligible,
-                opener_shape=opener_shape, opener_hcp=opener_hcp,
-                reference=anchor_quality.get(key) if slot else None,
-            )
-        except RuntimeError as exc:
-            raise RuntimeError(
-                f'coverage cell HCP={hcp}, South={rotated}, North={opener_shape}, '
-                f'North HCP={opener_hcp}, replicate={slot + 1} failed'
-            ) from exc
-        if slot == 0:
-            anchor_quality[key] = (hand_kr(hands['n']), hand_kr(hands['s']))
+            if explicit:
+                nk_min, nk_max = _envelope(
+                    north_min.get(identity), north_max.get(identity), slot)
+                sk_min, sk_max = _envelope(
+                    south_min.get(identity), south_max.get(identity), slot)
+                plan = JointPartnershipPlan(
+                    OpenerModeConstraints(stratum.shape, stratum.mode,
+                                          (nk_min, nk_max)),
+                    rotated, hcp, (sk_min, sk_max))
+                hands = sample_conditioned_partnership(
+                    plan, rng=rng, opening_assessment=opening_assessment,
+                    complete_opponents=complete_opponents)
+                n_kr = hand_kr(hands['n'])
+                s_kr = hand_kr(hands['s'])
+                north_min[identity] = min(north_min.get(identity, n_kr), n_kr)
+                north_max[identity] = max(north_max.get(identity, n_kr), n_kr)
+                south_min[identity] = min(south_min.get(identity, s_kr), s_kr)
+                south_max[identity] = max(south_max.get(identity, s_kr), s_kr)
+                north_hcp_by_mode[stratum.mode].add(hands['n'].hcp)
+                opener_shape = stratum.shape
+                opener_mode = stratum.mode
+            else:
+                opener_shape = (OPENING_SHAPES[(hcp * len(shapes) + shape_index)
+                                               % len(OPENING_SHAPES)]
+                                if hcp <= 19 else (4, 3, 3, 3))
+                opener_hcp = 15 + ((hcp + shape_index) % 3) if hcp <= 19 else 15
+                hands = sample_partnership(
+                    rng, hcp, rotated, opener_eligible=opener_eligible,
+                    opener_shape=opener_shape, opener_hcp=opener_hcp,
+                    reference=anchor_quality.get(key) if slot else None,
+                )
+                opener_mode = None
+                if slot == 0:
+                    anchor_quality[key] = (hand_kr(hands['n']), hand_kr(hands['s']))
+            generated_pairs[identity] += 1
+        except (JointConstraintError, RuntimeError) as exc:
+            failed_cells.add(identity)
+            summary['generation_errors'] += 1
+            cell_failures.append({
+                'shape': list(stratum.shape) if stratum is not None else list(opener_shape),
+                'mode': stratum.mode if stratum is not None else 'normal',
+                'cell': {'target_hcp': hcp, 'base_shape_index': shape_index},
+                'missing_pair_slots': list(range(slot, pairs_per_cell)),
+                'reason': f'generation_error: {exc}',
+            })
+            if progress is not None:
+                progress(summary.copy(), len(schedule))
+            continue
+
         south_shape = hand_shape(hands['s'])
         observed_hcp.add(hcp)
         observed_longest.add(max(south_shape))
@@ -332,6 +395,15 @@ def scan_coverage(
             raise RuntimeError('sampled opener did not bid 1NT in the auction')
         summary['pairs'] += 1
         summary[simulation.status] += 1
+        coverage_cell = {
+            'target_hcp': hcp,
+            'base_shape_index': shape_index,
+            'base_shape': list(base_shape),
+            'pair_slot': slot,
+        }
+        if explicit:
+            coverage_cell['opener_shape'] = list(opener_shape)
+            coverage_cell['opener_mode'] = opener_mode
         case = {
             'id': trial, 'trial': trial, 'stratum': 'coverage', 'dealer': 'n',
             'vulnerability': 'none',
@@ -341,12 +413,7 @@ def scan_coverage(
             'north_shape': hand_shape(hands['n']), 'south_shape': south_shape,
             'calls': list(simulation.calls), 'auction': simulation.compact_sequence(),
             'history': _history(simulation),
-            'coverage_cell': {
-                'target_hcp': hcp,
-                'base_shape_index': shape_index,
-                'base_shape': list(base_shape),
-                'pair_slot': slot,
-            },
+            'coverage_cell': coverage_cell,
         }
         if simulation.status == 'blocked':
             case.update(blocked=simulation.blocked, review_status='unreviewed')
@@ -357,12 +424,10 @@ def scan_coverage(
         elif simulation.status == 'complete':
             contract, declarer = _contract(simulation.calls)
             case.update(contract=contract, declarer=declarer)
-            class_records.append(case)
             boards = []
             for index in range(ew_samples):
                 deal = hands if index == 0 else complete_opponents(rng, hands['n'], hands['s'])
                 boards.append(solve_table(deal))
-            tables_by_id[trial] = boards
             case['dds_tables'] = boards
             summary['dds_boards'] += len(boards)
             complete_cases.append(case)
@@ -373,16 +438,47 @@ def scan_coverage(
             progress(summary.copy(), len(schedule))
 
     suspicious_cases = []
-    for case in complete_cases:
-        analysis = classify_suspicious(case, class_records, tables_by_id,
-                                       min_boards=min_class_boards,
-                                       min_pairs=min_class_pairs)
-        case['analysis'] = analysis
-        if analysis['status'] != 'assessed':
-            summary['unassessed'] += 1
+    flagged_groups = 0
+    for members, analysis in assess_auction_groups(
+            complete_cases, min_boards=min_class_boards,
+            min_pairs=min_class_pairs):
+        if analysis is None:
+            analysis = {'status': 'insufficient_data',
+                        'class_pairs': len(members), 'dds_boards': 0,
+                        'flags': [], 'rates': {}}
+        for case in members:
+            case['analysis'] = {
+                **analysis,
+                'flags': list(analysis.get('flags') or ()),
+                'rates': dict(analysis.get('rates') or {}),
+                'alternative_game_rates': dict(
+                    analysis.get('alternative_game_rates') or {}),
+            }
+            if analysis['status'] != 'assessed':
+                summary['unassessed'] += 1
         if analysis['flags']:
-            summary['suspicious'] += 1
-            suspicious_cases.append(case)
+            flagged_groups += 1
+            suspicious_cases.extend(members)
+    summary['suspicious'] = flagged_groups
+
+    coverage_south = {
+        'responder_hcp': sorted(observed_hcp),
+        'longest_suit': sorted(observed_longest),
+        'top_two_suits': sorted(observed_top_two),
+        'longest_top_two_pairs': [list(pair) for pair in sorted(
+            {(longest, top_two) for _, longest, top_two in observed_cells})],
+        'cells': [list(cell) for cell in sorted(observed_cells)],
+        'exact_shapes': [list(shape) for shape in sorted(observed_shapes)],
+    }
+    coverage_north = (
+        build_north_summary(
+            cells=_south_cell_records(hcp_targets, shapes),
+            assignments=assignments,
+            generated_pairs=dict(generated_pairs),
+            north_hcp_by_mode=north_hcp_by_mode,
+            cell_failures=cell_failures,
+        ) if explicit else {'schema_status': 'legacy'}
+    )
     return {
         'schema_version': 2,
         'profile': {'id': profile.id, 'name': profile.name, 'version': profile.version},
@@ -393,13 +489,7 @@ def scan_coverage(
         'budget': {'pairs_per_cell': pairs_per_cell, 'ew_samples': ew_samples,
                    'min_class_boards': min_class_boards,
                    'min_class_pairs': min_class_pairs},
-        'coverage': {'responder_hcp': sorted(observed_hcp),
-                     'longest_suit': sorted(observed_longest),
-                     'top_two_suits': sorted(observed_top_two),
-                     'longest_top_two_pairs': [list(pair) for pair in sorted(
-                         {(longest, top_two) for _, longest, top_two in observed_cells})],
-                     'cells': [list(cell) for cell in sorted(observed_cells)],
-                     'exact_shapes': [list(shape) for shape in sorted(observed_shapes)]},
+        'coverage': {**coverage_south, 'north': coverage_north},
         'summary': summary,
         'block_points': [
             {'auction': auction, 'seat': seat, 'count': count,
@@ -418,7 +508,6 @@ def scan_coverage(
                         'coverage frequencies are not population frequencies.'),
     }
 
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description='Balanced North-1NT coverage and DDS audit')
     parser.add_argument('--profile', default='daqiush_2over1')
@@ -426,7 +515,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--pairs-per-cell', type=int, default=2)
     parser.add_argument('--ew-samples', type=int, default=10)
     parser.add_argument('--min-class-boards', type=int, default=10)
-    parser.add_argument('--min-class-pairs', type=int, default=2)
+    parser.add_argument('--min-class-pairs', type=int, default=1)
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args(argv)
     from .loader import load_profile

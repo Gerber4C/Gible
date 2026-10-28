@@ -6,13 +6,13 @@ from unittest.mock import patch
 
 from engine.cards import Hand
 from engine.coverage_scan import (
-    COVERAGE_SHAPES, _contract, classify_suspicious, sample_partnership, scan_coverage,
+    COVERAGE_SHAPES, _contract, sample_partnership, scan_coverage,
     wrong_game_rates,
 )
 from engine.dds_adapter import deal_to_pbn
 from engine.hand_quality import assess_quality
 from engine.model import Author, Gadget, PartnershipProfile
-from engine.outcome_metrics import RULE_ID
+from engine.outcome_metrics import RULE_ID, assess_auction_groups
 
 
 class CoverageSamplingTests(unittest.TestCase):
@@ -166,77 +166,128 @@ class CoverageSamplingTests(unittest.TestCase):
         })
 
 
-class SuspicionTests(unittest.TestCase):
-    def test_perfect_chosen_game_has_finite_completion_ratio(self):
-        def table(nt_tricks):
-            values = {strain: {seat: 6 for seat in 'ns'}
-                      for strain in ('S', 'H', 'D', 'C', 'NT')}
-            values['S']['n'] = 10
-            values['NT']['n'] = nt_tricks
-            return values
+class AuctionGroupTests(unittest.TestCase):
+    @staticmethod
+    def table(*, spades=6, nt=6, hearts=6):
+        values = {strain: {seat: 6 for seat in 'ns'}
+                  for strain in ('S', 'H', 'D', 'C', 'NT')}
+        values['S'].update(n=spades, s=spades)
+        values['NT'].update(n=nt, s=nt)
+        values['H'].update(n=hearts, s=hearts)
+        return values
 
+    @staticmethod
+    def case(case_id, *, boards, calls=('1N', 'P', '2H', 'P', '2S', 'P', 'P', 'P'),
+             contract='2S', declarer='s', hcp=11, shape=(6, 3, 2, 2),
+             cell_index=0, pair_slot=0):
+        return {
+            'id': case_id,
+            'coverage_cell': {'target_hcp': hcp, 'base_shape_index': cell_index,
+                              'base_shape': list(shape), 'pair_slot': pair_slot},
+            'south_hcp': hcp, 'south_shape': list(shape),
+            'contract': contract, 'declarer': declarer,
+            'calls': list(calls), 'auction': ' '.join(calls),
+            'dds_tables': boards,
+        }
+
+    @classmethod
+    def analysis_for(cls, cases, case_id, **options):
+        for members, analysis in assess_auction_groups(cases, **options):
+            if any(member['id'] == case_id for member in members):
+                return analysis
+        raise AssertionError('case missing from auction groups')
+
+    def test_perfect_chosen_game_has_finite_completion_ratio(self):
         ratio, alternatives = wrong_game_rates(
-            '4S', 'n', [table(9), table(8)])
+            '4S', 'n', [self.table(spades=10, nt=9), self.table(spades=10, nt=8)])
 
         self.assertEqual(ratio, 2.0)
         self.assertTrue(math.isfinite(ratio))
         self.assertEqual(alternatives['3NT'], .5)
 
-    def test_wrong_game_requires_failed_chosen_game_and_a_different_made_game(self):
-        subject = {'id': 1, 'north_shape': (4, 3, 3, 3),
-                   'south_shape': (6, 3, 2, 2), 'north_hcp': 16,
-                   'south_hcp': 11, 'north_kr': 16.0, 'south_kr': 12.0,
-                   'contract': '4S', 'declarer': 'n'}
-        neighbor = {**subject, 'id': 2}
+    def test_same_cell_and_same_auction_pool_boards_and_share_flags(self):
+        failing = self.table(spades=9)
+        making = self.table(spades=10)
+        calls = ('1N', 'P', '2H', 'P', '2S', 'P', '4S', 'P', 'P', 'P')
+        first = self.case(1, boards=[failing] * 5, contract='4S',
+                          declarer='n', calls=calls)
+        second = self.case(2, boards=[failing] * 2 + [making] * 3,
+                           contract='4S', declarer='n', calls=calls,
+                           pair_slot=1)
 
-        def table(spade_n, nt_n=8, heart_n=8):
-            values = {strain: {seat: 6 for seat in 'ns'}
-                      for strain in ('S', 'H', 'D', 'C', 'NT')}
-            values['S']['n'] = spade_n
-            values['NT']['n'] = nt_n
-            values['H']['n'] = heart_n
-            return values
+        first_analysis = self.analysis_for([first, second], 1)
+        second_analysis = self.analysis_for([first, second], 2)
 
-        # 4S succeeds on 4/10 boards while 3NT succeeds on 6/10.
-        boards = ([table(10)] * 4
-                  + [table(9, nt_n=9, heart_n=10)] * 6)
-        result = classify_suspicious(subject, [subject, neighbor],
-                                     {1: boards[:5], 2: boards[5:]},
-                                     min_boards=10)
-        self.assertAlmostEqual(result['rates']['wrong_game'], 2 / 3)
-        self.assertIn('wrong_game', result['flags'])
-        self.assertEqual(result['alternative_game_rates']['3NT'], .6)
-        self.assertEqual(result['alternative_game_rates']['4H'], .6)
+        self.assertEqual(first_analysis['class_pairs'], 2)
+        self.assertEqual(first_analysis['dds_boards'], 10)
+        self.assertEqual(first_analysis['rates']['contract_failure'], .7)
+        self.assertIn('contract_failure', first_analysis['flags'])
+        self.assertEqual(first_analysis, second_analysis)
+
+    def test_different_auctions_split_one_sampling_cell(self):
+        calls_a = ('1N', 'P', '2H', 'P', '2S', 'P', '4S', 'P', 'P', 'P')
+        calls_b = ('1N', 'P', '3N', 'P', 'P', 'P')
+        first = self.case(1, boards=[self.table(spades=9)] * 10,
+                          contract='4S', declarer='n', calls=calls_a)
+        second = self.case(2, boards=[self.table(spades=10, nt=9)] * 10,
+                           contract='3NT', declarer='s', calls=calls_b,
+                           pair_slot=1)
+
+        groups = assess_auction_groups([first, second], min_boards=10)
+
+        self.assertEqual(len(groups), 2)
+        self.assertEqual([len(members) for members, _ in groups], [1, 1])
+        self.assertIn('contract_failure',
+                      self.analysis_for([first, second], 1)['flags'])
+        self.assertEqual(self.analysis_for([first, second], 2)['flags'], [])
+
+    def test_same_auction_in_different_cells_is_not_merged(self):
+        first = self.case(1, boards=[self.table()] * 10, cell_index=0)
+        second = self.case(2, boards=[self.table()] * 10, cell_index=1,
+                           pair_slot=1)
+
+        groups = assess_auction_groups([first, second], min_boards=10)
+
+        self.assertEqual(len(groups), 2)
+        self.assertEqual([group['class_pairs'] for _, group in groups], [1, 1])
+
+    def test_single_pair_group_is_assessed_when_boards_are_sufficient(self):
+        case = self.case(1, boards=[self.table()] * 10)
+
+        assessed = self.analysis_for([case], 1, min_boards=10)
+        self.assertEqual(assessed['status'], 'assessed')
+        self.assertEqual(assessed['class_pairs'], 1)
+        self.assertEqual(assessed['dds_boards'], 10)
+
+        unassessed = self.analysis_for([case], 1, min_boards=11)
+        self.assertEqual(unassessed['status'], 'insufficient_data')
+        self.assertEqual(unassessed['flags'], [])
+
+    def test_wrong_game_uses_group_completion_ratio(self):
+        chosen_make = self.table(spades=10, nt=8)
+        other_make = self.table(spades=9, nt=9)
+        boards = [chosen_make] * 4 + [other_make] * 6
+        calls = ('1N', 'P', '2H', 'P', '2S', 'P', '4S', 'P', 'P', 'P')
+        first = self.case(1, boards=boards[:5], contract='4S',
+                          declarer='n', calls=calls)
+        second = self.case(2, boards=boards[5:], contract='4S',
+                           declarer='n', calls=calls, pair_slot=1)
+
+        analysis = self.analysis_for([first, second], 1, min_boards=10)
+
+        self.assertAlmostEqual(analysis['rates']['wrong_game'], 2 / 3)
+        self.assertIn('wrong_game', analysis['flags'])
+        self.assertEqual(analysis['alternative_game_rates']['3NT'], .6)
 
     def test_wrong_game_does_not_apply_to_partscore_or_slam(self):
-        base = {'id': 1, 'north_shape': (4, 3, 3, 3),
-                'south_shape': (6, 3, 2, 2), 'north_hcp': 16,
-                'south_hcp': 11, 'north_kr': 16.0, 'south_kr': 12.0,
-                'declarer': 'n'}
-        table = {strain: {seat: 13 for seat in 'ns'}
-                 for strain in ('S', 'H', 'D', 'C', 'NT')}
+        table = self.table(spades=13, nt=13, hearts=13)
         for contract in ('2S', '6S'):
             with self.subTest(contract=contract):
-                subject = {**base, 'contract': contract}
-                result = classify_suspicious(subject, [subject],
-                                             {1: [table]}, min_pairs=1,
-                                             min_boards=1)
-                self.assertIsNone(result['rates']['wrong_game'])
-                self.assertNotIn('wrong_game', result['flags'])
-
-    def test_class_span_is_at_most_two_not_two_either_side_of_subject(self):
-        subject = {'id': 1, 'north_shape': (4, 3, 3, 3),
-                   'south_shape': (6, 3, 2, 2), 'north_hcp': 16,
-                   'south_hcp': 11, 'north_kr': 16.0, 'south_kr': 12.0,
-                   'contract': '4S', 'declarer': 'n'}
-        low = {**subject, 'id': 2, 'north_hcp': 14, 'north_kr': 14.0}
-        high = {**subject, 'id': 3, 'north_hcp': 18, 'north_kr': 18.0}
-        table = {strain: {seat: 9 for seat in 'ns'}
-                 for strain in ('S', 'H', 'D', 'C', 'NT')}
-        result = classify_suspicious(subject, [subject, low, high],
-                                     {1: [table], 2: [table], 3: [table]},
-                                     min_boards=1, min_pairs=1)
-        self.assertEqual(result['class_pairs'], 2)
+                case = self.case(1, boards=[table], contract=contract,
+                                 declarer='n')
+                analysis = self.analysis_for([case], 1, min_boards=1)
+                self.assertIsNone(analysis['rates']['wrong_game'])
+                self.assertNotIn('wrong_game', analysis['flags'])
 
     def test_final_declarer_is_first_partner_to_bid_final_strain(self):
         self.assertEqual(_contract(('1N', 'P', '2D', 'P', '2H', 'P', 'P', 'P')),
@@ -245,50 +296,52 @@ class SuspicionTests(unittest.TestCase):
     def test_final_declarer_respects_non_north_dealer(self):
         self.assertEqual(_contract(('1H', 'P', 'P', 'P'), dealer='s'), ('1H', 's'))
 
-    def test_flags_failed_contract_and_missed_game_from_nearby_class(self):
-        first = {'id': 1, 'north_shape': (4, 3, 3, 3),
-                 'south_shape': (6, 3, 2, 2), 'north_hcp': 16,
-                 'south_hcp': 11, 'north_kr': 16.0, 'south_kr': 12.0,
-                 'contract': '2H', 'declarer': 's'}
-        nearby = {**first, 'id': 2, 'north_hcp': 18, 'south_hcp': 9,
-                  'north_kr': 17.9, 'south_kr': 10.1}
-        far = {**first, 'id': 3, 'north_hcp': 19, 'north_kr': 17.0}
-        far_kr = {**first, 'id': 4, 'south_kr': 14.1}
-        far_south_hcp = {**first, 'id': 5, 'south_hcp': 14}
-        records = [first, nearby, far, far_kr, far_south_hcp]
-        tables = {
-            1: [{'H': {'s': 7, 'n': 7}, 'NT': {'n': 9, 's': 8},
-                 'S': {'n': 8, 's': 8}, 'D': {'n': 9, 's': 9}, 'C': {'n': 9, 's': 9}}],
-            2: [{'H': {'s': 7, 'n': 7}, 'NT': {'n': 9, 's': 8},
-                 'S': {'n': 8, 's': 8}, 'D': {'n': 9, 's': 9}, 'C': {'n': 9, 's': 9}}],
-            3: [{'H': {'s': 8, 'n': 8}, 'NT': {'n': 6, 's': 6},
-                 'S': {'n': 8, 's': 8}, 'D': {'n': 9, 's': 9}, 'C': {'n': 9, 's': 9}}],
-            4: [{'H': {'s': 8, 'n': 8}, 'NT': {'n': 6, 's': 6},
-                 'S': {'n': 8, 's': 8}, 'D': {'n': 9, 's': 9}, 'C': {'n': 9, 's': 9}}],
-            5: [{'H': {'s': 8, 'n': 8}, 'NT': {'n': 6, 's': 6},
-                 'S': {'n': 8, 's': 8}, 'D': {'n': 9, 's': 9}, 'C': {'n': 9, 's': 9}}],
-        }
-        result = classify_suspicious(first, records, tables, min_boards=2)
-        self.assertEqual(result['class_pairs'], 2)
-        self.assertEqual(result['dds_boards'], 2)
-        self.assertIn('contract_failure', result['flags'])
-        self.assertIn('missed_game', result['flags'])
-        self.assertEqual(result['rates']['contract_failure'], 1.0)
-        self.assertEqual(result['rates']['missed_game'], 1.0)
+    def test_group_flags_failed_contract_and_missed_game(self):
+        table = {'H': {'s': 7, 'n': 7}, 'NT': {'n': 9, 's': 8},
+                 'S': {'n': 8, 's': 8}, 'D': {'n': 9, 's': 9},
+                 'C': {'n': 9, 's': 9}}
+        calls = ('1N', 'P', '2D', 'P', '2H', 'P', 'P', 'P')
+        first = self.case(1, boards=[table], contract='2H',
+                          declarer='s', calls=calls)
+        second = self.case(2, boards=[table], contract='2H',
+                           declarer='s', calls=calls, pair_slot=1)
 
-    def test_insufficient_boards_are_unassessed_not_suspicious(self):
-        record = {'id': 1, 'north_shape': (4, 3, 3, 3),
-                  'south_shape': (6, 3, 2, 2), 'north_hcp': 16,
-                  'south_hcp': 11, 'north_kr': 16.0, 'south_kr': 12.0,
-                  'contract': '2H', 'declarer': 's'}
-        table = {strain: {seat: 13 for seat in 'ns'}
-                 for strain in ('S', 'H', 'D', 'C', 'NT')}
-        result = classify_suspicious(record, [record], {1: [table]}, min_boards=5)
-        self.assertEqual(result['status'], 'insufficient_data')
-        self.assertEqual(result['flags'], [])
-        result = classify_suspicious(record, [record], {1: [table] * 10},
-                                     min_boards=10)
-        self.assertEqual(result['status'], 'insufficient_data')
+        analysis = self.analysis_for([first, second], 1, min_boards=2)
+
+        self.assertEqual(analysis['class_pairs'], 2)
+        self.assertEqual(analysis['dds_boards'], 2)
+        self.assertIn('contract_failure', analysis['flags'])
+        self.assertIn('missed_game', analysis['flags'])
+        self.assertEqual(analysis['rates']['contract_failure'], 1.0)
+        self.assertEqual(analysis['rates']['missed_game'], 1.0)
+
+
+class OpenerScheduleTests(unittest.TestCase):
+    def test_complete_opener_schedule_assigns_every_stratum(self):
+        from engine.coverage_scan import build_coverage_schedule
+        schedule = build_coverage_schedule(range(23), COVERAGE_SHAPES, 2)
+
+        self.assertEqual(schedule['available_cells'], 529)
+        self.assertEqual(schedule['required_cells'], 92)
+        self.assertTrue(schedule['complete'])
+        self.assertEqual(len(schedule['entries']), 1058)
+        self.assertEqual(len({tuple(entry['opener_shape'])
+                             for entry in schedule['entries']}), 68)
+        upgrade = sum(entry['opener_mode'] == 'upgrade_14'
+                      for entry in schedule['entries'])
+        soft = sum(entry['opener_mode'] == 'soft_18'
+                   for entry in schedule['entries'])
+        self.assertEqual((upgrade, soft), (24, 24))
+
+    def test_partial_schedule_reports_incomplete_north_coverage(self):
+        from engine.coverage_scan import build_coverage_schedule
+        schedule = build_coverage_schedule(range(10), COVERAGE_SHAPES[:3], 1)
+
+        self.assertEqual(schedule['available_cells'], 30)
+        self.assertEqual(schedule['required_cells'], 92)
+        self.assertFalse(schedule['complete'])
+        self.assertEqual(len(schedule['entries']), 30)
+        self.assertGreater(len(schedule['ungenerated_strata']), 0)
 
 
 if __name__ == '__main__':

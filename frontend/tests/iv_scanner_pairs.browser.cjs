@@ -1,4 +1,4 @@
-// Deterministic Pair-rail check against a grouped fixture. Only the
+// Deterministic IV Scanner check against a split-cell fixture. Only the
 // frontend dev server is required; every API call is fulfilled locally.
 const { chromium } = require("playwright");
 const { expect } = require("playwright/test");
@@ -7,6 +7,16 @@ const fs = require("node:fs/promises");
 
 const FIXTURE_PATH = path.resolve(__dirname, "fixtures/iv_scanner_grouped_report.json");
 const REPORT_ID = "iv-scanner-fixture-pairs.json";
+
+async function setRange(page, label, value) {
+  await page.getByRole("slider", { name: label, exact: true }).evaluate((element, next) => {
+    const setter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype, "value").set;
+    setter.call(element, String(next));
+    element.dispatchEvent(new Event("input", { bubbles: true }));
+    element.dispatchEvent(new Event("change", { bubbles: true }));
+  }, value);
+}
 
 (async () => {
   const fixture = JSON.parse(await fs.readFile(FIXTURE_PATH, "utf8"));
@@ -43,62 +53,125 @@ const REPORT_ID = "iv-scanner-fixture-pairs.json";
     await expect(page.locator(".iv-category-missed strong")).toHaveText("2");
     await expect(page.locator(".iv-category-down strong")).toHaveText("1");
     await expect(page.locator(".iv-category-wrong strong")).toHaveText("1");
-    await expect(page.locator(".iv-list-tools")).toContainText("20 findings · 2 NS cells");
-    await expect(page.locator(".iv-case")).toHaveCount(2);
+    await expect(page.locator(".iv-list-tools")).toContainText("5 findings · 6 N/S pairs");
+    await expect(page.locator(".iv-case")).toHaveCount(5);
 
-    await page.locator(".iv-case").first().click();
-    await expect(page.locator(".iv-pair-button")).toHaveCount(10);
-    const selected = page.locator(".iv-pair-button[aria-pressed='true']");
-    await expect(selected).toContainText("#1");
-    await expect(page.locator(".iv-badge-clean").first()).toBeVisible();
+    // Overview lists every cell·process group, including clean ones.
+    await page.getByRole("button", { name: "Overview · 总览" }).click();
+    await expect(page.locator(".iv-list-tools")).toContainText("all 11 cell·process groups · page 1/1");
+    await expect(page.locator(".iv-case")).toHaveCount(11);
+    await expect(page.locator(".iv-tag-clean").first()).toBeVisible();
+    await expect(page.locator(".iv-pager")).toContainText("Page 1 / 1");
+    await page.getByRole("button", { name: "Findings" }).click();
+    await expect(page.locator(".iv-case")).toHaveCount(5);
 
-    const handsBefore = await page.locator(".iv-hands").innerText();
-    const auctionBefore = await page.locator(".iv-auction-rows").innerText();
-    await page.locator(".iv-pair-button").nth(1).click();
+    // First split cell: single-pair WRONG process.
+    await page.locator(".iv-case").nth(0).click();
+    await expect(page.locator(".iv-pair-button")).toHaveCount(1);
     await expect(page.locator(".iv-pair-button[aria-pressed='true']")).toContainText("#2");
-    await expect(page.locator(".iv-hands")).not.toHaveText(handsBefore);
-    await expect(page.locator(".iv-auction-rows")).not.toHaveText(auctionBefore);
+    await expect(page.locator(".iv-case.selected .iv-tag-wrong")).toBeVisible();
     await expect(page.locator(".iv-warning-list")).toContainText("RATIO");
-
-    await page.locator(".iv-pair-button").nth(2).click();
-    await expect(page.locator(".iv-pair-button[aria-pressed='true']")).toContainText("#3");
-    await expect(page.locator(".iv-warning-list")).toContainText("SET > 60%");
     await expect(page.locator(".iv-ew-outcome").first()).toHaveText(/MAKE|SET/);
+
+    // Second split cell: a different process with SET and a LOSE marker.
+    const firstHands = await page.locator(".iv-hands").textContent();
+    const firstAuction = await page.locator(".iv-auction-rows").textContent();
+    await page.locator(".iv-case").nth(1).click();
+    await expect(page.locator(".iv-pair-button")).toHaveCount(1);
+    await expect(page.locator(".iv-pair-button[aria-pressed='true']")).toContainText("#3");
+    await expect(page.locator(".iv-case.selected .iv-tag-down")).toBeVisible();
+    await expect(page.locator(".iv-warning-list")).toContainText("SET ·");
     await expect(page.locator(".iv-ew-lose").first()).toHaveAttribute("title", "Missed small slam");
+    await expect(page.locator(".iv-hands")).not.toHaveText(firstHands);
+    await expect(page.locator(".iv-auction-rows")).not.toHaveText(firstAuction);
 
-    await page.locator(".iv-pair-button").nth(4).click();
+    // Third split cell: two pairs merged by one auction process.
+    await page.locator(".iv-case").nth(2).click();
+    await expect(page.locator(".iv-pair-button")).toHaveCount(2);
+    await expect(page.locator(".iv-pair-button[aria-pressed='true']")).toContainText("#4");
+    await expect(page.locator(".iv-case.selected .iv-tag-missed")).toBeVisible();
+    const mergedHands = await page.locator(".iv-hands").textContent();
+    const mergedAuction = await page.locator(".iv-auction-rows").textContent();
+    await page.locator(".iv-pair-button").nth(1).click();
+    await expect(page.locator(".iv-pair-button[aria-pressed='true']")).toContainText("#10");
+    await expect(page.locator(".iv-hands")).not.toHaveText(mergedHands);
+    await expect(page.locator(".iv-auction-rows")).toHaveText(mergedAuction);
+
+    // Blocked process stays a TD-only cell.
+    await page.locator(".iv-case").nth(3).click();
+    await expect(page.locator(".iv-case.selected .iv-tag-block")).toBeVisible();
     await expect(page.locator(".iv-block-diagnostic")).toBeVisible();
+    await expect(page.locator(".iv-call-td")).toHaveText("TD");
+    await expect(page.locator(".iv-call-td")).toHaveAttribute("aria-label", "TD at S");
     await expect(page.locator(".iv-ew-strip")).toHaveCount(0);
 
-    await page.locator(".iv-pair-button").nth(5).click();
-    await expect(page.locator(".iv-detail-heading h3")).toContainText("Call limit");
-    await expect(page.locator(".iv-ew-strip")).toHaveCount(0);
+    // Threshold sliders reclassify the same report without refetching.
+    await setRange(page, "SET 宕 failure", 0.5);
+    await expect(page.locator(".iv-category-down strong")).toHaveText("3");
+    await expect(page.locator(".iv-list-tools")).toContainText("6 findings · 7 N/S pairs");
+    await page.getByRole("button", { name: "Reset" }).click();
+    await expect(page.locator(".iv-category-down strong")).toHaveText("1");
+    await expect(page.locator(".iv-list-tools")).toContainText("5 findings · 6 N/S pairs");
 
-    await expect(page.locator(".iv-badge-unavailable")).toHaveCount(1);
-    await expect(page.locator(".iv-badge-td")).toHaveCount(1);
-    await expect(page.locator(".iv-badge-set")).toHaveCount(1);
-    await expect(page.locator(".iv-badge-lose")).toHaveCount(1);
-    await expect(page.locator(".iv-badge-wrong")).toHaveCount(1);
+    await setRange(page, "WRONG 错 success ratio", 0.9);
+    await expect(page.locator(".iv-category-wrong strong")).toHaveText("2");
+    await expect(page.locator(".iv-list-tools")).toContainText("6 findings · 7 N/S pairs");
+    await page.getByRole("button", { name: "Reset" }).click();
+    await expect(page.locator(".iv-category-wrong strong")).toHaveText("1");
 
+    await setRange(page, "LOSE 丢 availability", 0.2);
+    await expect(page.locator(".iv-category-missed strong")).toHaveText("3");
+    await expect(page.locator(".iv-list-tools")).toContainText("6 findings · 7 N/S pairs");
+    await page.getByRole("button", { name: "Reset" }).click();
+    await expect(page.locator(".iv-category-missed strong")).toHaveText("2");
+
+    await setRange(page, "WRONG best-other floor", 0.6);
+    await expect(page.locator(".iv-category-wrong strong")).toHaveText("0");
+    await expect(page.locator(".iv-list-tools")).toContainText("4 findings · 5 N/S pairs");
+    await page.getByRole("button", { name: "Reset" }).click();
+    await expect(page.locator(".iv-category-wrong strong")).toHaveText("1");
+
+    // Numeric entry and the on-screen arrow buttons drive the same thresholds.
+    const setValue = page.getByLabel("SET 宕 failure value");
+    await setValue.fill("50");
+    await setValue.press("Enter");
+    await expect(page.locator(".iv-category-down strong")).toHaveText("3");
+    await page.getByRole("button", { name: "Reset" }).click();
+    await expect(page.locator(".iv-category-down strong")).toHaveText("1");
+
+    await expect(setValue).toHaveValue("60");
+    for (let index = 0; index < 10; index += 1) {
+      await page.getByRole("button", { name: "Increase SET 宕 failure" }).click();
+    }
+    await expect(setValue).toHaveValue("70");
+    await expect(page.locator(".iv-category-down strong")).toHaveText("0");
+    await page.getByRole("button", { name: "Decrease SET 宕 failure" }).click();
+    await expect(setValue).toHaveValue("69");
+    await page.getByRole("button", { name: "Reset" }).click();
+    await expect(setValue).toHaveValue("60");
+
+    const wrongValue = page.getByLabel("WRONG 错 success ratio value");
+    await wrongValue.fill("0.90");
+    await wrongValue.press("Enter");
+    await expect(page.locator(".iv-category-wrong strong")).toHaveText("2");
+    await page.getByRole("button", { name: "Reset" }).click();
+    await expect(wrongValue).toHaveValue("0.80");
+
+    // Category and search filters keep the whole split cell and reset selection.
     await page.locator(".iv-category-down").click();
-    await expect(page.locator(".iv-list-tools")).toContainText("1 findings · 1 NS cells");
-    await expect(page.locator(".iv-pair-button")).toHaveCount(10);
+    await expect(page.locator(".iv-list-tools")).toContainText("1 findings · 1 N/S pairs");
+    await expect(page.locator(".iv-case")).toHaveCount(1);
     await expect(page.locator(".iv-pair-button[aria-pressed='true']")).toContainText("#3");
 
-    await page.locator(".iv-pair-button").first().click();
-    await expect(page.locator(".iv-pair-button[aria-pressed='true']")).toContainText("#1");
-    await expect(page.locator(".iv-warning-list")).toHaveCount(0);
-
-    await page.locator(".iv-category-wrong").click();
-    await expect(page.locator(".iv-pair-button[aria-pressed='true']")).toContainText("#2");
-    await page.locator(".iv-category-wrong").click();
-    await page.getByRole("searchbox", { name: "Search scanner findings" }).fill("17");
+    await page.getByRole("button", { name: "Show all" }).click();
+    await page.getByRole("searchbox", { name: "Search scanner findings" }).fill("10");
     await expect(page.locator(".iv-case")).toHaveCount(1);
-    await expect(page.locator(".iv-pair-button")).toHaveCount(10);
-    await expect(page.locator(".iv-pair-button[aria-pressed='true']")).toContainText("#17");
+    await expect(page.locator(".iv-pair-button")).toHaveCount(2);
+    await expect(page.locator(".iv-pair-button[aria-pressed='true']")).toContainText("#10");
+    await expect(page.locator(".iv-list-tools")).toContainText("1 findings · 1 N/S pairs");
 
     if (errors.length) throw new Error(errors.join("\n"));
-    console.log("PASS: IV Scanner pair rail, synchronized pair detail, badges, and filter-reset behavior");
+    console.log("PASS: IV Scanner split cells, merged pair rail, and live threshold sliders");
   } finally {
     await browser.close();
   }

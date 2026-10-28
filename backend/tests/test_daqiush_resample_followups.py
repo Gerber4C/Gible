@@ -191,7 +191,7 @@ class DaqiushResampleFollowupTests(unittest.TestCase):
             's': cards,
         })
         self.assertEqual(result.status, 'complete')
-        self.assertEqual(result.calls[-6:], ('3N', 'P', '4H', 'P', 'P', 'P'))
+        self.assertEqual(result.calls[-6:], ('3H', 'P', '4H', 'P', 'P', 'P'))
 
     def test_six_five_spade_minor_also_values_second_suit(self):
         cards = 'SKQJT98H2DQJ954C2'
@@ -202,7 +202,7 @@ class DaqiushResampleFollowupTests(unittest.TestCase):
             's': cards,
         })
         self.assertEqual(result.status, 'complete')
-        self.assertEqual(result.calls[-6:], ('3N', 'P', '4S', 'P', 'P', 'P'))
+        self.assertEqual(result.calls[-6:], ('3S', 'P', '4S', 'P', 'P', 'P'))
 
     def test_seven_retained_points_six_five_major_minor_invites_in_major(self):
         heart_cards = 'S2HKQJT98DJ9543C2'

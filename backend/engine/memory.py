@@ -16,18 +16,22 @@ class Purpose:
     status: str = "active"
     own_keycards: int | None = None
     owns_trump_queen: bool | None = None
+    grand_candidate: bool | None = None
+    combined_min: int | None = None
     responses: dict[str, str] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Purpose":
         return cls(**{key: data.get(key) for key in (
             'kind', 'owner', 'source_index', 'source_call', 'trump',
-            'status', 'own_keycards', 'owns_trump_queen', 'responses') if key in data})
+            'status', 'own_keycards', 'owns_trump_queen', 'grand_candidate',
+            'combined_min', 'responses') if key in data})
 
     def to_dict(self) -> dict[str, Any]:
         return {key: getattr(self, key) for key in (
             'kind', 'owner', 'source_index', 'source_call', 'trump',
-            'status', 'own_keycards', 'owns_trump_queen', 'responses')}
+            'status', 'own_keycards', 'owns_trump_queen', 'grand_candidate',
+            'combined_min', 'responses')}
 
 
 @dataclass(frozen=True)

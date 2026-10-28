@@ -182,6 +182,13 @@ def ordinary_acceptance(ctx, trump):
                         for _, suit in SUPERACCEPTS[trump]))
 
 
+def three_card_flat(ctx, trump):
+    """Three-card major support in a 4-3-3-3 hand."""
+    return (ctx.hand is not None and ctx.hand.length(trump) == 3
+            and sorted(ctx.hand.length(suit) for suit in 'SHDC')
+            == [3, 3, 3, 4])
+
+
 class JacobyMajorTransfers(Gadget):
     id = 'jacoby_major_transfers'
     namespace = 'daqiush_2over1'
@@ -382,9 +389,10 @@ class JacobyMajorTransfers(Gadget):
                                         + '_support_cue_' + cue.lower())
                     cue_call.when = minor_prefix
                     cue_call.bid = '3' + cue
-                    cue_call.applies = (lambda ctx, m=minor, s=cue, earlier=tuple(
+                    cue_call.applies = (lambda ctx, t=trump, m=minor, s=cue, earlier=tuple(
                         earlier for earlier in available_cues if earlier < cue):
-                        ctx.hand is not None and ctx.hand.length(m) >= 4
+                        ctx.hand is not None and ctx.hand.length(t) < 3
+                        and ctx.hand.length(m) >= 4
                         and second_round_control(ctx, s)
                         and not any(second_round_control(ctx, x) for x in earlier))
                     cue_call.meaning.action = 'minor_support_control'
@@ -398,14 +406,44 @@ class JacobyMajorTransfers(Gadget):
                 natural_nt = self.call('jacoby_' + trump.lower() + '_' + minor.lower() + '_no_cue')
                 natural_nt.when = minor_prefix
                 natural_nt.bid = '3NT'
-                natural_nt.applies = (lambda ctx, m=minor, suits=tuple(available_cues):
-                                      ctx.hand is not None and (ctx.hand.length(m) < 4
-                                      or not any(second_round_control(ctx, s) for s in suits)))
+                natural_nt.applies = (lambda ctx, t=trump, m=minor, suits=tuple(available_cues):
+                                      ctx.hand is not None
+                                      and ctx.hand.length(t) < 3
+                                      and (ctx.hand.length(m) < 4
+                                           or not any(second_round_control(ctx, s) for s in suits)))
                 natural_nt.meaning.action = 'second_minor_natural_notrump'
                 natural_nt.meaning.nature = ['natural']
                 natural_nt.meaning.acts = ['descriptive']
                 natural_nt.meaning.target_suit = 'N'
                 natural_nt.description = 'Without a supported three-level cue, offer natural 3NT.'
+
+                support = self.call('jacoby_' + trump.lower() + '_' + minor.lower()
+                                    + '_major_support')
+                support.when = minor_prefix
+                support.bid = '3' + trump
+                support.applies = (lambda ctx, t=trump:
+                                   ctx.hand is not None and ctx.hand.length(t) >= 3)
+                support.meaning.action = 'major_support_after_second_minor'
+                support.meaning.nature = ['natural']
+                support.meaning.acts = ['descriptive']
+                support.meaning.agreed_suit = trump
+                support.meaning.target_suit = trump
+                support.meaning.support_length_min = 3
+                support.effect('agreed_suit').suit = trump
+                support.description = 'Show three-card or longer support for the transferred major.'
+
+                support_game = self.call('jacoby_' + trump.lower() + '_' + minor.lower()
+                                         + '_major_support_game')
+                support_game.when = minor_prefix + '3' + trump + 'P'
+                support_game.bid = '4' + trump
+                support_game.applies = (lambda ctx, t=trump:
+                                        ctx.hand is not None and ctx.hand.length(t) >= 5)
+                support_game.meaning.action = 'major_game_after_second_minor_support'
+                support_game.meaning.nature = ['natural']
+                support_game.meaning.acts = ['signoff', 'final_placement']
+                support_game.meaning.target_suit = trump
+                support_game.meaning.purpose_completed = True
+                support_game.description = 'Place the known five-card major at game.'
 
                 shaped_game = self.call('jacoby_' + trump.lower() + '_' + minor.lower()
                                         + '_shapely_game_after_3nt')
@@ -478,13 +516,20 @@ class JacobyMajorTransfers(Gadget):
                 follow = self.call('jacoby_' + trump.lower() + '_game_' + bid.lower())
                 follow.when = ordinary_prefix + '3NTP'
                 follow.bid = bid
-                follow.applies = lambda ctx, t=trump, fit=has_fit: ctx.hand is not None and (ctx.hand.length(t) >= 3) == fit
+                follow.applies = (lambda ctx, t=trump, fit=has_fit:
+                                  ctx.hand is not None
+                                  and ((ctx.hand.length(t) >= 3
+                                        and not three_card_flat(ctx, t))
+                                       if fit else
+                                       (ctx.hand.length(t) < 3
+                                        or three_card_flat(ctx, t))))
                 follow.meaning.action = 'jacoby_game_placement'
                 follow.meaning.nature = ['natural']
                 follow.meaning.acts = ['signoff', 'final_placement']
                 follow.meaning.target_suit = 'N' if bid == 'P' else trump
                 follow.meaning.purpose_completed = True
-                follow.description = 'With three-card support play 4M; otherwise play 3NT.'
+                follow.description = ('With three-card support play 4M unless the '
+                                      'hand is 4-3-3-3; otherwise play 3NT.')
 
             for answer, doubleton in SUPERACCEPTS[trump]:
                 special = self.call('jacoby_' + trump.lower() + '_doubleton_' + doubleton.lower())

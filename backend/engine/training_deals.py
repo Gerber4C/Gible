@@ -22,7 +22,7 @@ SEATS = 'nesw'
 PARTNER = {'n': 's', 's': 'n', 'e': 'w', 'w': 'e'}
 RANKS = 'AKQJT98765432'
 MAX_ATTEMPTS = 5000
-MAX_SECONDS = 8
+MAX_SECONDS = 20
 
 
 def _authored_call(profile: PartnershipProfile, auction: Auction, call: str) -> bool:

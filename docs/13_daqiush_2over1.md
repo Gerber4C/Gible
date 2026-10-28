@@ -68,7 +68,10 @@ silently imported into Daqiush.
   with responder's public 14–15 HCP, good-quality, minor 5-4-2-2 promise and
   compares 5C, 5D, 6C and 6D with the local double-dummy solver. It chooses
   the highest binary-completion expected duplicate score, with no overtricks
-  and a one-undertrick proxy on failure. This is a first DDS-based decision;
+  and a one-undertrick proxy on failure. A 3-3 minor opener does not guess the
+  minor: it bids `5NT`, responder names the five-card minor at the six level,
+  and opener passes. Without a five-card minor responder places `6NT`. This is
+  a first DDS-based decision;
   if the solver or enough samples are unavailable, the auction blocks with a
   diagnostic. The 33-HCP rule applies to suitable no-trump slams, not this
   minor-slam route.
@@ -91,17 +94,21 @@ silently imported into Daqiush.
   selection policy is provisional, not an additional owner-supplied agreement.
 - Ordinary Jacoby acceptance now covers a weak five- or six-card major stop;
   a five-card invitation via `2NT`; and a bounded five-card game via `3NT`,
-  which opener converts to `4M` with three-card support. A six-card invitation
+  which opener converts to `4M` with three-card support. The exception is a
+  4-3-3-3 opener with exactly three trumps: that hand passes `3NT` rather than
+  supporting the major. A six-card invitation
   can use `3M`. After a superaccept, a weak five-card hand uses `3M−1` to
   retransfer (or Passes when opener has already bid `3M`); five-card
   invitational/game-only hands place `4M`. The previously authored six-card
   slam-interest hand still asks keycards at `4NT`.
 - After an ordinary Jacoby acceptance, a responder with five-plus cards in
   the transferred major, four-plus in a second minor, and at least 10 HCP can
-  bid natural `3m`, forcing to game. Opener's available three-level new suits
-  are control bids confirming four-card support for that minor; absent such a
-  bid, opener offers natural `3NT`. Continuations after the control bid are
-  still to be authored.
+  bid natural `3m`, forcing to game. When opener holds three or more cards in
+  the transferred major, opener supports that major at the three level (for
+  example `1NT–2H–2S–3D–3S`); responder can place `4M`. Otherwise opener's
+  available three-level new suits are control bids confirming four-card
+  support for that minor; absent such a bid, opener offers natural `3NT`.
+  Continuations after the control bid are still to be authored.
 - Explicit final placements use the shared purpose axiom to close with Pass.
   The axiom now permits that terminal Pass after a rejected invitation; a new
   invitation is not demanded once partner has placed the final contract.
@@ -522,7 +529,7 @@ are pending. Ask in small batches; questions do not authorize guesses.
 | Q06 | The exactly-five-card transfer condition, absolute-maximum evaluator, four-card support, doubleton superaccept table and `3M` 4333 superaccept are implemented above. After an ordinary transfer acceptance, a jump new suit is recorded as a singleton/void slam splinter; its legal branches and adjusted-point response boundaries are in the [slam notes](15_daqiush_slam.md). Retransfer and other strength-dependent continuations still need definition. After any superaccept a slam-interest responder bids 4NT immediately, so the prior superaccept cue/splinter branch does not apply there. |
 | Q07 | After ordinary major transfer acceptance then 3m, what strengths/lengths apply? Resolve the owner's `[?]` on opener 4m making every responder call a cue bid, including 4M. Define opener's three-level support cues and responder's lowest natural M precisely. |
 | Q08 | For minor transfers, define non-minimum and "有大牌非单张大牌" (which suit, what holding and length). Expand normal +2 and superaccept +1 into exact auctions. Who bids `3NT企图摸局`, and at which node do the following 3M bids occur? A literal 3M after an already bid 3NT is illegal; branch ordering must be clarified. Define stopper-showing versus advance cue bids, serious 3NT, 4m invitations, and 6-4 om rebids. |
-| Q09 | In `3C–3D`, the good 5422 hand that bids 4NT has 14–15 raw HCP and seeks a minor slam through simulation, not 6NT by combined HCP. The first simulated policy compares both minors at levels five and six. Future refinement: should 4NT reveal which minor is five cards, and how should opener answer with one or both five-card majors? |
+| Q09 | In `3C–3D`, the good 5422 hand that bids 4NT has 14–15 raw HCP and seeks a minor slam through simulation, not 6NT by combined HCP. The first simulated policy compares both minors at levels five and six. A 3-3 minor opener now bids 5NT; responder names the five-card minor at the six level (or 6NT without one). |
 | Q10 | After the 3D minor two-suiter, does 3H/3S show the bid major's stopper and ask for the other? What exact holding/length qualifies as `QT以上`? Confirm the referenced three opener calls and the meaning/forcing status of responder 4NT with no stopper. |
 | Q11 | For 3H/3S minor invitations, define strength/shape eligibility, the desired continuations, and what happens when multiple inviting routes apply. |
 | Q12 | Opener's +1/+2 declarer choice uses the confirmed unprotected K/Q count. Classified game-only Texas has a saved signoff plan; the 17+ HCP 6-3-2-2 Texas class has a saved keycard-to-slam plan. Texas-versus-Jacoby choice when slam depends on opener's exact values still needs sampled-deal evaluation; K–R game strength alone does not settle it. |

@@ -1,7 +1,9 @@
 import unittest
+import random
 
 from engine.constrained_deals import (
-    ConstrainedDealSampler, HandConstraints, bid_constrained_deals,
+    DECK, ConstrainedDealSampler, HandConstraints, _HandPlan,
+    bid_constrained_deals, kr_shape_adjustment_units,
 )
 from engine.coverage_scan import hand_kr
 from engine.dds_adapter import deal_to_pbn
@@ -9,6 +11,26 @@ from engine.model import Author, Gadget, PartnershipProfile
 
 
 class ConstrainedDealSamplerTests(unittest.TestCase):
+    def test_public_shape_adjustment_preserves_hand_plan_counts_and_seed(self):
+        rule = HandConstraints((4, 3, 3, 3), (16, 16), (16.0, 16.1))
+        plan = _HandPlan(DECK, rule)
+
+        self.assertEqual(kr_shape_adjustment_units(rule.shape), -10)
+        self.assertEqual(kr_shape_adjustment_units((4, 4, 3, 2)), -20)
+        self.assertEqual(plan.total, 35423913)
+        self.assertEqual(plan.targets, [
+            ((16, 330), 12447421),
+            ((16, 331), 13286946),
+            ((16, 332), 9689546),
+        ])
+        self.assertEqual(plan.sample(random.Random(19)), (
+            ('clubs', 'K'), ('clubs', '6'), ('clubs', '3'),
+            ('diamonds', 'A'), ('diamonds', 'Q'), ('diamonds', '5'),
+            ('hearts', '4'), ('hearts', '3'), ('hearts', '2'),
+            ('spades', 'A'), ('spades', 'K'), ('spades', '7'),
+            ('spades', '6'),
+        ))
+
     def test_generated_deals_run_auto_auction_and_retain_block_diagnostics(self):
         opening = Gadget.from_parts(
             {'id': 'test', 'author': {'name': 'Test'}},

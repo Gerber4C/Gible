@@ -7,6 +7,9 @@ from .calls import normalize_call
 from .context import CallCandidate
 from .legality import SIDE_BY_SEAT, is_call_legal, last_contract_state
 from .memory import Purpose, SeatMemory
+from .slam_intent import (
+    PARTNER_1NT_MIN, PARTNER_DEFAULT_MIN, detect_slam_intent,
+)
 
 
 @dataclass(frozen=True)
@@ -101,11 +104,22 @@ def remember_selected_purpose(memory: SeatMemory, auction, hand, candidate) -> S
     trump = meaning.get('agreed_suit') or meaning.get('target_suit')
     if not isinstance(trump, str) or trump not in 'CDHS':
         return memory
+    intent = detect_slam_intent(
+        hand, _partner_minimum(auction, auction.actor_to_call), strain=trump)
     return memory.with_purpose(Purpose(
         kind='keycard_slam', owner=auction.actor_to_call,
         source_index=len(auction.calls), source_call=candidate.call, trump=trump,
         own_keycards=hand.keycard_count(trump),
-        owns_trump_queen=hand.contains_rank(trump, 'Q')))
+        owns_trump_queen=hand.contains_rank(trump, 'Q'),
+        grand_candidate=intent.grand, combined_min=intent.combined_min))
+
+
+def _partner_minimum(auction, owner: str) -> int:
+    partner = {'n': 's', 's': 'n', 'e': 'w', 'w': 'e'}[owner]
+    for index, call in enumerate(auction.calls):
+        if auction.actor_at(index) == partner and normalize_call(call) == '1N':
+            return PARTNER_1NT_MIN
+    return PARTNER_DEFAULT_MIN
 
 
 def complete_purpose(memory: SeatMemory, purpose: Purpose | None) -> SeatMemory:
@@ -160,7 +174,11 @@ def _keycard_slam(auction, trace, purpose):
     game, slam = f'5{purpose.trump}', f'6{purpose.trump}'
     if missing_count >= 2:
         return game, None
-    if missing_count == 0 or purpose.owns_trump_queen or meaning.get('trump_queen') is True:
+    queen_known = (purpose.owns_trump_queen is True
+                   or meaning.get('trump_queen') is True)
+    if missing_count == 0 and queen_known and purpose.grand_candidate:
+        return f'7{purpose.trump}', None
+    if missing_count == 0 or queen_known:
         return slam, None
     if meaning.get('trump_queen') is False:
         return game, None

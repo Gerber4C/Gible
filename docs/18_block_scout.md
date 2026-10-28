@@ -78,20 +78,65 @@ with a larger limit.
 ## Balanced 1NT coverage and DDS audit
 
 The coverage scanner fixes **North as the 1NT opener** and samples South at
-every raw HCP value from 0 through 22. Its 13 representative South shapes
+every raw HCP value from 0 through 22. Its 23 representative South shapes
 cover every feasible combination of longest suit 4–8 cards and
-longest-two-suit total 7–11 cards (23 × 13 = 299 quota cells). The scan
-rotates suit placements. North is constructed in one of three common 1NT
-shapes (4333, 4432, 5332), with 15–17 HCP, then kept only when the selected
-profile actually opens 1NT. High-HCP South cells use a 15-HCP 4333 North
-hand for feasibility. The profile bids using each player's own information;
+longest-two-suit total 7–11 cards (23 × 23 = 529 quota cells). Suit placement
+is rotated deterministically for each HCP/shape identity. Those cells are
+allocated across 92 North strata: 68 legal named normal shapes, twelve
+14-HCP 5332 upgrades, and twelve soft-18 4432 shapes. A normal stratum is the
+ordinary natural 15–17 HCP range; it is not pinned to one HCP value or to the
+first generated hand. The profile bids using each player's own information;
 opponents Pass. Each completed auction is checked with fresh East/West
-completions using DDS:
+completions using DDS.
+
+A minimal real full scan uses one N/S pair and one E/W completion per cell.
+The class minima must also be one so each single-board group is assessable:
 
 ```powershell
 cd backend
-..\.venv\Scripts\python.exe -m engine.coverage_scan --profile daqiush_2over1 --seed 23 --pairs-per-cell 2 --ew-samples 10 --min-class-boards 10 --min-class-pairs 2 --output ../reports/block_scans/daqiush-1nt-coverage-seed23.json
-..\.venv\Scripts\python.exe -m engine.block_report_viewer ../reports/block_scans/daqiush-1nt-coverage-seed23.json
+..\.venv\Scripts\python.exe -m engine.coverage_scan --profile daqiush_2over1 --seed 23 --pairs-per-cell 1 --ew-samples 1 --min-class-boards 1 --min-class-pairs 1 --output ../reports/block_scans/daqiush-1nt-coverage-seed23-minimal.json
+..\.venv\Scripts\python.exe -m engine.block_report_viewer ../reports/block_scans/daqiush-1nt-coverage-seed23-minimal.json
+```
+
+This is still a real 529-cell profile scan, not a unit-test shortcut. For
+stronger outcome rates, raise `--pairs-per-cell`, `--ew-samples`, and the two
+class minima together.
+
+The exact-counter feasibility check constructs all 529 allocated constraints,
+does not call DDS, and requires a positive joint completion count for every
+one. It is intentionally opt-in:
+
+```powershell
+cd backend
+$env:GIBLE_RUN_SLOW_COVERAGE = '1'
+..\.venv\Scripts\python.exe -m unittest tests.test_joint_deal_sampler.JointDealSamplerTests.test_all_default_allocations_have_an_exact_joint_completion -v
+Remove-Item Env:GIBLE_RUN_SLOW_COVERAGE
+```
+
+The focused real-profile selector check records three reproducible
+`(target_hcp, base_shape_index, joint_seed)` identities: `(0,0,0)` → 3D,
+`(0,1,0)` → 3S, and `(0,3,0)` → 3H after `1NT-Pass-3C-Pass`. It uses the
+allocated stratum, exact joint sampler, Daqiush opening assessment, and actual
+selector. Run it with:
+
+```powershell
+cd backend
+..\.venv\Scripts\python.exe -m unittest tests.test_joint_deal_sampler.JointDealSamplerTests.test_real_allocated_strata_cover_every_five_card_major_inquiry_reply -v
+```
+
+After a real scan, inspect which saved hands produced each reply (including
+their coverage-cell identities) with:
+
+```powershell
+@'
+import json
+from pathlib import Path
+p = Path('../reports/block_scans/daqiush-1nt-coverage-seed23-minimal.json')
+r = json.loads(p.read_text(encoding='utf-8'))
+for c in r['cases'] + r['complete_cases'] + r['limit_cases']:
+    if c.get('calls', [])[:4] == ['1N', 'P', '3C', 'P'] and len(c['calls']) > 4 and c['calls'][4] in ('3D', '3H', '3S'):
+        print(c['calls'][4], c['coverage_cell'], c['hands']['n'])
+'@ | ..\.venv\Scripts\python.exe -
 ```
 
 The HTML viewer has **Blocked**, **Suspicious**, and **All deals** sections.
@@ -107,6 +152,10 @@ deal from another run (for example, `seed 23, #0042`). The JSON `id` and
 A comparable
 class has exactly the same North and South lengths in each named suit, and
 the full range of each player's raw HCP and Kaplan–Rubens score is at most 2.
+Pairs in one sampling cell that also produce the identical complete auction
+are merged: their DDS boards are pooled and all member pairs share one set of
+rates. A cell whose pairs diverge into different auctions splits into one cell
+per process.
 For the displayed final contract, a DDS failure rate above 60% is flagged.
 If the auction stopped below game, small slam, or grand slam, a DDS rate
 above 30% for any makeable contract at that level is flagged. A **wrong game**
@@ -114,13 +163,14 @@ warning applies only to an actual `3NT`, `4S`, `4H`, `5D`, or `5C` contract:
 the selected game's completion probability divided by the best alternative
 game's completion probability must be below 0.8, and the best alternative
 itself must clear 40%. Completion probabilities are `success / all boards`
-across all DDS boards in the class; alternative-game rates are listed
+across the pooled DDS boards of the cell; alternative-game rates are listed
 separately and can overlap. A class
 with fewer than `--min-class-boards` DDS boards or
 `--min-class-pairs` distinct North/South hands is marked insufficient rather
-than suspicious. Pairs within each quota cell are generated with the same
-North/South shapes and HCP, and each partner's K–R score stays within 2 of
-the first pair. These are terminal-auction screening signals, not a
+than suspicious. Pairs within each quota cell keep exact North/South shapes
+and exact South HCP. North HCP follows its mode (normal 15–17, upgrade 14, or
+soft 18), and each new K–R draw uses the current aggregate envelope rather
+than a pinned first-pair anchor. These are terminal-auction screening signals, not a
 diagnosis of which earlier bid was wrong. DDS is double-dummy, and synthetic
 coverage weights are not real-world frequencies. The report records the
 number of matching North/South pairs and DDS boards for every estimate.
@@ -160,14 +210,18 @@ cases separately. It records full hands and North/South HCP and K–R values.
 This report runs no DDS or contract success analysis. The supplied ranges do
 not themselves guarantee any particular opening; the profile chooses bids.
 
-The generator counts suit combinations by both scores, then draws only
-qualifying hands. South draws from the deck remaining after North; East and
-West randomly split the other 26 cards. Fixed seeds reproduce the same
-output. Contradictory shape or HCP requirements fail immediately; if North
-hands repeatedly leave no eligible South hand, the generator stops after
-`--max-tries` draws per deal and reports the failure. The selection is
-conditional on the requested constraints and is not a natural-frequency
-estimate or a uniform distribution over all qualifying N/S pairs.
+The joint generator counts exact legal North/South completions under the fixed
+named shapes, HCP targets/mode, and K–R envelopes, then samples backward by
+those completion counts. It is uniform over legal concrete N/S card
+assignments within those fixed constraints; it does not draw North first and
+blindly reject the remaining deck for South. A suit is rejected immediately
+when its North and South lengths total more than 13. A/K/Q/J/T/9/8 remain
+explicit in the count. Only ranks 2–7 share the score-state `x` abstraction,
+and the chosen state is refilled uniformly from its legal concrete 2–7
+allocations before any opponents are completed or DDS is called. Fixed seeds
+therefore reproduce the same concrete N/S assignments. The distribution is
+conditional on the requested synthetic constraints and is not a natural
+bridge-frequency estimate.
 
 ## IV Scanner in the local web workspace
 
@@ -179,19 +233,104 @@ E/W completions per pair, and a reproducible seed. The default is ten E/W
 completions. Progress remains visible while the other pages are usable;
 completed reports are saved under `reports/block_scans/`.
 
+A full scan also covers the complete Daqiush 1NT opener space. The 529 South
+cells are matched to 92 North strata: 68 legal named normal shapes (4333,
+4432, 5332, 6322, 5422, 4441 and 5431, excluding a six-card major and a
+five-card major with four or more in the other major), 12 guaranteed 14-HCP
+5332 upgrade strata, and 12 guaranteed soft-18 4432 strata. Within a named
+shape, hands keep their conditional card-combination frequency; different
+named shapes receive equal or near-equal cell quotas. Each `coverage_cell`
+records `opener_shape` and `opener_mode`, and the report carries a
+`coverage.north` summary. A scan with fewer than 92 strata still runs but marks
+`coverage.north.complete=false` and lists every omitted or failed stratum.
+For explicit reports, `coverage.north.requested_strata` is the authoritative
+cell-to-stratum schedule, while `coverage.north.cell_failures` records concrete
+generation failures and their exact missing pair slots. The remaining summary
+fields describe what was actually generated, so a partial report preserves
+both its requested coverage and its failures instead of silently appearing
+complete.
+Legacy reports without this metadata remain readable with
+`coverage.north.schema_status="legacy"`; no strata or modes are invented for
+them.
+
 The four finding filters are: **TD**, no supported next call; **丢**, a game
-or slam is available more than 30% of comparable DDS boards but was not bid;
-**宕**, the chosen contract fails on more than 60%; and **错**, the chosen
-game's completion probability divided by the best alternative game's
-completion probability is below 0.8 while the best alternative itself clears
-40%. Comparable hands have the same named-suit shapes and each seat's complete
-HCP and K–R spans stay within two points. The browser omits bulky DDS tables,
-groups findings by sampling cell, and shows every N/S pair of a selected cell
-in a vertical rail; picking one pair shows that pair's exact hands, auction,
-diagnostics, warnings, and its own E/W outcome strip marked MAKE, SET, and
-LOSE. The selected auction is rendered in rows of four calls, alongside
-numbered N/S hands, warning rates, alternative games, and the number of DDS
-boards. The saved JSON and standalone HTML retain full evidence.
+or slam is available more than the configured share of comparable DDS boards
+but was not bid; **宕**, the chosen contract fails more than the configured
+share; and **错**, the chosen game's completion probability divided by the best
+alternative game's completion probability falls below the configured ratio
+while the best alternative also clears its own floor. Comparable hands have
+the same named-suit shapes and each seat's complete HCP and K–R spans stay
+within two points. Pairs in one sampling cell with the identical complete
+auction are merged into one cell and their DDS boards are pooled; different
+auctions split into separate cells. The browser omits bulky DDS tables and
+shows every N/S pair of a selected cell in a vertical rail; picking one pair
+shows that pair's exact hands, auction, diagnostics, warnings, and its own E/W
+outcome strip marked MAKE, SET, and LOSE. A blocked auction ends with an
+orange TD call tile naming the seat that could not bid. Findings has a
+**Findings / Overview** switch: Overview lists every cell·process group,
+including clean ones, 100 per page with Prev/Next paging; search still applies,
+while category filters remain on the Findings view. Reading a report exposes
+sliders, direct numeric entry, and ←/→ step buttons
+for the SET failure share, the LOSE missed-share, the WRONG success ratio, and
+the WRONG best-other floor; TD has no threshold. Categories and counts
+reclassify immediately, while default thresholds remain 60%, 30%, 0.8, and
+40%. The saved
+JSON and standalone HTML retain full evidence.
+
+## Top up undersized cell·process groups
+
+The browser groups one cell per sampling cell × complete auction, so a report
+can show groups with one to three N/S pairs even when every HCP/shape sampling
+cell already contains ten. The extender tops up every existing process group:
+
+```powershell
+cd backend
+..\.venv\Scripts\python.exe -m engine.coverage_extend ..\reports\block_scans\old-report.json --target-pairs 10 --seed 41 --output ..\reports\block_scans\old-report-topup.json
+```
+
+`--target-pairs` defaults to 10. For an explicit report, the extender validates
+and obeys `coverage.north.requested_strata` and `cell_failures`; stored cases
+cannot override that authoritative cell schedule. It reconstructs even a
+zero-case failed cell from the report filters plus requested stratum, and a
+common repair pre-pass retries exactly the persisted missing pair slots before
+either extension scope starts its ordinary top-up. Normal North hands retain
+their natural 15–17 range; only `upgrade_14` and `soft_18` are exact-HCP modes.
+The K–R envelope is recomputed after every accepted pair from the current
+aggregate minimum and maximum, so it is not a fixed first-pair anchor.
+
+The default `--scope process` samples new N/S pairs under the parent sampling
+cell's exact South shape/HCP and authoritative North shape/mode. Known process
+groups are filled first.
+Once they reach the target, remaining sampling attempts may discover an
+auction not present in the report; that candidate opens a new process
+sub-cell, which is then topped up to the same target before another new
+process is considered. `--discard-new-processes` restores the older behavior
+of discarding unseen auctions. Discovery stops after
+`--discovery-idle-limit` consecutive attempts that do not open a new process
+(default 100; `0` disables discovery, and `None` in the Python API keeps
+trying until the attempt cap). `--max-attempts-per-cell` caps sampling per
+parent cell; groups still short of the target are listed in
+`extension.unreached_groups`, and newly opened groups are listed in
+`extension.discovered_processes`. `--ew-samples` overrides the stored E/W count
+and the seed reproduces the additions. `--scope sampling` tops up each parent
+HCP/shape sampling cell instead. Both explicit scopes use the same repair,
+validation, and dynamic-envelope rules. After extension, the aggregate
+analysis, block points, suspicious cases, counts, DDS-board totals, coverage
+observations, and the complete `coverage.north` summary are recomputed from
+the resulting cases rather than retaining stale source-report totals.
+
+Reports with `coverage.north.schema_status="legacy"` use the legacy
+reconstruction path because they have no authoritative requested-strata or
+failure metadata. That compatibility path retains its stored opener HCP and
+reference behavior and must not be interpreted as the explicit Task 4 rules.
+
+Added pairs cost one DDS solve per E/W sample, and rejected candidates still
+run an auction. Discovery uses the same per-cell attempt cap, so a large old
+report can take a long time; rare processes may not reach the target. Cells
+whose stored metadata cannot define a sampling rule are listed in
+`extension.skipped_cells` and left unchanged. Parent cells that already meet
+every process target are not re-sampled, so discovery only happens in cells
+that initially had a deficit.
 
 ## Re-sample small suspicious classes
 

@@ -98,7 +98,8 @@ class DaqiushOneNotrumpExpansionTests(unittest.TestCase):
         self.assertIsNone(self.bid('1NP2DP2HP2NP', 'SAQ7HKJ8DA762CQ54'))
         self.assertIsNone(self.bid('1NP2DP2HP2NP', 'SAJ65HK762DQ73CKQ'))
         self.assertEqual(self.bid('1NP2DP2HP', game), '3N')
-        self.assertEqual(self.bid('1NP2DP2HP3NP', 'SAQ7HKJ8DA762CQ54'), '4H')
+        self.assertEqual(self.bid('1NP2DP2HP3NP', 'SAQ7HKJ8DA762CQ54'), 'P')
+        self.assertEqual(self.bid('1NP2DP2HP3NP', 'SAQ7HKJ8DA7652CQ5'), '4H')
 
     def test_five_card_major_superaccept_retransfer_and_game(self):
         weak_hearts = 'S632HKJ763D842C76'
@@ -125,7 +126,8 @@ class DaqiushOneNotrumpExpansionTests(unittest.TestCase):
         self.assertEqual(self.bid('1NP2DP2HP', responder), '3C')
         self.assertEqual(self.bid('1NP2DP2HP3CP', 'SAK5HK8DA72CA9765'), '3D')
         self.assertEqual(self.bid('1NP2DP2HP3CP', 'SAK5HK8DQ72CA9765'), '3H')
-        self.assertEqual(self.bid('1NP2DP2HP3CP', 'SAK54HK832DQ72CA9'), '3N')
+        self.assertEqual(self.bid('1NP2DP2HP3CP', 'SAK54HK832DQ72CA9'), '3H')
+        self.assertEqual(self.bid('1NP2DP2HP3CP', 'SAK54HK8DQ762CA97'), '3N')
 
     def test_four_minor_stayman_after_major_denial(self):
         responder = 'SA32HK8DAQJ7CKJ87'

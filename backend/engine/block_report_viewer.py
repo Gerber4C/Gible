@@ -7,30 +7,62 @@ import json
 from pathlib import Path
 from typing import Mapping
 
-from .outcome_metrics import RULE_ID, reclassify_analysis
+from .outcome_metrics import (
+    RULE_ID, assess_auction_groups, case_cell_key, case_process_key,
+    reclassify_analysis,
+)
 
 
 TEMPLATE = Path(__file__).resolve().parent / 'templates' / 'block_report.html'
 PLACEHOLDER = '__BLOCK_REPORT_JSON__'
 
 
+def _case_id_key(case: Mapping):
+    value = case.get('id')
+    return (0, value) if isinstance(value, int) else (1, str(value))
+
+
 def group_suspicious_cases(cases: list[Mapping]) -> list[list[int]]:
-    """Partition nearby cases without allowing a group to drift past ±2 points."""
-    groups: list[list[Mapping]] = []
-    for case in sorted(cases, key=lambda item: item['id']):
-        for group in groups:
-            if all(
-                case['north_shape'] == member['north_shape']
-                and case['south_shape'] == member['south_shape']
-                and all(abs(case[field] - member[field]) <= 2 for field in (
-                    'north_hcp', 'south_hcp', 'north_kr', 'south_kr'))
-                for member in group
-            ):
-                group.append(case)
-                break
+    """Group one sampling cell's identical bidding process into one unit."""
+    grouped: dict[tuple, list] = {}
+    order = []
+    for case in sorted(cases, key=_case_id_key):
+        key = (case_cell_key(case), case_process_key(case))
+        if key not in grouped:
+            grouped[key] = []
+            order.append(key)
+        grouped[key].append(case['id'])
+    return [grouped[key] for key in order]
+
+
+def _budget_minimums(report: Mapping) -> tuple[int, int]:
+    budget = report.get('budget') or {}
+    min_boards = budget.get('min_class_boards', 10)
+    min_pairs = budget.get('min_class_pairs', 1)
+    if not isinstance(min_boards, int) or isinstance(min_boards, bool) or min_boards < 1:
+        min_boards = 10
+    if not isinstance(min_pairs, int) or isinstance(min_pairs, bool) or min_pairs < 1:
+        min_pairs = 1
+    return min_boards, min_pairs
+
+
+def _pooled_copies(members, analysis):
+    copies = []
+    for source in members:
+        case = dict(source)
+        if analysis is None:
+            case['analysis'] = reclassify_analysis(
+                case.get('contract'), case.get('analysis') or {})
         else:
-            groups.append([case])
-    return [[item['id'] for item in group] for group in groups]
+            case['analysis'] = {
+                **analysis,
+                'flags': list(analysis.get('flags') or ()),
+                'rates': dict(analysis.get('rates') or {}),
+                'alternative_game_rates': dict(
+                    analysis.get('alternative_game_rates') or {}),
+            }
+        copies.append(case)
+    return copies
 
 
 def render_html(report: Mapping) -> str:
@@ -44,21 +76,50 @@ def render_html(report: Mapping) -> str:
         raise ValueError('coverage report requires complete_cases and suspicious_cases lists')
     if report['schema_version'] == 2:
         report = dict(report)
+        min_boards, min_pairs = _budget_minimums(report)
+        complete = report['complete_cases']
+        eligible = [case for case in complete
+                    if isinstance(case, Mapping)
+                    and isinstance(case.get('contract'), str)
+                    and case.get('declarer') in ('n', 's')]
         complete_cases = []
-        for source in report['complete_cases']:
+        suspicious_cases = []
+        suspicious_groups = []
+        handled = set()
+        unhandled = {}
+        flagged_groups = 0
+        for members, analysis in assess_auction_groups(
+                eligible, min_boards=min_boards, min_pairs=min_pairs):
+            copies = _pooled_copies(members, analysis)
+            complete_cases.extend(copies)
+            handled.update(id(member) for member in members)
+            if any(case['analysis'].get('flags') for case in copies):
+                flagged_groups += 1
+                suspicious_groups.append([case['id'] for case in copies])
+                suspicious_cases.extend(
+                    case for case in copies if case['analysis'].get('flags'))
+        for source in complete:
+            if id(source) in handled:
+                continue
             case = dict(source)
             case['analysis'] = reclassify_analysis(
                 case.get('contract'), case.get('analysis') or {})
-            complete_cases.append(case)
-        suspicious_cases = [case for case in complete_cases
-                            if case['analysis'].get('flags')]
+            unhandled.setdefault(
+                (case_cell_key(case), case_process_key(case)), []).append(case)
+        for copies in unhandled.values():
+            complete_cases.extend(copies)
+            if any(case['analysis'].get('flags') for case in copies):
+                flagged_groups += 1
+                suspicious_groups.append([case.get('id') for case in copies])
+                suspicious_cases.extend(
+                    case for case in copies if case['analysis'].get('flags'))
         summary = dict(report.get('summary') or {})
-        summary['suspicious'] = len(suspicious_cases)
+        summary['suspicious'] = flagged_groups
         report['complete_cases'] = complete_cases
         report['suspicious_cases'] = suspicious_cases
         report['summary'] = summary
         report['wrong_game_rule'] = RULE_ID
-        report['suspicious_groups'] = group_suspicious_cases(report['suspicious_cases'])
+        report['suspicious_groups'] = suspicious_groups
     # JSON is a JavaScript literal here. Escape HTML-significant characters so
     # strings from diagnostics cannot close the inline script element.
     payload = json.dumps(report, ensure_ascii=False, separators=(',', ':'))

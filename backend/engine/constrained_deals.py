@@ -26,6 +26,12 @@ RANKS = 'AKQJT98765432'
 DECK = tuple((suit, rank) for suit in SUITS for rank in RANKS)
 
 
+def kr_shape_adjustment_units(shape) -> int:
+    """Return the fixed K-R shape adjustment in twentieths of a point."""
+
+    return -10 if sorted(shape) == [3, 3, 3, 4] else -20
+
+
 @dataclass(frozen=True)
 class HandConstraints:
     """S/H/D/C lengths, raw HCP interval, and pure K–R interval."""
@@ -65,8 +71,7 @@ class _HandPlan:
                 groups[(hcp, kr_units)].append(combo)
             self.buckets.append(groups)
 
-        # assess_quality adds -1 point for general shape, or -0.5 for 4333.
-        shape_adjustment = -10 if sorted(rule.shape) == [3, 3, 3, 4] else -20
+        shape_adjustment = kr_shape_adjustment_units(rule.shape)
         min_kr = math.ceil(rule.kr[0] * 20 - 1e-8) - shape_adjustment
         max_kr = math.floor(rule.kr[1] * 20 + 1e-8) - shape_adjustment
         self.layers = [{(0, 0): 1}]

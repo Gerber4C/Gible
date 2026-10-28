@@ -23,8 +23,9 @@ from .coverage_scan import (
 from .dds_adapter import available_solver_info, calculate_available_table
 from .hand_quality import assess_quality
 from .outcome_metrics import (
-    RULE_ID, available_level, classify_rates, game_success_ratio,
-    reached_game, reclassify_analysis,
+    RULE_ID, assess_auction_groups, available_level, case_cell_key,
+    case_process_key, classify_rates, game_success_ratio, reached_game,
+    reclassify_analysis,
 )
 from .selector import choose_bid
 from .simulator import simulate_auction
@@ -43,17 +44,54 @@ def _current_suspicious_cases(source: Mapping) -> list[Mapping]:
         return list(source['suspicious_cases'])
     if not isinstance(complete_cases, list):
         raise ValueError('source complete_cases must be a list')
-    current = []
     for original in complete_cases:
         if not isinstance(original, Mapping):
             raise ValueError('source complete_cases must contain mappings')
+    budget = source.get('budget') or {}
+    min_boards = budget.get('min_class_boards', 10)
+    min_pairs = budget.get('min_class_pairs', 1)
+    if not isinstance(min_boards, int) or isinstance(min_boards, bool) or min_boards < 1:
+        min_boards = 10
+    if not isinstance(min_pairs, int) or isinstance(min_pairs, bool) or min_pairs < 1:
+        min_pairs = 1
+    eligible = [case for case in complete_cases
+                if isinstance(case.get('contract'), str)
+                and case.get('declarer') in ('n', 's')]
+    current = []
+    handled = set()
+    for members, analysis in assess_auction_groups(
+            eligible, min_boards=min_boards, min_pairs=min_pairs):
+        copies = []
+        for original in members:
+            case = dict(original)
+            if analysis is None:
+                case['analysis'] = reclassify_analysis(
+                    case.get('contract'), case.get('analysis') or {})
+            else:
+                case['analysis'] = {
+                    **analysis,
+                    'flags': list(analysis.get('flags') or ()),
+                    'rates': dict(analysis.get('rates') or {}),
+                    'alternative_game_rates': dict(
+                        analysis.get('alternative_game_rates') or {}),
+                }
+            copies.append(case)
+            handled.add(id(original))
+        if any(case['analysis'].get('flags') for case in copies):
+            current.extend(case for case in copies if case['analysis'].get('flags'))
+    unhandled = {}
+    for original in complete_cases:
+        if id(original) in handled:
+            continue
         case = dict(original)
         analysis = case.get('analysis') or {}
         if not isinstance(analysis, Mapping):
             raise ValueError('source analysis must be a mapping')
         case['analysis'] = reclassify_analysis(case.get('contract'), analysis)
-        if case['analysis'].get('flags'):
-            current.append(case)
+        unhandled.setdefault(
+            (case_cell_key(case), case_process_key(case)), []).append(case)
+    for copies in unhandled.values():
+        current.extend(case for case in copies if case['analysis'].get('flags'))
     return current
 
 

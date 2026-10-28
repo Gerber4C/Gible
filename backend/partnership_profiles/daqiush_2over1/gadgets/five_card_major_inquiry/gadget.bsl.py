@@ -160,6 +160,7 @@ class FiveCardMajorInquiry(Gadget):
         probe.meaning.hcp_max = 15
         probe.description = ('Good 14–15 HCP minor 5-4-2-2 probes for a minor slam; '
                              'later calls require sampled-deal evaluation.')
+        probe.priority = 1
 
         for level in (5, 6):
             for minor in 'CD':
@@ -173,3 +174,39 @@ class FiveCardMajorInquiry(Gadget):
                 placement.meaning.target_suit = minor
                 placement.meaning.purpose_completed = True
                 placement.description = 'Chosen by public-information sampled DDS decision.'
+
+        choice = self.call('three_three_minor_choice_5nt')
+        choice.when = '1NP3CP3DP4NTP'
+        choice.bid = '5NT'
+        choice.applies = (lambda ctx: ctx.hand is not None
+                          and sorted(ctx.hand.length(s) for s in 'CD') == [3, 3])
+        choice.meaning.action = 'minor_suit_choice_ask'
+        choice.meaning.nature = ['artificial']
+        choice.meaning.acts = ['inquiry']
+        choice.description = ('With 3-3 minors ask responder to name the '
+                              'five-card minor at the six level.')
+
+        for minor in 'CD':
+            named = self.call('three_three_minor_choice_6' + minor.lower())
+            named.when = '1NP3CP3DP4NTP5NTP'
+            named.bid = '6' + minor
+            named.applies = (lambda ctx, m=minor: ctx.hand is not None
+                             and ctx.hand.length(m) >= 5)
+            named.meaning.action = 'five_card_minor_placement'
+            named.meaning.nature = ['natural']
+            named.meaning.acts = ['signoff', 'final_placement']
+            named.meaning.target_suit = minor
+            named.meaning.purpose_completed = True
+            named.description = 'Name the five-card minor for the slam.'
+
+        no_minor = self.call('three_three_minor_choice_6nt')
+        no_minor.when = '1NP3CP3DP4NTP5NTP'
+        no_minor.bid = '6NT'
+        no_minor.applies = (lambda ctx: ctx.hand is not None
+                            and max(ctx.hand.length(s) for s in 'CD') < 5)
+        no_minor.meaning.action = 'minor_choice_no_five_card_minor'
+        no_minor.meaning.nature = ['natural']
+        no_minor.meaning.acts = ['signoff', 'final_placement']
+        no_minor.meaning.target_suit = 'N'
+        no_minor.meaning.purpose_completed = True
+        no_minor.description = 'Without a five-card minor, play 6NT.'

@@ -150,7 +150,8 @@ class DaqiushOpeningTests(unittest.TestCase):
                 self.assertTrue(any('No authored call' in line for line in report['diagnostics']))
         result = simulate_auction(profile, {'n': hand, 's': Hand.parse(EXAMPLES[6][1])})
         self.assertEqual(result.calls[:7], ('1N', 'P', '2H', 'P', '2S', 'P', '3C'))
-        self.assertEqual(result.status, 'blocked')
+        self.assertEqual(result.calls[7:], ('P', '3S', 'P', '4S', 'P', 'P', 'P'))
+        self.assertEqual(result.status, 'complete')
 
     def test_profile_is_discoverable_and_uses_only_actor_cards(self):
         self.profile()

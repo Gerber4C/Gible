@@ -15,12 +15,43 @@ from .legality import illegal_calls_in_auction
 from .memory import SeatMemory
 from .purpose_axiom import complete_purpose, remember_selected_purpose, resolve_purpose, terminal_pass_candidate
 from .replay import active_environment_for, replay_auction
+from .slam_conventions import keycard_ask_restricted
+from .slam_intent import detect_slam_intent
 from .simulation_decision import (decide_minor_5422, is_minor_5422_decision,
                                   decide_minor_major_74, is_minor_major_74_decision,
                                   decide_two_major_spade_slam,
                                   is_two_major_spade_slam_decision,
                                   decide_six_four_major_after_three_notrump,
                                   is_six_four_major_after_three_notrump)
+
+
+def _partner_minimum(auction: Auction, owner: str) -> int:
+    partner = {'n': 's', 's': 'n', 'e': 'w', 'w': 'e'}[owner]
+    for index, call in enumerate(auction.calls):
+        if auction.actor_at(index) == partner and call == '1N':
+            return 15
+    return 12
+
+
+def _apply_keycard_restrictions(auction: Auction, hand: Hand,
+                                candidates, trace):
+    kept = []
+    for candidate in candidates:
+        meaning = candidate.public_meaning or {}
+        if candidate.call == '4N' and 'keycard_asking' in meaning.get(
+                'call_act_types', ()):
+            trump = meaning.get('agreed_suit') or meaning.get('target_suit')
+            if trump in 'CDHS':
+                grand = detect_slam_intent(
+                    hand, _partner_minimum(auction, auction.actor_to_call),
+                    strain=trump).grand
+                if keycard_ask_restricted(hand, trump, grand_candidate=grand):
+                    trace.warn(
+                        '4NT keycard ask restricted for this keycard/queen '
+                        'holding; cue-bid instead')
+                    continue
+        kept.append(candidate)
+    return tuple(kept)
 
 
 def choose_bid(
@@ -59,6 +90,7 @@ def choose_bid(
         return BidDecision(call=None, selected_candidate=None,
                            candidate_pool=CandidatePool((), auction), trace=trace,
                            private_memory=actor_memory)
+    candidates = _apply_keycard_restrictions(auction, hand, candidates, trace)
     fallback = None
 
     if not candidates and profile.missing_call_behavior == 'block':

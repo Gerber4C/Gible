@@ -33,7 +33,7 @@ SIX_FOUR_MAJOR_THREE_NOTRUMP = {
     ('1N', 'P', '2C', 'P', '2D', 'P', '3H', 'P', '3N', 'P'): 'S',
     ('1N', 'P', '2C', 'P', '2D', 'P', '3S', 'P', '3N', 'P'): 'H',
 }
-SAMPLE_COUNT = 20
+SAMPLE_COUNT = 40
 MIN_GOOD_SAMPLES = 12
 
 
@@ -290,6 +290,12 @@ def decide_minor_5422(auction: Auction, hand: Hand) -> dict:
     """Choose among 5m/6m by completion on sampled public-compatible deals."""
     if auction.calls != MINOR_5422_AUCTION:
         raise ValueError('Minor 5-4-2-2 simulation requires its authored 4NT auction')
+    if sorted(hand.length(suit) for suit in 'CD') == [3, 3]:
+        return {
+            'call': '5N', 'sample_count': 0, 'attempts': 0,
+            'seed': _seed(auction, hand),
+            'comparison': 'three-three minors; 5NT asks responder for the five-card minor',
+        }
     actor = auction.actor_to_call
     partner = {'n': 's', 's': 'n', 'e': 'w', 'w': 'e'}[actor]
     constraints = {partner: {
@@ -299,7 +305,7 @@ def decide_minor_5422(auction: Auction, hand: Hand) -> dict:
     }}
     sampled = sample_deals(actor, hand, public_constraints=constraints,
                            sample_count=SAMPLE_COUNT, seed=_seed(auction, hand),
-                           max_attempts=50000, max_seconds=8.0)
+                           max_attempts=50000, max_seconds=20.0)
     deals = tuple(deal for deal in sampled.deals if assess_quality(deal[partner])['good'])
     if len(deals) < MIN_GOOD_SAMPLES:
         raise ValueError(f'Only {len(deals)} sampled responder hands matched the public good-hand promise')

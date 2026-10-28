@@ -18,7 +18,8 @@ class IVScannerTests(unittest.TestCase):
             'NT': {'n': nt, 's': nt},
         }
 
-    def pair(self, case_id, slot, *, hcp=10, shape=(6, 3, 2, 2), cell=0):
+    @staticmethod
+    def pair(case_id, slot, *, hcp=10, shape=(6, 3, 2, 2), cell=0):
         return {
             'id': case_id,
             'hands': {'n': f'SAKQJH432D432C{case_id}',
@@ -34,108 +35,130 @@ class IVScannerTests(unittest.TestCase):
             },
         }
 
+    @staticmethod
+    def in_cell(case, *, hcp, shape, cell):
+        case['coverage_cell'].update(
+            target_hcp=hcp, base_shape_index=cell, base_shape=list(shape))
+        case['south_hcp'] = hcp
+        case['south_shape'] = list(shape)
+        return case
+
     def sample_report(self):
-        warned = self.pair(2, 1)
-        warned.update(
-            contract='4S', declarer='n',
-            dds_tables=[self.table(spades=10), self.table(spades=9),
-                        self.table(spades=9, hearts=12)],
-            analysis={'flags': ['contract_failure'],
-                      'rates': {'contract_failure': 2 / 3, 'wrong_game': None},
-                      'alternative_game_rates': {'3NT': 0.0, '4H': 1 / 3},
-                      'class_pairs': 3, 'dds_boards': 3},
-        )
-        clean = self.pair(1, 0)
-        clean.update(contract='4S', declarer='n', dds_tables=[self.table()],
-                     analysis={'flags': [],
-                               'rates': {'contract_failure': 0.0},
-                               'alternative_game_rates': {'3NT': 0.0}})
-        limit = self.pair(3, 2)
-        limit['status'] = 'limit'
-        clean_cell = []
-        for case_id, slot in ((4, 0), (5, 1), (6, 2)):
-            case = self.pair(case_id, slot, hcp=11, shape=(5, 4, 3, 1), cell=1)
-            case.update(contract='3NT', declarer='n', dds_tables=[self.table()],
-                        analysis={'flags': [],
-                                  'rates': {'contract_failure': 0.0},
-                                  'alternative_game_rates': {'4S': 0.0}})
-            clean_cell.append(case)
+        calls_a = ('1N', 'P', '3N', 'P', 'P', 'P')
+        calls_b = ('1N', 'P', '2H', 'P', '2S', 'P', '4S', 'P', 'P', 'P')
+        calls_c = ('1N', 'P', '2D', 'P', '2H', 'P')
+        calls_d = ('1N', 'P', '2D', 'P', '2H', 'P', '4H', 'P', 'P', 'P')
+        calls_e = ('1N', 'P', '2H', 'P', '2S', 'P', '3D')
+
+        clean_a1 = dict(self.pair(1, 0), calls=list(calls_a), auction='1NP3NPPP',
+                        contract='3NT', declarer='n',
+                        dds_tables=[self.table() for _ in range(3)])
+        clean_a2 = dict(self.pair(2, 1), calls=list(calls_a), auction='1NP3NPPP',
+                        contract='3NT', declarer='n',
+                        dds_tables=[self.table() for _ in range(3)])
+        warned = dict(self.pair(3, 2), calls=list(calls_b),
+                      auction='1NP2HP2SP4SPPP', contract='4S', declarer='n',
+                      dds_tables=([self.table(spades=9, nt=6)] * 9
+                                  + [self.table(spades=9, nt=6, hearts=12)]))
+        limit = dict(self.pair(4, 3), calls=list(calls_c),
+                     auction='1NP2DP2HPPP', status='limit')
+        clean_b = [
+            self.in_cell(dict(self.pair(case_id, slot), calls=list(calls_d),
+                              auction='1NP2DP2HP4HPPP', contract='4H',
+                              declarer='s', dds_tables=[self.table(hearts=10)]),
+                         hcp=11, shape=(5, 4, 3, 1), cell=1)
+            for case_id, slot in ((5, 0), (6, 1), (7, 2))
+        ]
+        blocked = self.in_cell(
+            dict(self.pair(8, 3), calls=list(calls_e),
+                 auction='1NP2HP2SP3DP',
+                 blocked={'seat': 's', 'diagnostics': ['No call']}),
+            hcp=11, shape=(5, 4, 3, 1), cell=1)
         return {
             'schema_version': 2, 'profile': {'id': 'daqiush_2over1'},
             'seed': 23,
-            'summary': {'pairs': 6, 'complete': 5, 'blocked': 0,
-                        'limit': 1, 'dds_boards': 7, 'suspicious': 99},
-            'budget': {'pairs_per_cell': 3, 'ew_samples': 3},
+            'summary': {'pairs': 8, 'complete': 6, 'blocked': 1,
+                        'limit': 1, 'dds_boards': 19, 'suspicious': 99},
+            'budget': {'pairs_per_cell': 4, 'ew_samples': 3,
+                       'min_class_boards': 2, 'min_class_pairs': 1},
             'filters': {'opening': '1N'},
             'wrong_game_rule': 'legacy_joint_failure_30pct',
-            'cases': [],
-            'complete_cases': [clean, warned, *clean_cell],
+            'cases': [blocked],
+            'complete_cases': [clean_a1, clean_a2, warned, *clean_b],
             'limit_cases': [limit],
         }
 
-    def test_report_projects_warned_cell_with_all_siblings_and_explicit_schema(self):
+    def test_report_splits_every_cell_by_auction_process_and_keeps_siblings(self):
         projected = project_report(self.sample_report(), 'sample.json')
 
         self.assertNotIn('cases', projected)
-        self.assertEqual(len(projected['groups']), 1)
+        self.assertEqual(len(projected['groups']), 5)
         group = projected['groups'][0]
         self.assertEqual(set(group), {
-            'id', 'south_hcp', 'south_shape', 'warning_counts',
-            'actual_pair_count', 'expected_pair_count', 'incomplete', 'pairs',
+            'id', 'parent_id', 'south_hcp', 'south_shape', 'auction',
+            'warning_counts', 'actual_pair_count', 'parent_pair_count',
+            'expected_pair_count', 'incomplete', 'pairs',
         })
-        self.assertEqual(group['id'], '10:0')
+        self.assertEqual(group['id'], '10:0|1NP3NPPP')
+        self.assertEqual(group['parent_id'], '10:0')
         self.assertEqual(group['south_hcp'], 10)
         self.assertEqual(group['south_shape'], [6, 3, 2, 2])
+        self.assertEqual(group['auction'], '1NP3NPPP')
         self.assertEqual(group['warning_counts'],
-                         {'block': 0, 'missed': 0, 'down': 1, 'wrong': 0})
-        self.assertEqual(group['actual_pair_count'], 3)
-        self.assertEqual(group['expected_pair_count'], 3)
+                         {'block': 0, 'missed': 0, 'down': 0, 'wrong': 0})
+        self.assertEqual(group['actual_pair_count'], 2)
+        self.assertEqual(group['parent_pair_count'], 4)
+        self.assertEqual(group['expected_pair_count'], 4)
         self.assertFalse(group['incomplete'])
-        self.assertEqual([pair['id'] for pair in group['pairs']], [1, 2, 3])
-        self.assertEqual(group['pairs'][0]['categories'], [])
-        self.assertEqual(group['pairs'][0]['pair_slot'], 0)
-        self.assertEqual(group['pairs'][0]['status'], 'complete')
-        self.assertEqual(group['pairs'][2]['status'], 'limit')
-        self.assertNotIn('contract', group['pairs'][2])
-        self.assertNotIn('ew_results', group['pairs'][2])
+        self.assertEqual([pair['id'] for pair in group['pairs']], [1, 2])
+        self.assertEqual([pair['pair_slot'] for pair in group['pairs']], [0, 1])
+
+        down = projected['groups'][1]
+        self.assertEqual(down['id'], '10:0|1NP2HP2SP4SPPP')
+        self.assertEqual([pair['id'] for pair in down['pairs']], [3])
+        self.assertEqual(down['pairs'][0]['flags'], ['contract_failure'])
+        self.assertEqual(down['pairs'][0]['class_pairs'], 1)
+        self.assertEqual(down['pairs'][0]['dds_boards'], 10)
+        self.assertEqual(down['warning_counts']['down'], 1)
         self.assertEqual(projected['counts'],
-                         {'block': 0, 'missed': 0, 'down': 1, 'wrong': 0})
-        self.assertEqual(projected['summary']['suspicious'], 1)
+                         {'block': 1, 'missed': 0, 'down': 1, 'wrong': 0})
+        self.assertEqual(projected['summary']['suspicious'], 2)
         self.assertEqual(projected['wrong_game_rule'], RULE_ID)
         self.assertNotIn('dds_tables', json.dumps(projected))
 
-    def test_blocked_sibling_is_retained_and_counted(self):
-        report = self.sample_report()
-        blocked = report['complete_cases'].pop(0)
-        for field in ('contract', 'declarer', 'dds_tables', 'analysis'):
-            blocked.pop(field)
-        blocked['blocked'] = {'seat': 's', 'diagnostics': ['No call']}
-        report['cases'].append(blocked)
+    def test_blocked_and_limit_processes_stay_their_own_cells(self):
+        projected = project_report(self.sample_report(), 'sample.json')
 
-        projected = project_report(report, 'sample.json')
+        limit_group = projected['groups'][2]
+        self.assertEqual(limit_group['id'], '10:0|1NP2DP2HPPP')
+        self.assertEqual(limit_group['pairs'][0]['status'], 'limit')
+        self.assertNotIn('contract', limit_group['pairs'][0])
+        self.assertNotIn('ew_results', limit_group['pairs'][0])
 
-        self.assertEqual(projected['groups'][0]['pairs'][0]['status'], 'blocked')
-        self.assertEqual(projected['groups'][0]['warning_counts']['block'], 1)
+        blocked_group = projected['groups'][4]
+        self.assertEqual(blocked_group['pairs'][0]['status'], 'blocked')
+        self.assertEqual(blocked_group['warning_counts']['block'], 1)
         self.assertEqual(projected['counts']['block'], 1)
 
     def test_ew_results_keep_make_set_and_independent_missed_target(self):
         projected = project_report(self.sample_report(), 'sample.json')
-        results = projected['groups'][0]['pairs'][1]['ew_results']
+        results = projected['groups'][1]['pairs'][0]['ew_results']
 
-        self.assertEqual([result['outcome'] for result in results],
-                         ['MAKE', 'SET', 'SET'])
+        self.assertEqual(len(results), 10)
         self.assertEqual(results[0],
-                         {'outcome': 'MAKE', 'lose': False, 'missed_target': None})
-        self.assertEqual(results[2],
+                         {'outcome': 'SET', 'lose': False, 'missed_target': None})
+        self.assertEqual(results[-1],
                          {'outcome': 'SET', 'lose': True,
                           'missed_target': 'small slam'})
 
-    def test_legacy_cases_group_by_stored_south_identity_and_reclassify_stale_flags(self):
+    def test_legacy_cases_split_by_stored_cell_and_call_sequence(self):
         report = self.sample_report()
-        legacy = [self.pair(8, 0), self.pair(3, 1)]
-        for case in legacy:
+        legacy = [self.pair(3, 0), self.pair(8, 1)]
+        for case, calls in zip(legacy, (('1N', 'P', '3N', 'P', 'P', 'P'),
+                                        ('1N', 'P', '2N', 'P', 'P', 'P'))):
             case.pop('coverage_cell')
-            case.update(contract='4S', declarer='n', dds_tables=[self.table()],
+            case.update(calls=list(calls), auction=' '.join(calls),
+                        contract='4S', declarer='n',
                         analysis={'flags': ['contract_failure', 'wrong_game',
                                             'missed_small_slam'],
                                   'rates': {'contract_failure': .6,
@@ -146,17 +169,22 @@ class IVScannerTests(unittest.TestCase):
 
         projected = project_report(report, 'legacy.json')
 
-        group = projected['groups'][0]
-        self.assertEqual(group['id'], 'legacy:10:6-3-2-2')
-        self.assertEqual([pair['id'] for pair in group['pairs']], [3, 8])
-        self.assertEqual([pair['pair_slot'] for pair in group['pairs']], [0, 1])
-        self.assertEqual(group['actual_pair_count'], 2)
-        self.assertEqual(group['expected_pair_count'], 3)
-        self.assertTrue(group['incomplete'])
-        self.assertEqual(group['pairs'][0]['flags'], ['missed_small_slam'])
-        self.assertEqual(group['warning_counts']['missed'], 2)
-        self.assertEqual(group['warning_counts']['down'], 0)
-        self.assertEqual(group['warning_counts']['wrong'], 0)
+        self.assertEqual(len(projected['groups']), 2)
+        first, second = projected['groups']
+        self.assertEqual(first['id'], 'legacy:10:6-3-2-2|1N P 3N P P P')
+        self.assertEqual(second['id'], 'legacy:10:6-3-2-2|1N P 2N P P P')
+        self.assertEqual([pair['id'] for pair in first['pairs']], [3])
+        self.assertEqual([pair['id'] for pair in second['pairs']], [8])
+        self.assertEqual([pair['pair_slot'] for pair in first['pairs']], [0])
+        self.assertEqual([pair['pair_slot'] for pair in second['pairs']], [1])
+        self.assertEqual(first['actual_pair_count'], 1)
+        self.assertEqual(first['parent_pair_count'], 2)
+        self.assertEqual(first['expected_pair_count'], 4)
+        self.assertTrue(first['incomplete'])
+        self.assertEqual(first['pairs'][0]['flags'], ['missed_small_slam'])
+        self.assertEqual(projected['counts']['missed'], 2)
+        self.assertEqual(projected['counts']['down'], 0)
+        self.assertEqual(projected['counts']['wrong'], 0)
         json.dumps(projected, allow_nan=False)
 
     def test_invalid_legacy_identity_is_retained_as_incomplete_fallback(self):
@@ -165,7 +193,9 @@ class IVScannerTests(unittest.TestCase):
         broken.pop('coverage_cell')
         broken.pop('south_hcp')
         broken['south_shape'] = [6, 3, 2]
-        broken.update(contract='4S', declarer='n', dds_tables=[self.table(spades=9)],
+        broken.update(contract='4S', declarer='n',
+                      calls=['1N', 'P', '4S', 'P', 'P', 'P'],
+                      auction='1NP4SPPP',
                       analysis={'flags': ['contract_failure'],
                                 'rates': {'contract_failure': 1.0},
                                 'alternative_game_rates': {}})
@@ -174,10 +204,27 @@ class IVScannerTests(unittest.TestCase):
         projected = project_report(report, 'legacy.json')
 
         group = projected['groups'][0]
-        self.assertEqual(group['id'], 'legacy-fallback:77')
+        self.assertEqual(group['id'], 'legacy-fallback:77|1NP4SPPP')
         self.assertEqual(group['actual_pair_count'], 1)
-        self.assertEqual(group['expected_pair_count'], 3)
+        self.assertEqual(group['parent_pair_count'], 1)
+        self.assertEqual(group['expected_pair_count'], 4)
         self.assertTrue(group['incomplete'])
+        self.assertEqual(group['warning_counts']['down'], 1)
+
+    def test_process_pair_target_marks_process_groups_incomplete(self):
+        report = self.sample_report()
+        report['budget']['pairs_per_process_cell'] = 2
+
+        projected = project_report(report, 'sample.json')
+
+        clean = projected['groups'][0]
+        self.assertEqual(clean['actual_pair_count'], 2)
+        self.assertEqual(clean['expected_pair_count'], 2)
+        self.assertFalse(clean['incomplete'])
+        down = projected['groups'][1]
+        self.assertEqual(down['actual_pair_count'], 1)
+        self.assertEqual(down['expected_pair_count'], 2)
+        self.assertTrue(down['incomplete'])
 
     def test_scan_options_are_bounded_and_north_one_notrump(self):
         settings = scan_options({})
@@ -225,6 +272,33 @@ class IVScannerTests(unittest.TestCase):
 
             self.assertEqual([item['id'] for item in list_reports(root)],
                              ['iv-scan-good.json'])
+
+
+    def test_explicit_opener_metadata_flows_through_projection(self):
+        report = self.sample_report()
+        for case in report['complete_cases'] + report['cases'] + report['limit_cases']:
+            cell = dict(case['coverage_cell'])
+            cell['opener_shape'] = [4, 3, 3, 3]
+            cell['opener_mode'] = 'normal'
+            case['coverage_cell'] = cell
+        report['coverage'] = {'north': {
+            'schema_status': 'explicit', 'required_cells': 92,
+            'available_cells': 4, 'complete': False,
+        }}
+
+        projected = project_report(report, 'sample.json')
+
+        self.assertEqual(projected['coverage']['north']['schema_status'], 'explicit')
+        self.assertEqual(projected['groups'][0]['opener_shape'], [4, 3, 3, 3])
+        self.assertEqual(projected['groups'][0]['opener_mode'], 'normal')
+        self.assertEqual(
+            projected['groups'][0]['pairs'][0]['coverage_cell']['opener_mode'],
+            'normal')
+
+    def test_legacy_report_has_a_strict_legacy_north_marker(self):
+        projected = project_report(self.sample_report(), 'sample.json')
+        self.assertEqual(projected['coverage'],
+                         {'north': {'schema_status': 'legacy'}})
 
 
 if __name__ == '__main__':

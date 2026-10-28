@@ -117,16 +117,18 @@ class BlockReportViewerTests(unittest.TestCase):
         self.assertNotIn('odds ratio', html)
         self.assertNotIn('Down > 50%', html)
 
-    def test_suspicious_groups_require_pairwise_shape_hcp_and_kr_match(self):
-        base = {'north_shape': [4, 3, 3, 3], 'south_shape': [6, 3, 2, 2],
-                'north_hcp': 16, 'south_hcp': 11,
-                'north_kr': 16.0, 'south_kr': 12.0}
+    def test_suspicious_groups_split_by_sampling_cell_and_auction_process(self):
+        cell_a = {'coverage_cell': {'target_hcp': 10, 'base_shape_index': 0,
+                                    'base_shape': [6, 3, 2, 2], 'pair_slot': 0}}
+        cell_b = {'coverage_cell': {'target_hcp': 11, 'base_shape_index': 1,
+                                    'base_shape': [5, 4, 3, 1], 'pair_slot': 0}}
         cases = [
-            {'id': 1, **base},
-            {'id': 2, **base, 'north_kr': 17.8},
-            {'id': 3, **base, 'north_kr': 19.6},
-            {'id': 4, **base, 'south_shape': [5, 4, 2, 2]},
-            {'id': 5, **base, 'south_hcp': 14},
+            {'id': 1, **cell_a, 'calls': ['1N', 'P', '3N']},
+            {'id': 2, **cell_a, 'calls': ['1N', 'P', '3N']},
+            {'id': 3, **cell_a, 'calls': ['1N', 'P', '2H']},
+            {'id': 4, **cell_b, 'calls': ['1N', 'P', '3N']},
+            {'id': 5, 'south_hcp': 10, 'south_shape': [6, 3, 2, 2],
+             'calls': ['1N', 'P', '3N']},
         ]
         self.assertEqual(group_suspicious_cases(cases), [[1, 2], [3], [4], [5]])
 

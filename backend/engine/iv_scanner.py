@@ -14,7 +14,10 @@ from pathlib import Path
 from .block_report_viewer import render_html
 from .coverage_scan import COVERAGE_SHAPES, scan_coverage
 from .loader import load_profile
-from .outcome_metrics import RULE_ID, board_result, reclassify_analysis
+from .outcome_metrics import (
+    RULE_ID, assess_auction_groups, board_result, case_process_key,
+    reclassify_analysis,
+)
 
 
 REPORT_ROOT = Path(__file__).resolve().parents[2] / 'reports' / 'block_scans'
@@ -102,14 +105,23 @@ def _cell_identity(case: dict) -> tuple[str, int | None, list[int] | None, int |
         list(shape) if _valid_shape(shape) else None), None, True
 
 
-def _pair_projection(case: dict, status: str, pair_slot: int | None) -> dict:
-    analysis = (reclassify_analysis(case.get('contract'), case.get('analysis') or {})
-                if status == 'complete' and isinstance(case.get('contract'), str)
-                else dict(case.get('analysis') or {}))
-    flags = list(analysis.get('flags') or ()) if status == 'complete' else []
-    categories = (['block'] if status == 'blocked' else
-                  sorted({FLAG_CATEGORY[flag] for flag in flags
-                          if flag in FLAG_CATEGORY}))
+def _id_sort_key(value):
+    return (0, value) if isinstance(value, int) else (1, str(value))
+
+
+def _auction_label(case: dict) -> str:
+    auction = case.get('auction')
+    if isinstance(auction, str) and auction:
+        return auction
+    calls = case.get('calls')
+    if isinstance(calls, (list, tuple)) and calls:
+        return ' '.join(str(call) for call in calls)
+    return 'no-calls'
+
+
+def _pair_projection(case: dict, status: str, pair_slot: int | None,
+                     analysis: dict | None, categories: list[str],
+                     *, include_results: bool = True) -> dict:
     hands = case.get('hands') or {}
     pair = {
         'id': case.get('id'), 'pair_slot': pair_slot, 'status': status,
@@ -119,6 +131,7 @@ def _pair_projection(case: dict, status: str, pair_slot: int | None) -> dict:
         'north_kr': case.get('north_kr'), 'south_kr': case.get('south_kr'),
         'north_shape': case.get('north_shape'), 'south_shape': case.get('south_shape'),
         'auction': case.get('auction'), 'calls': case.get('calls'),
+        'coverage_cell': case.get('coverage_cell'),
     }
     if status == 'blocked':
         pair['blocked'] = case.get('blocked')
@@ -127,22 +140,45 @@ def _pair_projection(case: dict, status: str, pair_slot: int | None) -> dict:
         declarer = case.get('declarer')
         tables = case.get('dds_tables')
         results = []
-        if (isinstance(contract, str) and declarer in ('n', 's')
+        if (include_results and isinstance(contract, str) and declarer in ('n', 's')
                 and isinstance(tables, list)):
             results = [board_result(contract, declarer, table) for table in tables]
+        analysis = analysis or {}
         pair.update({
             'contract': contract, 'declarer': declarer, 'ew_results': results,
-            'flags': flags, 'rates': analysis.get('rates', {}),
+            'flags': list(analysis.get('flags') or ()),
+            'rates': analysis.get('rates', {}),
             'alternative_game_rates': analysis.get('alternative_game_rates', {}),
             'wrong_game_comparison': analysis.get('wrong_game_comparison', {}),
+            'analysis_status': analysis.get('status'),
             'class_pairs': analysis.get('class_pairs'),
             'dds_boards': analysis.get('dds_boards'),
         })
     return pair
 
 
-def project_report(report: dict, report_id: str) -> dict:
-    """Project actionable sampling cells while retaining all sibling pairs."""
+def _north_coverage(report: Mapping) -> dict:
+    """Return explicit North coverage or a strict legacy marker."""
+    north = (report.get('coverage') or {}).get('north')
+    if isinstance(north, Mapping) and north.get('schema_status') == 'explicit':
+        return dict(north)
+    return {'schema_status': 'legacy'}
+
+
+def _budget_minimums(report: Mapping) -> tuple[int, int]:
+    budget = report.get('budget') or {}
+    min_boards = budget.get('min_class_boards', 10)
+    min_pairs = budget.get('min_class_pairs', 1)
+    if not isinstance(min_boards, int) or isinstance(min_boards, bool) or min_boards < 1:
+        min_boards = 10
+    if not isinstance(min_pairs, int) or isinstance(min_pairs, bool) or min_pairs < 1:
+        min_pairs = 1
+    return min_boards, min_pairs
+
+
+def project_report(report: dict, report_id: str, *,
+                   include_pairs: bool = True) -> dict:
+    """Project every sampling cell split by its distinct bidding processes."""
     if not isinstance(report, Mapping) or report.get('schema_version') != 2:
         raise ValueError('Expected a coverage scan report')
     budget = report.get('budget')
@@ -160,49 +196,135 @@ def project_report(report: dict, report_id: str) -> dict:
     expected = budget.get('pairs_per_cell', 1)
     if not isinstance(expected, int) or isinstance(expected, bool) or expected < 1:
         expected = 1
-    grouped = {}
+    process_target = budget.get('pairs_per_process_cell')
+    if not isinstance(process_target, int) or isinstance(process_target, bool) or process_target < 1:
+        process_target = None
+    min_boards, min_pairs = _budget_minimums(report)
+
+    complete = collections['complete_cases']
+    analyses = {}
+    for members, analysis in assess_auction_groups(
+            complete, min_boards=min_boards, min_pairs=min_pairs):
+        for member in members:
+            analyses[member.get('id')] = analysis
+
     records = [*((case, 'blocked') for case in collections['cases']),
-               *((case, 'complete') for case in collections['complete_cases']),
+               *((case, 'complete') for case in complete),
                *((case, 'limit') for case in collections['limit_cases'])]
-    for case, status in sorted(records, key=lambda item: item[0].get('id', 0)):
-        group_id, south_hcp, south_shape, pair_slot, fallback = _cell_identity(case)
-        group = grouped.setdefault(group_id, {
-            'id': group_id, 'south_hcp': south_hcp, 'south_shape': south_shape,
-            'fallback': fallback, 'pairs': [],
+    records.sort(key=lambda item: _id_sort_key(item[0].get('id')))
+
+    parent_counts = {}
+    parent_pairs = {}
+    for case, _ in records:
+        cell_id, _, _, _, _ = _cell_identity(case)
+        parent_counts[cell_id] = parent_counts.get(cell_id, 0) + 1
+        parent_pairs.setdefault(cell_id, []).append(case)
+    legacy_slots = {}
+    for cell_id, members in parent_pairs.items():
+        if all(_cell_identity(case)[3] is None for case in members):
+            for slot, case in enumerate(members):
+                legacy_slots[id(case)] = slot
+
+    grouped = {}
+    for case, status in records:
+        cell_id, south_hcp, south_shape, pair_slot, fallback = _cell_identity(case)
+        if pair_slot is None:
+            pair_slot = legacy_slots.get(id(case))
+        process = case_process_key(case)
+        key = (cell_id, process,
+               case.get('contract') if status == 'complete' else None,
+               case.get('declarer') if status == 'complete' else None,
+               status)
+        group = grouped.setdefault(key, {
+            'cell_id': cell_id, 'south_hcp': south_hcp,
+            'south_shape': south_shape, 'fallback': fallback,
+            'auction': _auction_label(case), 'entries': [],
         })
-        group['pairs'].append(_pair_projection(case, status, pair_slot))
+        group['entries'].append((case, status, pair_slot))
+
+    def pair_order(entry):
+        case, _, slot = entry
+        return (slot is None, slot if slot is not None else 0,
+                _id_sort_key(case.get('id')))
 
     groups = []
+    used_ids = set()
     counts = {'block': 0, 'missed': 0, 'down': 0, 'wrong': 0}
-    suspicious = 0
+    total_unassessed = 0
     for group in grouped.values():
-        pairs = sorted(group['pairs'], key=lambda pair: (
-            pair['pair_slot'] is None,
-            pair['pair_slot'] if pair['pair_slot'] is not None else pair['id']))
-        if pairs and all(pair['pair_slot'] is None for pair in pairs):
-            for slot, pair in enumerate(pairs):
-                pair['pair_slot'] = slot
-        warning_counts = {category: sum(category in pair['categories'] for pair in pairs)
+        entries = sorted(group['entries'], key=pair_order)
+        complete_members = [case for case, status, _ in entries if status == 'complete']
+        group_analysis = None
+        if complete_members:
+            group_analysis = analyses.get(complete_members[0].get('id'))
+        group_categories = set()
+        pairs = []
+        unassessed = 0
+        for case, status, pair_slot in entries:
+            cell = case.get('coverage_cell') or {}
+            if 'opener_shape' in cell and 'opener_shape' not in group:
+                group['opener_shape'] = cell.get('opener_shape')
+                group['opener_mode'] = cell.get('opener_mode')
+            analysis = None
+            categories = []
+            if status == 'blocked':
+                categories = ['block']
+            elif status == 'complete':
+                analysis = analyses.get(case.get('id'))
+                if analysis is None:
+                    analysis = reclassify_analysis(
+                        case.get('contract'), case.get('analysis') or {})
+                if analysis.get('status') != 'assessed':
+                    unassessed += 1
+                categories = sorted({FLAG_CATEGORY[flag]
+                                     for flag in analysis.get('flags') or ()
+                                     if flag in FLAG_CATEGORY})
+            group_categories.update(categories)
+            if include_pairs:
+                pairs.append(_pair_projection(
+                    case, status, pair_slot, analysis, categories))
+        warning_counts = {category: int(category in group_categories)
                           for category in counts}
-        if not any(warning_counts.values()) and not group['fallback']:
-            continue
-        for category, count in warning_counts.items():
-            counts[category] += count
-        suspicious += sum(pair['status'] == 'complete' and bool(pair['categories'])
-                          for pair in pairs)
-        groups.append({
-            'id': group['id'], 'south_hcp': group['south_hcp'],
-            'south_shape': group['south_shape'], 'warning_counts': warning_counts,
-            'actual_pair_count': len(pairs), 'expected_pair_count': expected,
-            'incomplete': len(pairs) != expected, 'pairs': pairs,
-        })
+        for category in group_categories:
+            counts[category] += 1
+        base_id = f"{group['cell_id']}|{group['auction']}"
+        group_id = base_id
+        suffix = 2
+        while group_id in used_ids:
+            group_id = f"{base_id}#{suffix}"
+            suffix += 1
+        used_ids.add(group_id)
+        group_data = {
+            'id': group_id, 'parent_id': group['cell_id'],
+            'south_hcp': group['south_hcp'],
+            'south_shape': group['south_shape'],
+            'auction': group['auction'],
+            'warning_counts': warning_counts,
+            'actual_pair_count': len(entries),
+            'parent_pair_count': parent_counts[group['cell_id']],
+            'expected_pair_count': process_target or expected,
+            'incomplete': (
+                len(entries) != process_target
+                if process_target is not None
+                else parent_counts[group['cell_id']] != expected),
+            'pairs': pairs,
+        }
+        if group.get('opener_shape') is not None:
+            group_data['opener_shape'] = group['opener_shape']
+            group_data['opener_mode'] = group['opener_mode']
+        groups.append(group_data)
+        total_unassessed += unassessed
+
     summary = dict(report.get('summary') or {})
-    summary['suspicious'] = suspicious
+    summary['suspicious'] = sum(
+        1 for group in groups if any(group['warning_counts'].values()))
+    summary['unassessed'] = total_unassessed
     return _json_safe({
         'id': report_id, 'profile': report.get('profile'),
         'seed': report.get('seed'), 'filters': report.get('filters'),
         'budget': report.get('budget'), 'summary': summary,
         'wrong_game_rule': RULE_ID,
+        'coverage': {'north': _north_coverage(report)},
         'counts': counts, 'groups': groups,
         'method_note': report.get('method_note'),
     })
@@ -237,7 +359,7 @@ def list_reports(root: Path = REPORT_ROOT) -> list[dict]:
                     or report.get('schema_version') != 2
                     or not isinstance(report.get('cases'), list)):
                 continue
-            projected = project_report(report, path.name)
+            projected = project_report(report, path.name, include_pairs=False)
         except (OSError, ValueError, KeyError, TypeError):
             continue
         results.append({'id': path.name, 'profile': projected['profile'],

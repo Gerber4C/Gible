@@ -46,6 +46,34 @@ class DaqiushMinorSlamSimulationTests(unittest.TestCase):
         self.assertEqual(choose_bid(self.profile, Auction.parse('1NP3CP3DP4NP5CP'),
                                     GOOD_RESPONDER).call, 'P')
 
+    def test_three_three_minor_opener_asks_for_the_five_card_minor(self):
+        opener = Hand.parse('SKQ72HAK6DKQ8C953')
+        self.assertEqual(choose_bid(self.profile, AUCTION, opener).call, '5N')
+        self.assertEqual(choose_bid(
+            self.profile, Auction.parse('1NP3CP3DP4NTP5NTP'),
+            GOOD_RESPONDER).call, '6C')
+        self.assertEqual(choose_bid(
+            self.profile, Auction.parse('1NP3CP3DP4NTP5NTP6CP'), opener).call, 'P')
+
+        diamond_responder = Hand.parse('SA2H32DAKJ76CKQT8')
+        self.assertEqual(choose_bid(
+            self.profile, Auction.parse('1NP3CP3DP4NTP5NTP'),
+            diamond_responder).call, '6D')
+        self.assertEqual(choose_bid(
+            self.profile, Auction.parse('1NP3CP3DP4NTP5NTP6DP'),
+            opener).call, 'P')
+
+        flat_responder = Hand.parse('SAKQ2HKJ3DQJ4CQ32')
+        self.assertEqual(choose_bid(
+            self.profile, Auction.parse('1NP3CP3DP4NTP5NTP'),
+            flat_responder).call, '6N')
+
+    def test_four_notrump_probe_replays_without_an_ambiguous_prior_call(self):
+        from engine.replay import replay_auction
+        trace = replay_auction(self.profile, Auction.parse('1NP3CP3DP4NP'))
+        self.assertFalse(any('Ambiguous prior call 4N' in item
+                             for item in trace.diagnostics))
+
     @patch('engine.simulation_decision.sample_deals', side_effect=sampled_deals)
     @patch('engine.simulation_decision.calculate_available_table',
            side_effect=DDSUnavailableError('DDS unavailable'))
