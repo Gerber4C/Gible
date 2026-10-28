@@ -81,6 +81,68 @@ class CuePolicyHelperTests(unittest.TestCase):
                 'call_act_types': ['signoff'], 'agreed_suit': 'S'}},
         ))
         self.assertIsNone(policy.cue_continuation(plain))
+        # A cue with no agreed suit must not crash the `in` membership test.
+        suitless = SimpleNamespace(applied_meanings=(
+            {'call': '4D', 'seat': 's', 'public_meaning': {
+                'call_act_types': ['slam_try']}},
+        ))
+        self.assertIsNone(policy.cue_continuation(suitless))
+
+
+    def test_partner_hcp_bounds(self):
+        trace = SimpleNamespace(applied_meanings=(
+            {'seat': 'n', 'call': '1N',
+             'public_meaning': {'hcp_min': 14, 'hcp_max': 18}},
+            {'seat': 's', 'call': '2C', 'public_meaning': {}},
+            {'seat': 's', 'call': '4D',
+             'public_meaning': {'call_act_types': ['slam_try']}},
+        ))
+        self.assertEqual(policy.partner_hcp_bounds(trace, 'n'), (14, 18))
+        self.assertEqual(policy.partner_hcp_bounds(trace, 's'), (0, 37))
+
+    def test_sample_process_hands_keeps_only_observed_bidders(self):
+        from engine.auction import Auction
+        actor = Hand.parse('SAQ82HQJ72DKCA965')
+        kept = Hand.parse('S5432H5432D5432C5')
+        dropped = Hand.parse('SAKQH432D432C5432')
+        auction = Auction.parse('1NP2CP2SP4DP')
+        trace = SimpleNamespace(applied_meanings=(
+            {'seat': 'n', 'call': '1N',
+             'public_meaning': {'hcp_min': 14, 'hcp_max': 18}},
+            {'seat': 's', 'call': '2C', 'public_meaning': {}},
+            {'seat': 's', 'call': '4D',
+             'public_meaning': {'call_act_types': ['slam_try']}},
+        ))
+        sampled = SimpleNamespace(
+            deals=({'n': actor, 's': kept}, {'n': actor, 's': dropped}),
+            attempts=2, seed=0)
+        with patch.object(policy, 'hand_would_bid_observed',
+                          side_effect=[True, False]), \
+             patch('engine.deal_sampler.sample_deals', return_value=sampled):
+            hands = policy.sample_process_hands(
+                SimpleNamespace(), auction, trace, actor, 's', count=2)
+        self.assertEqual(hands, (kept,))
+
+
+    def test_cue_three_way_requires_unknown_range(self):
+        from engine.auction import Auction
+        auction = Auction.parse('1NP2CP2SP4DP')
+        wide = SimpleNamespace(applied_meanings=(
+            {'seat': 'n', 'call': '1N',
+             'public_meaning': {'hcp_min': 14, 'hcp_max': 18}},
+            {'seat': 's', 'call': '2C', 'public_meaning': {}},
+            {'seat': 's', 'call': '4D', 'public_meaning': {
+                'call_act_types': ['slam_try'], 'agreed_suit': 'S'}},
+        ))
+        self.assertEqual(policy.cue_three_way(auction, wide), ('S', 's'))
+        # Partner pinned to exactly 15 HCP: strength is known, so no override.
+        pinned = SimpleNamespace(applied_meanings=(
+            {'seat': 's', 'call': '2C',
+             'public_meaning': {'hcp_min': 15, 'hcp_max': 15}},
+            {'seat': 's', 'call': '4D', 'public_meaning': {
+                'call_act_types': ['slam_try'], 'agreed_suit': 'S'}},
+        ))
+        self.assertIsNone(policy.cue_three_way(auction, pinned))
 
 
 class CueDecisionTests(unittest.TestCase):

@@ -54,7 +54,7 @@ def cue_continuation(trace) -> tuple[dict, str] | None:
     if not CUE_ACT_TYPES.intersection(meaning.get('call_act_types', ())):
         return None
     trump = meaning.get('agreed_suit') or meaning.get('target_suit')
-    if trump not in 'CDHS':
+    if not isinstance(trump, str) or trump not in 'CDHS':
         return None
     return last, trump
 
@@ -225,6 +225,28 @@ def _preferred_cue(hand: Hand, trump: str, cue_calls: Iterable[str]) -> str:
     return 'P'
 
 
+def cue_three_way(auction, trace) -> tuple[str, str] | None:
+    """Return ``(trump, partner)`` when the general policy may override.
+
+    The policy applies only after partner's cue, when partner's public HCP
+    interval is still wide enough to be unknown.  A narrow band that partner
+    has already narrowed by cueing counts as known and keeps the authored
+    continuation.
+    """
+
+    context = cue_continuation(trace)
+    if context is None:
+        return None
+    entry, trump = context
+    partner = entry.get('seat')
+    if partner not in 'nsew':
+        return None
+    low, high = partner_hcp_bounds(trace, partner)
+    if not strength_is_unknown((low, high), has_cue_bid=True):
+        return None
+    return trump, partner
+
+
 def cue_allowed_above(trump: str, call: str) -> bool:
     """Return whether a cue may be made at this level under the owner rule."""
 
@@ -237,13 +259,78 @@ def cue_allowed_above(trump: str, call: str) -> bool:
     return True
 
 
+def partner_hcp_bounds(trace, partner: str) -> tuple[int, int]:
+    """Collect the public HCP interval a seat has promised so far."""
+
+    low, high = 0, 37
+    for entry in trace.applied_meanings:
+        if entry.get('seat') != partner or entry.get('call') == 'P':
+            continue
+        meaning = entry.get('public_meaning') or {}
+        if meaning.get('hcp_min') is not None:
+            low = max(low, meaning['hcp_min'])
+        if meaning.get('hcp_max') is not None:
+            high = min(high, meaning['hcp_max'])
+    return low, high
+
+
+def hand_would_bid_observed(profile, auction, hand: Hand, partner: str) -> bool:
+    """Replay the auction and check a candidate hand makes partner's calls."""
+
+    from .auction import Auction
+    from .selector import choose_bid
+
+    for index, call in enumerate(auction.calls):
+        if call == 'P' or auction.actor_at(index) != partner:
+            continue
+        prefix = Auction(calls=auction.calls[:index], dealer=auction.dealer,
+                         vulnerability=auction.vulnerability)
+        if choose_bid(profile, prefix, hand).call != call:
+            return False
+    return True
+
+
+def sample_process_hands(profile, auction, trace, actor_hand: Hand,
+                         partner: str, *, count: int = 40, seed=None,
+                         max_attempts: int = 4000,
+                         max_seconds: float = 10.0) -> tuple[Hand, ...]:
+    """Infer partner's range by simulating what hands would bid this way.
+
+    Candidate hands are drawn inside partner's public HCP interval, then kept
+    only when replaying the auction makes them produce partner's exact calls.
+    The surviving hands replace any hard-coded range for later decisions.
+    """
+
+    from .deal_sampler import sample_deals
+
+    low, high = partner_hcp_bounds(trace, partner)
+    if low > high:
+        return ()
+    constraints = {partner: {'min_hcp': low, 'max_hcp': high}}
+    sampled = sample_deals(
+        auction.actor_to_call, actor_hand, public_constraints=constraints,
+        sample_count=count, seed=seed, max_attempts=max_attempts,
+        max_seconds=max_seconds)
+    kept = []
+    for deal in sampled.deals:
+        hand = deal[partner]
+        if hand_would_bid_observed(profile, auction, hand, partner):
+            kept.append(hand)
+    return tuple(kept)
+
+
+
 __all__ = (
     'CueDecision',
     'cue_allowed_above',
     'cue_continuation',
     'cue_public_kr',
+    'cue_three_way',
     'decide_from_hands',
     'extra_kr_threshold',
+    'hand_would_bid_observed',
     'keycards_sufficient',
+    'partner_hcp_bounds',
+    'sample_process_hands',
     'strength_is_unknown',
 )

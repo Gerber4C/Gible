@@ -17,6 +17,8 @@ from .purpose_axiom import complete_purpose, remember_selected_purpose, resolve_
 from .replay import active_environment_for, replay_auction
 from .slam_conventions import keycard_ask_restricted
 from .slam_intent import detect_slam_intent
+from .cue_slam_policy import (cue_three_way, decide_from_hands,
+                              sample_process_hands)
 from .simulation_decision import (decide_minor_5422, is_minor_5422_decision,
                                   decide_minor_major_74, is_minor_major_74_decision,
                                   decide_two_major_spade_slam,
@@ -189,6 +191,43 @@ def choose_bid(
                                trace=trace, private_memory=actor_memory)
         trace.simulation_decision = simulated
         candidates = (selected,)
+
+    cue_context = cue_three_way(auction, trace)
+    if cue_context is not None:
+        trump, partner = cue_context
+        keycard = next((c for c in candidates if c.call == '4N'), None)
+        game = next((c for c in candidates
+                     if c.call != '4N'
+                     and {'signoff', 'final_placement'} & set(
+                         (c.public_meaning or {}).get('call_act_types', ()))),
+                    None)
+        cue_candidates = [c for c in candidates
+                          if c.call != '4N'
+                          and {'control_showing', 'slam_try'} & set(
+                              (c.public_meaning or {}).get('call_act_types', ()))]
+        if keycard is not None and game is not None and cue_candidates:
+            try:
+                partner_hands = sample_process_hands(
+                    profile, auction, trace, hand, partner)
+            except (SamplingExhausted, RuntimeError, ValueError) as exc:
+                trace.warn('Cue-continuation sampling unavailable: ' + str(exc))
+                partner_hands = ()
+            if partner_hands:
+                try:
+                    simulated = decide_from_hands(
+                        hand, trump, partner_hands, game_call=game.call,
+                        cue_calls=[c.call for c in cue_candidates])
+                except (DDSUnavailableError, RuntimeError, ValueError) as exc:
+                    trace.warn('Cue-continuation simulation unavailable: ' + str(exc))
+                else:
+                    selected = next((c for c in candidates
+                                     if c.call == simulated.call), None)
+                    if selected is not None:
+                        trace.simulation_decision = {
+                            'call': simulated.call,
+                            'reason': simulated.reason,
+                            'extra_kr_threshold': simulated.extra_kr_threshold}
+                        candidates = (selected,)
 
     decision = choose_candidate(
         candidates,
