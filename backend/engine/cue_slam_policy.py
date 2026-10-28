@@ -388,17 +388,49 @@ def _process_seed(auction, hand: Hand) -> int:
     return int.from_bytes(sha256(serial.encode('ascii')).digest()[:8], 'big')
 
 
+def _complete_opponents(actor: str, partner: str, actor_hand: Hand,
+                        partner_hand: Hand, count: int,
+                        rng) -> list[dict]:
+    """Deal the remaining cards into the two opponents ``count`` times."""
+
+    from .cards import SUITS
+    from .constrained_deals import DECK
+    from .deal_sampler import _hand_from_cards
+
+    seats = [seat for seat in 'nsew' if seat not in (actor, partner)]
+    used = {(suit, rank) for suit in SUITS
+            for rank in actor_hand.holding(suit)}
+    used |= {(suit, rank) for suit in SUITS
+             for rank in partner_hand.holding(suit)}
+    remaining = [card for card in DECK if card not in used]
+    deals = []
+    for _ in range(count):
+        rng.shuffle(remaining)
+        deals.append({
+            actor: actor_hand,
+            partner: partner_hand,
+            seats[0]: _hand_from_cards(tuple(remaining[:13])),
+            seats[1]: _hand_from_cards(tuple(remaining[13:26])),
+        })
+    return deals
+
+
 def sample_process_hands(profile, auction, trace, actor_hand: Hand,
-                         partner: str, *, count: int = 40, seed=None,
-                         max_attempts: int = 4000,
+                         partner: str, *, partner_count: int = 5,
+                         ew_count: int = 4, seed=None,
+                         max_attempts: int = 20000,
                          max_seconds: float = 8.0,
-                         extra_filter=None) -> tuple[Hand, ...]:
+                         extra_filter=None) -> tuple[dict, ...]:
     """Infer partner's range by simulating what hands would bid this way.
 
     Candidate hands are drawn inside partner's public HCP and length bounds,
     then kept only when the authored candidates include partner's exact calls.
-    The surviving hands replace any hard-coded range for later decisions.
+    Up to ``partner_count`` distinct partner hands are kept and each is paired
+    with ``ew_count`` fresh opponent completions, so DDS sees many layouts of
+    the same partnership.
     """
+
+    import random
 
     from .auction import Auction
     from .candidate_generation import generate_candidates
@@ -433,20 +465,37 @@ def sample_process_hands(profile, auction, trace, actor_hand: Hand,
     constraints = {partner: partner_constraints(trace, partner)}
     sampled = sample_deals(
         auction.actor_to_call, actor_hand, public_constraints=constraints,
-        sample_count=count, seed=seed, max_attempts=max_attempts,
-        max_seconds=max_seconds)
-    kept = []
+        sample_count=max(partner_count * 6, 24), seed=seed,
+        max_attempts=max_attempts, max_seconds=max_seconds)
+
+    distinct = []
+    seen = set()
     for deal in sampled.deals:
         hand = deal[partner]
+        key = tuple(hand.holding(suit) for suit in 'SHDC')
+        if key in seen:
+            continue
         if extra_filter is not None and not extra_filter(hand):
             continue
-        if all(any(candidate.call == call
-                   for candidate in generate_candidates(
-                       profile, prefix, hand, prepared_trace, prepared_env,
-                       SeatMemory()))
-               for prefix, prepared_trace, prepared_env, call in prepared):
-            kept.append(deal)
-    return tuple(kept)
+        if not all(any(candidate.call == call
+                       for candidate in generate_candidates(
+                           profile, prefix, hand, prepared_trace,
+                           prepared_env, SeatMemory()))
+                   for prefix, prepared_trace, prepared_env, call in prepared):
+            continue
+        seen.add(key)
+        distinct.append(hand)
+        if len(distinct) >= partner_count:
+            break
+    if not distinct:
+        return ()
+
+    rng = random.Random(seed)
+    deals = []
+    for hand in distinct:
+        deals.extend(_complete_opponents(
+            auction.actor_to_call, partner, actor_hand, hand, ew_count, rng))
+    return tuple(deals)
 
 
 

@@ -130,8 +130,11 @@ class CuePolicyHelperTests(unittest.TestCase):
              patch('engine.candidate_generation.generate_candidates',
                    side_effect=fake_candidates):
             deals = policy.sample_process_hands(
-                SimpleNamespace(), auction, trace, actor, 's', count=2)
-        self.assertEqual(deals, (kept_deal,))
+                SimpleNamespace(), auction, trace, actor, 's',
+                partner_count=1, ew_count=1)
+        self.assertEqual(len(deals), 1)
+        self.assertIs(deals[0]['s'], kept)
+        self.assertEqual(set(deals[0]), {'n', 'e', 's', 'w'})
 
 
     def test_cue_three_way_requires_unknown_range(self):
