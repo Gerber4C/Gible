@@ -177,6 +177,13 @@ def no_shortage_refusal_keycard(ctx):
     return ctx.hand is not None and ctx.hand.hcp >= 16
 
 
+def no_shortage_continue_control(ctx, suit):
+    return (ctx.hand is not None
+            and (ctx.hand.contains_rank(suit, 'A')
+                 or ctx.hand.contains_rank(suit, 'K')
+                 or ctx.hand.length(suit) <= 1))
+
+
 def seven_four_minor_alternative(ctx, answer, minor):
     return (shortage_fit_probe(ctx, answer)
             and ctx.hand.length(answer[-1]) == 4
@@ -632,6 +639,8 @@ class OneNotrumpInvitations(Gadget):
                 no_shortage.meaning.forcing = 'game_forcing'
                 no_shortage.meaning.agreed_suit = answer[-1]
                 no_shortage.meaning.target_suit = answer[-1]
+                no_shortage.meaning.min_lengths = {'S': 2, 'H': 2, 'D': 2,
+                                                   'C': 2, answer[-1]: 4}
                 no_shortage.effect('agreed_suit').suit = answer[-1]
                 no_shortage.description = 'Four diamonds confirms the major fit and slam interest without a singleton or void.'
 
@@ -749,14 +758,34 @@ class OneNotrumpInvitations(Gadget):
                 refusal = self.call('stayman_' + answer.lower() + '_no_shortage_decline')
                 refusal.when = prefix + '4DP'
                 refusal.bid = '4' + answer[-1]
-                refusal.applies = (lambda ctx, t=answer[-1]:
-                                   named_evaluator(ctx, 'absolute_maximum_' + t) is not True)
+                refusal.applies = lambda ctx: ctx.hand is not None
                 refusal.meaning.action = 'no_shortage_slam_decline'
                 refusal.meaning.nature = ['natural']
                 refusal.meaning.acts = ['reject', 'signoff', 'final_placement']
                 refusal.meaning.target_suit = answer[-1]
                 refusal.meaning.agreed_suit = answer[-1]
                 refusal.description = 'Decline the no-shortage slam try at four of the agreed major.'
+
+                # Third option: keep cue-bidding a side control. The
+                # simulation policy selects among the keycard, game, and cue
+                # candidates at this position.
+                cue_bids = {'H': (('S', '4S'), ('C', '5C'), ('D', '5D')),
+                            'S': (('C', '5C'), ('D', '5D'), ('H', '5H'))}[answer[-1]]
+                for cue_suit, cue_bid in cue_bids:
+                    cont = self.call('stayman_' + answer.lower()
+                                     + '_no_shortage_continue_' + cue_suit.lower())
+                    cont.when = prefix + '4DP'
+                    cont.bid = cue_bid
+                    cont.applies = (lambda ctx, s=cue_suit:
+                                    no_shortage_continue_control(ctx, s))
+                    cont.meaning.action = 'no_shortage_continue_cue'
+                    cont.meaning.nature = ['artificial']
+                    cont.meaning.acts = ['slam_try', 'control_showing']
+                    cont.meaning.control_suit = cue_suit
+                    cont.meaning.agreed_suit = answer[-1]
+                    cont.meaning.target_suit = answer[-1]
+                    cont.description = ('Keep cue-bidding a side control after the '
+                                        'no-shortage major slam try.')
 
                 continue_prefix = prefix + '4DP4' + answer[-1] + 'P'
                 continue_ask = self.call('stayman_' + answer.lower()

@@ -137,13 +137,17 @@ class CueDecision:
 
 
 def _completion_rates(hand: Hand, trump: str, hands: Sequence[Hand],
-                      solve_table: Callable) -> tuple[dict[str, float], int]:
+                      solve_table: Callable,
+                      deals: Sequence[dict] | None = None
+                      ) -> tuple[dict[str, float], int]:
     if not hands:
         return {}, 0
+    if deals is None:
+        deals = tuple({'n': hand, 's': partner} for partner in hands)
     targets = (ContractTarget(4 if trump in 'HS' else 5, trump, 's'),
                ContractTarget(6, trump, 's'))
-    deals = tuple({'n': hand, 's': partner} for partner in hands)
-    estimates = compare_contract_targets(deals, targets, solve_table=solve_table)
+    estimates = compare_contract_targets(tuple(deals), targets,
+                                         solve_table=solve_table)
     return {item.contract: item.completion_rate for item in estimates}, len(hands)
 
 
@@ -156,23 +160,31 @@ def decide_from_hands(
     cue_calls: Iterable[str] = (),
     slam_threshold: float = SLAM_QUALIFY_RATE,
     solve_table: Callable = calculate_available_table,
+    deals: Sequence[dict] | None = None,
 ) -> CueDecision:
     """Apply the cue-continuation policy to already-sampled partner hands."""
 
     partner_hands = tuple(partner_hands)
+    if deals is not None:
+        deals = tuple(deals)
     krs = [assess_quality(item)['kr_points'] for item in partner_hands]
     threshold = extra_kr_threshold(krs)
-    no_extra = tuple(partner for partner, kr in zip(partner_hands, krs)
-                     if kr < threshold)
-    with_extra = tuple(partner for partner, kr in zip(partner_hands, krs)
-                       if kr >= threshold)
+    no_extra_index = [index for index, kr in enumerate(krs) if kr < threshold]
+    with_extra_index = [index for index, kr in enumerate(krs) if kr >= threshold]
 
     # Deterministic keycard filter.  A hand that cannot reach sufficient
     # keycards is not a slam candidate, so it never justifies 4NT or a cue.
-    no_extra_ok = tuple(item for item in no_extra
-                        if keycards_sufficient(hand, item, trump))
-    with_extra_ok = tuple(item for item in with_extra
-                          if keycards_sufficient(hand, item, trump))
+    no_extra_ok = [index for index in no_extra_index
+                   if keycards_sufficient(hand, partner_hands[index], trump)]
+    with_extra_ok = [index for index in with_extra_index
+                     if keycards_sufficient(hand, partner_hands[index], trump)]
+
+    def rates(indices):
+        subset_hands = [partner_hands[index] for index in indices]
+        subset_deals = ([deals[index] for index in indices]
+                        if deals is not None else None)
+        return _completion_rates(hand, trump, subset_hands, solve_table,
+                                 deals=subset_deals)
 
     slam_call = f'6{trump}'
 
@@ -182,16 +194,16 @@ def decide_from_hands(
         # hands also fail keycards, place game; otherwise keep cueing.
         if not with_extra_ok:
             return CueDecision(game_call, 'keycards insufficient', threshold)
-        rates, _ = _completion_rates(hand, trump, with_extra_ok, solve_table)
-        rate = rates.get(slam_call, 0.0)
-        if rate < slam_threshold:
+        rates_extra, _ = rates(with_extra_ok)
+        extra_rate = rates_extra.get(slam_call, 0.0)
+        if extra_rate < slam_threshold:
             return CueDecision(game_call, 'slam fails even with extra strength',
-                               threshold, extra_slam_rate=rate)
+                               threshold, extra_slam_rate=extra_rate)
         return CueDecision(_preferred_cue(hand, trump, cue_calls),
                            'slam depends on partner extra strength',
-                           threshold, extra_slam_rate=rate)
+                           threshold, extra_slam_rate=extra_rate)
 
-    rates_no, _ = _completion_rates(hand, trump, no_extra_ok, solve_table)
+    rates_no, _ = rates(no_extra_ok)
     no_extra_rate = rates_no.get(slam_call, 0.0)
     if no_extra_rate >= slam_threshold:
         # Qualifies without extra strength and keycards are sufficient: ask.
@@ -202,7 +214,7 @@ def decide_from_hands(
         return CueDecision(game_call, 'keycards insufficient with extra strength',
                            threshold, no_extra_slam_rate=no_extra_rate)
 
-    rates_extra, _ = _completion_rates(hand, trump, with_extra_ok, solve_table)
+    rates_extra, _ = rates(with_extra_ok)
     extra_rate = rates_extra.get(slam_call, 0.0)
     if extra_rate < slam_threshold:
         return CueDecision(game_call, 'slam fails even with extra strength',
@@ -262,9 +274,18 @@ def cue_allowed_above(trump: str, call: str) -> bool:
 def partner_hcp_bounds(trace, partner: str) -> tuple[int, int]:
     """Collect the public HCP interval a seat has promised so far."""
 
+    bounds = partner_constraints(trace, partner)
+    return bounds['min_hcp'], bounds['max_hcp']
+
+
+def partner_constraints(trace, partner: str) -> dict:
+    """Collect public HCP and length bounds a seat has promised so far."""
+
     from .slam_intent import PARTNER_DEFAULT_MIN
 
     low, high = 0, 37
+    min_lengths: dict[str, int] = {}
+    max_lengths: dict[str, int] = {}
     for entry in trace.applied_meanings:
         if entry.get('seat') != partner or entry.get('call') == 'P':
             continue
@@ -277,7 +298,18 @@ def partner_hcp_bounds(trace, partner: str) -> tuple[int, int]:
         if 'game_forcing' in acts or meaning.get('forcing') == 'game_forcing':
             # A game-forcing call guarantees at least opening values.
             low = max(low, PARTNER_DEFAULT_MIN)
-    return low, high
+        for suit, length in (meaning.get('min_lengths') or {}).items():
+            if suit in 'SHDC':
+                min_lengths[suit] = max(min_lengths.get(suit, 0), length)
+        for suit, length in (meaning.get('max_lengths') or {}).items():
+            if suit in 'SHDC':
+                max_lengths[suit] = min(max_lengths.get(suit, 13), length)
+    bounds = {'min_hcp': low, 'max_hcp': high}
+    if min_lengths:
+        bounds['min_lengths'] = min_lengths
+    if max_lengths:
+        bounds['max_lengths'] = max_lengths
+    return bounds
 
 
 def hand_would_bid_observed(profile, auction, hand: Hand, partner: str) -> bool:
@@ -296,23 +328,58 @@ def hand_would_bid_observed(profile, auction, hand: Hand, partner: str) -> bool:
     return True
 
 
+def _process_seed(auction, hand: Hand) -> int:
+    """Stable seed so a given auction and hand always sample the same deals."""
+
+    from hashlib import sha256
+
+    serial = (auction.canonical_key() + ':'
+              + '.'.join(hand.holding(suit) for suit in 'SHDC'))
+    return int.from_bytes(sha256(serial.encode('ascii')).digest()[:8], 'big')
+
+
 def sample_process_hands(profile, auction, trace, actor_hand: Hand,
                          partner: str, *, count: int = 40, seed=None,
                          max_attempts: int = 4000,
                          max_seconds: float = 8.0) -> tuple[Hand, ...]:
     """Infer partner's range by simulating what hands would bid this way.
 
-    Candidate hands are drawn inside partner's public HCP interval, then kept
-    only when replaying the auction makes them produce partner's exact calls.
+    Candidate hands are drawn inside partner's public HCP and length bounds,
+    then kept only when the authored candidates include partner's exact calls.
     The surviving hands replace any hard-coded range for later decisions.
     """
 
+    from .auction import Auction
+    from .candidate_generation import generate_candidates
     from .deal_sampler import sample_deals
+    from .memory import SeatMemory
+    from .replay import active_environment_for, replay_auction
+
+    turns = [(index, auction.calls[index])
+             for index in range(len(auction.calls))
+             if auction.calls[index] != 'P'
+             and auction.actor_at(index) == partner]
+    if not turns:
+        return ()
+
+    # The prefix trace is public and hand-independent, so prepare it once.
+    prepared = []
+    for index, call in turns:
+        prefix = Auction(calls=auction.calls[:index], dealer=auction.dealer,
+                         vulnerability=auction.vulnerability)
+        prepared.append((
+            prefix,
+            replay_auction(profile, prefix, None),
+            active_environment_for(profile, None, prefix),
+            call,
+        ))
 
     low, high = partner_hcp_bounds(trace, partner)
     if low > high:
         return ()
-    constraints = {partner: {'min_hcp': low, 'max_hcp': high}}
+    if seed is None:
+        seed = _process_seed(auction, actor_hand)
+    constraints = {partner: partner_constraints(trace, partner)}
     sampled = sample_deals(
         auction.actor_to_call, actor_hand, public_constraints=constraints,
         sample_count=count, seed=seed, max_attempts=max_attempts,
@@ -320,8 +387,12 @@ def sample_process_hands(profile, auction, trace, actor_hand: Hand,
     kept = []
     for deal in sampled.deals:
         hand = deal[partner]
-        if hand_would_bid_observed(profile, auction, hand, partner):
-            kept.append(hand)
+        if all(any(candidate.call == call
+                   for candidate in generate_candidates(
+                       profile, prefix, hand, prepared_trace, prepared_env,
+                       SeatMemory()))
+               for prefix, prepared_trace, prepared_env, call in prepared):
+            kept.append(deal)
     return tuple(kept)
 
 

@@ -96,7 +96,9 @@ class DaqiushResampleFollowupTests(unittest.TestCase):
         cards = 'SAQT4HQ93DK5CA873'
         self.assertEqual(self.bid('1NP2CP2SP', cards), '4D')
         self.assertEqual(self.bid('1NP2CP2SP4DP', 'SKJ982HAK6DA76CQ2'), '4N')
-        self.assertEqual(self.bid('1NP2CP2SP4DP', 'SAQT4HQ93DK5CA873'), '4S')
+        # The simulation policy asks keycards whenever the sampled slam makes
+        # often enough even without extra partner strength.
+        self.assertEqual(self.bid('1NP2CP2SP4DP', 'SAQT4HQ93DK5CA873'), '4N')
 
     def test_five_card_spade_reply_does_not_infer_four_heart_slam_trigger(self):
         # G016 rejected the 4NT proposal: 3S does not publicly establish a

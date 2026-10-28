@@ -113,15 +113,25 @@ class CuePolicyHelperTests(unittest.TestCase):
             {'seat': 's', 'call': '4D',
              'public_meaning': {'call_act_types': ['slam_try']}},
         ))
+        kept_deal = {'n': actor, 's': kept}
+        dropped_deal = {'n': actor, 's': dropped}
         sampled = SimpleNamespace(
-            deals=({'n': actor, 's': kept}, {'n': actor, 's': dropped}),
-            attempts=2, seed=0)
-        with patch.object(policy, 'hand_would_bid_observed',
-                          side_effect=[True, False]), \
-             patch('engine.deal_sampler.sample_deals', return_value=sampled):
-            hands = policy.sample_process_hands(
+            deals=(kept_deal, dropped_deal), attempts=2, seed=0)
+
+        def fake_candidates(profile, prefix, hand, trace, env, memory):
+            calls = [SimpleNamespace(call='2C')]
+            if hand is kept:
+                calls.append(SimpleNamespace(call='4D'))
+            return tuple(calls)
+
+        with patch('engine.deal_sampler.sample_deals', return_value=sampled), \
+             patch('engine.replay.replay_auction', return_value=None), \
+             patch('engine.replay.active_environment_for', return_value=None), \
+             patch('engine.candidate_generation.generate_candidates',
+                   side_effect=fake_candidates):
+            deals = policy.sample_process_hands(
                 SimpleNamespace(), auction, trace, actor, 's', count=2)
-        self.assertEqual(hands, (kept,))
+        self.assertEqual(deals, (kept_deal,))
 
 
     def test_cue_three_way_requires_unknown_range(self):

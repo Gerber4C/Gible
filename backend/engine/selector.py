@@ -207,16 +207,18 @@ def choose_bid(
                               (c.public_meaning or {}).get('call_act_types', ()))]
         if keycard is not None and game is not None and cue_candidates:
             try:
-                partner_hands = sample_process_hands(
+                deals = sample_process_hands(
                     profile, auction, trace, hand, partner)
             except (SamplingExhausted, RuntimeError, ValueError) as exc:
                 trace.warn('Cue-continuation sampling unavailable: ' + str(exc))
-                partner_hands = ()
-            if partner_hands:
+                deals = ()
+            if deals:
                 try:
                     simulated = decide_from_hands(
-                        hand, trump, partner_hands, game_call=game.call,
-                        cue_calls=[c.call for c in cue_candidates])
+                        hand, trump, tuple(deal[partner] for deal in deals),
+                        game_call=game.call,
+                        cue_calls=[c.call for c in cue_candidates],
+                        deals=deals)
                 except (DDSUnavailableError, RuntimeError, ValueError) as exc:
                     trace.warn('Cue-continuation simulation unavailable: ' + str(exc))
                 else:

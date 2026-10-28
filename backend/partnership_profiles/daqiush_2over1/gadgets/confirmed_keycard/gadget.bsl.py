@@ -32,7 +32,7 @@ class ConfirmedKeycard(Gadget):
             ask = self.call('stayman_' + answer.lower() + '_no_shortage_keycard_ask')
             ask.when = '1NP2CP' + answer + 'P4DP'
             ask.bid = '4NT'
-            ask.applies = lambda ctx, t=trump: named_evaluator(ctx, 'absolute_maximum_' + t) is True
+            ask.applies = lambda ctx: ctx.hand is not None
             ask.meaning.action = 'rkcb_1430'
             ask.meaning.nature = ['artificial']
             ask.meaning.acts = ['inquiry', 'keycard_asking']
