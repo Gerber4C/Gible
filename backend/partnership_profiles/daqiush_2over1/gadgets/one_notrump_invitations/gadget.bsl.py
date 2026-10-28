@@ -477,6 +477,13 @@ class OneNotrumpInvitations(Gadget):
             reply.meaning.nature = ['artificial' if answer == '2D' else 'natural']
             reply.meaning.acts = ['descriptive']
             reply.description = 'Shows opener major length according to Daqiush Stayman.'
+            if answer == '2H':
+                reply.meaning.min_lengths = {'H': 4}
+            elif answer == '2S':
+                reply.meaning.min_lengths = {'S': 4}
+                reply.meaning.max_lengths = {'H': 3}
+            else:
+                reply.meaning.max_lengths = {'H': 3, 'S': 3}
 
             prefix = '1NP2CP' + answer + 'P'
             garbage_stop = self.call('garbage_stayman_pass_after_' + answer.lower())
@@ -641,6 +648,7 @@ class OneNotrumpInvitations(Gadget):
                 no_shortage.meaning.target_suit = answer[-1]
                 no_shortage.meaning.min_lengths = {'S': 2, 'H': 2, 'D': 2,
                                                    'C': 2, answer[-1]: 4}
+                no_shortage.meaning.min_kr = 14.0
                 no_shortage.effect('agreed_suit').suit = answer[-1]
                 no_shortage.description = 'Four diamonds confirms the major fit and slam interest without a singleton or void.'
 
@@ -792,7 +800,7 @@ class OneNotrumpInvitations(Gadget):
                                          + '_no_shortage_after_refusal_keycard')
                 continue_ask.when = continue_prefix
                 continue_ask.bid = '4NT'
-                continue_ask.applies = no_shortage_refusal_keycard
+                continue_ask.applies = lambda ctx: ctx.hand is not None
                 continue_ask.meaning.action = 'rkcb_1430'
                 continue_ask.meaning.nature = ['artificial']
                 continue_ask.meaning.acts = ['inquiry', 'keycard_asking']
@@ -812,7 +820,7 @@ class OneNotrumpInvitations(Gadget):
                                           + '_no_shortage_after_refusal_pass')
                 continue_pass.when = continue_prefix
                 continue_pass.bid = 'P'
-                continue_pass.applies = lambda ctx: not no_shortage_refusal_keycard(ctx)
+                continue_pass.applies = lambda ctx: ctx.hand is not None
                 continue_pass.meaning.action = 'no_shortage_slam_decline'
                 continue_pass.meaning.nature = ['natural']
                 continue_pass.meaning.acts = ['signoff', 'final_placement']

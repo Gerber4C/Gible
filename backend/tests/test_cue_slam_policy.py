@@ -155,6 +155,39 @@ class CuePolicyHelperTests(unittest.TestCase):
         self.assertIsNone(policy.cue_three_way(auction, pinned))
 
 
+    def test_partner_promised_kr(self):
+        trace = SimpleNamespace(applied_meanings=(
+            {'seat': 's', 'call': '4D', 'public_meaning': {'min_kr': 14.0}},
+        ))
+        self.assertEqual(policy.partner_promised_kr(trace, 's'), 14.0)
+        self.assertIsNone(policy.partner_promised_kr(trace, 'n'))
+
+    def test_signoff_override_detection(self):
+        trace = SimpleNamespace(applied_meanings=(
+            {'seat': 's', 'call': '2C', 'public_meaning': {}},
+            {'seat': 'n', 'call': '2S', 'public_meaning': {}},
+            {'seat': 's', 'call': '4D', 'public_meaning': {
+                'call_act_types': ['slam_try'], 'agreed_suit': 'S'}},
+            {'seat': 'n', 'call': '4S', 'public_meaning': {
+                'call_act_types': ['reject', 'signoff', 'final_placement']}},
+        ))
+        self.assertEqual(policy.signoff_override(trace, 's'), ('S', 'n', '4S'))
+        self.assertIsNone(policy.signoff_override(trace, 'n'))
+
+    def test_promised_kr_sets_extra_threshold(self):
+        low = Hand.parse('S5432H5432D5432C5')
+        with patch.object(policy, 'assess_quality',
+                          side_effect=lambda hand: {'kr_points': 15.0}), \
+             patch.object(policy, 'keycards_sufficient', return_value=True), \
+             patch.object(policy, '_completion_rates',
+                          return_value=({'6S': 0.9}, 1)):
+            decision = policy.decide_from_hands(
+                Hand.parse('SAQ82HQJ72DKCA965'), 'S', [low],
+                game_call='4S', promised_kr=14.0)
+        self.assertEqual(decision.extra_kr_threshold, 15.95)
+        self.assertEqual(decision.call, '4N')
+
+
 class CueDecisionTests(unittest.TestCase):
     def setUp(self):
         self.low = Hand.parse('S5432H5432D5432C5')      # 13 cards, no HCP

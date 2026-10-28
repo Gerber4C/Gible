@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from typing import Any
 
 from .auction import Auction
@@ -10,6 +12,8 @@ from .context import BidDecision, CandidatePool
 from .decision import choose_candidate, _resolve_same_call_meanings
 from .dds_adapter import DDSUnavailableError
 from .deal_sampler import SamplingExhausted
+from .hand_quality import assess_quality
+from .honor_quality import assess_honor_texture
 from .model import PartnershipProfile
 from .legality import illegal_calls_in_auction
 from .memory import SeatMemory
@@ -18,7 +22,8 @@ from .replay import active_environment_for, replay_auction
 from .slam_conventions import keycard_ask_restricted
 from .slam_intent import detect_slam_intent
 from .cue_slam_policy import (cue_three_way, decide_from_hands,
-                              sample_process_hands)
+                              partner_promised_kr, sample_process_hands,
+                              signoff_override)
 from .simulation_decision import (decide_minor_5422, is_minor_5422_decision,
                                   decide_minor_major_74, is_minor_major_74_decision,
                                   decide_two_major_spade_slam,
@@ -218,7 +223,8 @@ def choose_bid(
                         hand, trump, tuple(deal[partner] for deal in deals),
                         game_call=game.call,
                         cue_calls=[c.call for c in cue_candidates],
-                        deals=deals)
+                        deals=deals,
+                        promised_kr=partner_promised_kr(trace, partner))
                 except (DDSUnavailableError, RuntimeError, ValueError) as exc:
                     trace.warn('Cue-continuation simulation unavailable: ' + str(exc))
                 else:
@@ -230,6 +236,48 @@ def choose_bid(
                             'reason': simulated.reason,
                             'extra_kr_threshold': simulated.extra_kr_threshold}
                         candidates = (selected,)
+
+    override = signoff_override(trace, auction.actor_to_call)
+    if override is not None:
+        trump, signoff_bidder, signoff_call = override
+        keycard = next((c for c in candidates if c.call == '4N'), None)
+        pass_candidate = next((c for c in candidates if c.call == 'P'), None)
+        if keycard is not None and pass_candidate is not None:
+            maximum = next(
+                (item.definition for item in profile.named_evaluators
+                 if item.id == 'absolute_maximum_' + trump), None)
+
+            def _not_maximum(hand):
+                if maximum is None:
+                    return True
+                context = SimpleNamespace(
+                    hand=hand, hand_quality=assess_quality(hand),
+                    honor_texture=assess_honor_texture(hand))
+                return maximum(context) is not True
+
+            try:
+                deals = sample_process_hands(
+                    profile, auction, trace, hand, signoff_bidder,
+                    extra_filter=_not_maximum)
+            except (SamplingExhausted, RuntimeError, ValueError) as exc:
+                trace.warn('Signoff-override sampling unavailable: ' + str(exc))
+                deals = ()
+            if deals:
+                try:
+                    simulated = decide_from_hands(
+                        hand, trump,
+                        tuple(deal[signoff_bidder] for deal in deals),
+                        game_call=signoff_call, cue_calls=(), deals=deals,
+                        promised_kr=partner_promised_kr(trace, signoff_bidder))
+                except (DDSUnavailableError, RuntimeError, ValueError) as exc:
+                    trace.warn('Signoff-override simulation unavailable: ' + str(exc))
+                else:
+                    selected = keycard if simulated.call == '4N' else pass_candidate
+                    trace.simulation_decision = {
+                        'call': selected.call,
+                        'reason': 'signoff override: ' + simulated.reason,
+                        'extra_kr_threshold': simulated.extra_kr_threshold}
+                    candidates = (selected,)
 
     decision = choose_candidate(
         candidates,

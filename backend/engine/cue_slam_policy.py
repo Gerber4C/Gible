@@ -33,6 +33,7 @@ from .hand_quality import assess_quality
 
 CUE_ACT_TYPES = frozenset({'control_showing', 'slam_try'})
 EXTRA_KR = 2.0
+EXTRA_KR_MARGIN = 1.95
 SLAM_QUALIFY_RATE = 0.5
 _LEVEL_ORDER = 'CDHSN'
 
@@ -103,6 +104,19 @@ def cue_public_kr(previous: tuple[float, float | None],
     return (low + high) / 2.0, high
 
 
+def partner_promised_kr(trace, partner: str) -> float | None:
+    """Return the largest K-R floor partner's calls published, if any."""
+
+    best = None
+    for entry in trace.applied_meanings:
+        if entry.get('seat') != partner or entry.get('call') == 'P':
+            continue
+        value = (entry.get('public_meaning') or {}).get('min_kr')
+        if value is not None and (best is None or value > best):
+            best = value
+    return best
+
+
 def extra_kr_threshold(partner_kr: Sequence[float]) -> float:
     """Return the tenth-percentile process K-R plus two points."""
 
@@ -161,6 +175,7 @@ def decide_from_hands(
     slam_threshold: float = SLAM_QUALIFY_RATE,
     solve_table: Callable = calculate_available_table,
     deals: Sequence[dict] | None = None,
+    promised_kr: float | None = None,
 ) -> CueDecision:
     """Apply the cue-continuation policy to already-sampled partner hands."""
 
@@ -168,7 +183,11 @@ def decide_from_hands(
     if deals is not None:
         deals = tuple(deals)
     krs = [assess_quality(item)['kr_points'] for item in partner_hands]
-    threshold = extra_kr_threshold(krs)
+    if promised_kr is not None:
+        # Owner rule: extra strength means 1.95 K-R above the promised floor.
+        threshold = promised_kr + EXTRA_KR_MARGIN
+    else:
+        threshold = extra_kr_threshold(krs)
     no_extra_index = [index for index, kr in enumerate(krs) if kr < threshold]
     with_extra_index = [index for index, kr in enumerate(krs) if kr >= threshold]
 
@@ -259,6 +278,37 @@ def cue_three_way(auction, trace) -> tuple[str, str] | None:
     return trump, partner
 
 
+def signoff_override(trace, actor: str) -> tuple[str, str, str] | None:
+    """Return ``(trump, signoff_bidder, signoff_call)`` after a cue signoff.
+
+    The signoff is the game bid that follows the actor's own cue.  Partner may
+    reject it when fresh simulation still shows a qualifying slam.
+    """
+
+    entries = [entry for entry in trace.applied_meanings
+               if entry.get('call') != 'P']
+    if len(entries) < 2:
+        return None
+    last, previous = entries[-1], entries[-2]
+    last_meaning = last.get('public_meaning') or {}
+    previous_meaning = previous.get('public_meaning') or {}
+    if last.get('seat') == actor:
+        return None
+    if not {'signoff', 'final_placement'}.intersection(
+            last_meaning.get('call_act_types', ())):
+        return None
+    if previous.get('seat') != actor:
+        return None
+    if not CUE_ACT_TYPES.intersection(
+            previous_meaning.get('call_act_types', ())):
+        return None
+    trump = (previous_meaning.get('agreed_suit')
+             or previous_meaning.get('target_suit'))
+    if not isinstance(trump, str) or trump not in 'CDHS':
+        return None
+    return trump, last['seat'], last['call']
+
+
 def cue_allowed_above(trump: str, call: str) -> bool:
     """Return whether a cue may be made at this level under the owner rule."""
 
@@ -341,7 +391,8 @@ def _process_seed(auction, hand: Hand) -> int:
 def sample_process_hands(profile, auction, trace, actor_hand: Hand,
                          partner: str, *, count: int = 40, seed=None,
                          max_attempts: int = 4000,
-                         max_seconds: float = 8.0) -> tuple[Hand, ...]:
+                         max_seconds: float = 8.0,
+                         extra_filter=None) -> tuple[Hand, ...]:
     """Infer partner's range by simulating what hands would bid this way.
 
     Candidate hands are drawn inside partner's public HCP and length bounds,
@@ -387,6 +438,8 @@ def sample_process_hands(profile, auction, trace, actor_hand: Hand,
     kept = []
     for deal in sampled.deals:
         hand = deal[partner]
+        if extra_filter is not None and not extra_filter(hand):
+            continue
         if all(any(candidate.call == call
                    for candidate in generate_candidates(
                        profile, prefix, hand, prepared_trace, prepared_env,
@@ -408,6 +461,8 @@ __all__ = (
     'hand_would_bid_observed',
     'keycards_sufficient',
     'partner_hcp_bounds',
+    'partner_promised_kr',
     'sample_process_hands',
+    'signoff_override',
     'strength_is_unknown',
 )

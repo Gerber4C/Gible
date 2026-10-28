@@ -256,9 +256,12 @@ Continuation at a cue position with partner strength still unknown:
 - If the slam qualifies even with no extra partner strength and the
   partnership keycards are sufficient (never missing two aces, never one ace
   plus the trump queen), ask 4NT.
-- If the slam fails even with the partner's +2 K-R extra strength and enough
-  keycards, place game. That game carries signoff meaning; partner may
-  override it by simulating a qualifying slam.
+- If the slam fails even with the partner's extra strength and enough
+  keycards, place game. "Extra strength" means 1.95 K-R above the floor the
+  cue promises; when no floor is published, the sampled 10th percentile plus
+  two is used instead. That game carries signoff meaning; partner may
+  override it by **re-simulating**: if a qualifying slam still exists, partner
+  rejects the signoff and continues (4NT or a further cue), otherwise passes.
 - Otherwise continue cue-bidding.
 - Major trump: cueing above 4M is allowed only when the sampled expected score
   beats stopping in 4M/5M/6M. Minor trump: never cue above 5m to hunt a small
