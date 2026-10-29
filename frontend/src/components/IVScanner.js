@@ -250,6 +250,45 @@ function pairDetail(pair, group, thresholds) {
   );
 }
 
+function ProcessView({ report }) {
+  const processes = report?.process_groups || [];
+  if (!processes.length) {
+    return e("p", { className: "iv-empty-list" },
+      "No process groups yet. Run a scan to populate them.");
+  }
+  const table = (headers, rows) => e("table", { className: "iv-process-table" },
+    e("thead", null, e("tr", null, headers.map((h) => e("th", { key: h }, h)))),
+    e("tbody", null, rows.map((cells, index) => e("tr", { key: index },
+      cells.map((cell, position) => e("td", { key: position }, cell))))));
+  return e("div", { className: "iv-process-view" },
+    processes.map((process) => e("details", {
+      key: (process.process || []).join(" ") || process.auction || process.cases,
+      className: "iv-process", open: false,
+    },
+      e("summary", null,
+        e("b", null, process.auction || (process.process || []).join(" ")),
+        e("span", null, ` · ${process.cases} N/S pairs`)),
+      e("div", { className: "iv-process-columns" },
+        e("div", null,
+          e("h4", null, "North primary"),
+          table(["Shape", "Mode", "HCP band", "KR band", "N hands", "S matches"],
+            (process.north_groups || []).map((group) => [
+              (group.north_shape || []).join("-"), group.opener_mode,
+              group.hcp_band, group.kr_band,
+              (group.north_hands || []).length,
+              (group.matched_south_hands || []).length,
+            ]))),
+        e("div", null,
+          e("h4", null, "South primary"),
+          table(["Shape", "HCP", "S hands", "N matches"],
+            (process.south_groups || []).map((group) => [
+              (group.south_shape || []).join("-"), group.south_hcp,
+              (group.south_hands || []).length,
+              (group.matched_north_hands || []).length,
+            ]))))))
+  );
+}
+
 export function IVScanner({ profileId }) {
   const [reports, setReports] = React.useState([]);
   const [reportId, setReportId] = React.useState("");
@@ -501,6 +540,11 @@ export function IVScanner({ profileId }) {
             "aria-pressed": view === "overview",
             onClick: () => { setView("overview"); setCategory("all"); },
           }, "Overview · 总览"),
+          e("button", {
+            type: "button", className: view === "process" ? "active" : "",
+            "aria-pressed": view === "process",
+            onClick: () => { setView("process"); setCategory("all"); },
+          }, "Process · 进程"),
         ),
         e("div", { className: "iv-categories" },
           Object.entries(CATEGORY).map(([key, item], index) => e("button", {
@@ -514,7 +558,9 @@ export function IVScanner({ profileId }) {
           e("strong", null, counts[key]),
           e("small", null, item.detail))),
         ),
-        e("div", { className: "iv-inspection" },
+        view === "process"
+          ? e(ProcessView, { report })
+          : e("div", { className: "iv-inspection" },
           e("div", { className: "iv-list" },
             e("div", { className: "iv-list-tools" },
               e("span", null, busy ? "Loading…" : (

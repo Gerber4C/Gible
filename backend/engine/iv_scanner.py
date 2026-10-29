@@ -176,6 +176,92 @@ def _budget_minimums(report: Mapping) -> tuple[int, int]:
     return min_boards, min_pairs
 
 
+def _band(value, width):
+    try:
+        return math.floor(float(value) / width) * width
+    except (TypeError, ValueError):
+        return 0
+
+
+def project_by_process(report: dict) -> list[dict]:
+    """Group every case by bidding process with North- and South-primary views.
+
+    This replaces the cell-first framing: the same process is one big cell no
+    matter which South sampling cell produced it.  Within a process the North
+    view groups opener hands by shape, mode and a close HCP/K-R band (two
+    points), listing the South hands they were matched with; the South view
+    groups responder hands by shape and exact HCP, listing matched North hands.
+    """
+
+    collections = [
+        report.get('cases') or [],
+        report.get('complete_cases') or [],
+        report.get('limit_cases') or [],
+    ]
+    by_process = {}
+    for items in collections:
+        for case in items:
+            if not isinstance(case, Mapping):
+                continue
+            by_process.setdefault(case_process_key(case), []).append(case)
+
+    result = []
+    for process, members in by_process.items():
+        north_groups = {}
+        south_groups = {}
+        for case in members:
+            hands = case.get('hands') or {}
+            north_hand = hands.get('n')
+            south_hand = hands.get('s')
+            if not north_hand or not south_hand:
+                continue
+            cell = case.get('coverage_cell') or {}
+            north_shape = tuple(cell.get('opener_shape')
+                                or case.get('north_shape') or ())
+            north_mode = cell.get('opener_mode') or 'normal'
+            north_key = (north_shape, north_mode,
+                         _band(case.get('north_hcp', 0), 2),
+                         _band(case.get('north_kr', 0), 2.0))
+            north_group = north_groups.setdefault(north_key, {
+                'north_shape': list(north_shape), 'opener_mode': north_mode,
+                'hcp_band': north_key[2], 'kr_band': north_key[3],
+                'north_hands': set(), 'matched_south_hands': set(),
+            })
+            north_group['north_hands'].add(north_hand)
+            north_group['matched_south_hands'].add(south_hand)
+
+            south_shape = tuple(case.get('south_shape')
+                                or cell.get('base_shape') or ())
+            south_key = (south_shape, case.get('south_hcp'))
+            south_group = south_groups.setdefault(south_key, {
+                'south_shape': list(south_shape),
+                'south_hcp': case.get('south_hcp'),
+                'south_hands': set(), 'matched_north_hands': set(),
+            })
+            south_group['south_hands'].add(south_hand)
+            south_group['matched_north_hands'].add(north_hand)
+
+        def _finish(group, hands_key, matched_key):
+            data = {key: value for key, value in group.items()
+                    if key not in ('north_hands', 'matched_south_hands',
+                                   'south_hands', 'matched_north_hands')}
+            data[hands_key] = sorted(group[hands_key])
+            data[matched_key] = sorted(group[matched_key])
+            return data
+
+        result.append({
+            'process': list(process),
+            'auction': members[0].get('auction'),
+            'cases': len(members),
+            'north_groups': [_finish(group, 'north_hands', 'matched_south_hands')
+                             for group in north_groups.values()],
+            'south_groups': [_finish(group, 'south_hands', 'matched_north_hands')
+                             for group in south_groups.values()],
+        })
+    result.sort(key=lambda item: (-item['cases'], item.get('auction') or ''))
+    return result
+
+
 def project_report(report: dict, report_id: str, *,
                    include_pairs: bool = True) -> dict:
     """Project every sampling cell split by its distinct bidding processes."""
@@ -326,6 +412,7 @@ def project_report(report: dict, report_id: str, *,
         'wrong_game_rule': RULE_ID,
         'coverage': {'north': _north_coverage(report)},
         'counts': counts, 'groups': groups,
+        'process_groups': project_by_process(report) if include_pairs else [],
         'method_note': report.get('method_note'),
     })
 

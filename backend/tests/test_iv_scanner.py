@@ -88,6 +88,30 @@ class IVScannerTests(unittest.TestCase):
             'limit_cases': [limit],
         }
 
+    def test_process_projection_merges_cells_with_both_viewpoints(self):
+        from engine.iv_scanner import project_by_process
+        groups = project_by_process(self.sample_report())
+        self.assertEqual(len(groups), 5)
+        self.assertEqual(sum(group['cases'] for group in groups), 8)
+        by_auction = {group['auction']: group for group in groups}
+        nt = by_auction['1NP3NPPP']
+        self.assertEqual(nt['cases'], 2)
+        north = nt['north_groups'][0]
+        self.assertEqual(north['north_shape'], [4, 3, 3, 3])
+        self.assertTrue(north['north_hands'])
+        self.assertTrue(north['matched_south_hands'])
+        south = nt['south_groups'][0]
+        self.assertEqual(south['south_hcp'], 10)
+        self.assertTrue(south['south_hands'])
+        self.assertTrue(south['matched_north_hands'])
+
+    def test_report_projection_exposes_process_groups(self):
+        projected = project_report(self.sample_report(), 'sample.json')
+        self.assertEqual(len(projected['process_groups']), 5)
+        listed = project_report(self.sample_report(), 'sample.json',
+                                include_pairs=False)
+        self.assertEqual(listed['process_groups'], [])
+
     def test_report_splits_every_cell_by_auction_process_and_keeps_siblings(self):
         projected = project_report(self.sample_report(), 'sample.json')
 
