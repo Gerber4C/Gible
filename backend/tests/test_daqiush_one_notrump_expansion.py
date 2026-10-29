@@ -36,7 +36,7 @@ class DaqiushOneNotrumpExpansionTests(unittest.TestCase):
         responder = 'SKQ3H9DA9754CKQ76'
         self.assertEqual(self.bid('1NP', responder), '3C')
         self.assertEqual(self.bid('1NP3CP3DP', responder), '3H')
-        self.assertEqual(self.bid('1NP3CP3DP3HP', 'SAJ65HK96DQ73CKQ8'), '3N')
+        self.assertEqual(self.bid('1NP3CP3DP3HP', 'S876HAKQ32D842C96'), '3N')
 
     def test_heart_stayman_invitation(self):
         responder = 'S932HKQ72DA43C862'
