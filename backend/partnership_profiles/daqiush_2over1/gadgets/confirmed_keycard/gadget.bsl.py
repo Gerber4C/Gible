@@ -83,9 +83,6 @@ class ConfirmedKeycard(Gadget):
             for answer in superaccepts:
                 prefix = '1NP' + transfer + 'P' + answer + 'P4NP'
                 asks.append(('jacoby_' + trump + '_' + answer, prefix, trump))
-            ordinary_accept = {'2D': '2H', '2H': '2S'}[transfer]
-            ordinary_prefix = '1NP' + transfer + 'P' + ordinary_accept + 'P4NP'
-            asks.append(('jacoby_' + trump + '_ordinary', ordinary_prefix, trump))
         for transfer, accept, trump, splinters in (
             ('2D', '2H', 'H', ('3S', '4C', '4D')),
             ('2H', '2S', 'S', ('4C', '4D', '4H')),

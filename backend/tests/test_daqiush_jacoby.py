@@ -105,10 +105,10 @@ class DaqiushJacobyTests(unittest.TestCase):
     def test_superaccept_keycard_answer_and_non_slam_responder_limit(self):
         self.assertEqual(self.bid('1NP2DP2SP4NP', 'S97HKQ32DAK76CA76'), '5D')
         self.assertIsNone(self.bid('1NP2DP2SP', 'ST2HAQT976D53CKJ2'))
-        # A confirmed slam-interest seven-carder now asks keycards over the
-        # ordinary acceptance instead of blocking (bug report: 7-card majors
-        # must continue, with the seventh card converting to strength).
-        self.assertEqual(self.bid('1NP2DP2HP', 'SA62HAQJT72DJ7CJ4'), '4N')
+        # 4NT after the ordinary acceptance is the quantitative invite
+        # (15-16 HCP, 5332), so a 7-4-1-1 slam-interest hand still blocks
+        # pending the owner's 3C/3M continuation routes (bug report items 2-4).
+        self.assertIsNone(self.bid('1NP2DP2HP', 'SA62HAQJT72DJ7CJ4'))
 
 
 if __name__ == '__main__':

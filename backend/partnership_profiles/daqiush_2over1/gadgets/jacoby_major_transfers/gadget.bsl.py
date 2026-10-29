@@ -368,28 +368,6 @@ class JacobyMajorTransfers(Gadget):
                 nt_stop.meaning.target_suit = 'N'
                 nt_stop.meaning.purpose_completed = True
 
-            ordinary_ask = self.call('jacoby_' + trump.lower()
-                                     + '_ordinary_acceptance_slam_keycard')
-            ordinary_ask.when = ordinary_prefix
-            ordinary_ask.bid = '4NT'
-            ordinary_ask.applies = lambda ctx, t=trump: (
-                ctx.hand is not None
-                and named_evaluator(ctx, 'six_card_slam_interest_' + t))
-            ordinary_ask.meaning.action = 'rkcb_1430'
-            ordinary_ask.meaning.nature = ['artificial']
-            ordinary_ask.meaning.acts = ['inquiry', 'keycard_asking']
-            ordinary_ask.meaning.target_suit = trump
-            ordinary_ask.meaning.agreed_suit = trump
-            ask_effect = ordinary_ask.effect('agreed_suit')
-            ask_effect.suit = trump
-            keycards = ordinary_ask.effect('keycard_context')
-            keycards.trump_suit = trump
-            keycards.ask_call = '4N'
-            keycards.method = 'rkcb_1430'
-            keycards.status = 'pending'
-            ordinary_ask.description = ('Confirmed slam-interest hands ask keycards '
-                                        'over the ordinary acceptance too.')
-
             for minor in 'CD':
                 new_suit = self.call('jacoby_' + trump.lower() + '_second_' + minor.lower())
                 new_suit.when = ordinary_prefix

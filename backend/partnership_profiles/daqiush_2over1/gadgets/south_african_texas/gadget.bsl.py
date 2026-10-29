@@ -59,18 +59,26 @@ def six_card_slam_interest(ctx, suit):
     # Raw HCP sets the minimum for slam exploration, with a seventh card
     # converting to strength. K-R minus raw HCP then compares honor quality
     # against the usual bonus of this long shape.
-    hcp = ctx.hand.hcp - _length_strength_bonus(ctx, suit)
+    hcp = ctx.hand.hcp + _length_strength_bonus(ctx, suit)
     return hcp >= threshold['hcp'] and ctx.hand_quality['kr_delta'] >= threshold['kr_delta']
 
 
 def game_only_texas(ctx, suit):
-    if not has_texas_game(ctx, suit) or ctx.hand.length(suit) not in (6, 7):
+    length = ctx.hand.length(suit)
+    if not has_texas_game(ctx, suit) or length not in (6, 7):
         return False
     if sorted((ctx.hand.length('H'), ctx.hand.length('S'))) == [4, 6]:
         return True
-    side_class, _ = _side_class(ctx, suit)
-    supported = side_class in ('no_shortage', 'small_singleton')
-    return supported and not six_card_slam_interest(ctx, suit) and not slam_keycard_texas(ctx, suit)
+    if length == 7:
+        # Seven trumps always carry the game; slam-interest hands instead
+        # transfer (keeping slam space below game) when their continuation
+        # exists.
+        supported = not six_card_slam_interest(ctx, suit)
+    else:
+        side_class, _ = _side_class(ctx, suit)
+        supported = side_class in ('no_shortage', 'small_singleton')
+    return (supported and not six_card_slam_interest(ctx, suit)
+            and not slam_keycard_texas(ctx, suit))
 
 
 def seven_card_texas(ctx, suit):
@@ -79,16 +87,22 @@ def seven_card_texas(ctx, suit):
 
 
 def slam_keycard_texas(ctx, suit):
-    """The six-card 6322 hand already committed to slam if keycards permit."""
-    return (has_texas_game(ctx, suit) and ctx.hand.length(suit) == 6
-            and ctx.hand.hcp >= 17
-            and sorted(ctx.hand.length(other) for other in 'SHDC' if other != suit) == [2, 2, 3])
+    """The 6322 six-card hand already committed to slam if keycards permit.
+
+    A seventh card converts to strength: the HCP floor drops by one.
+    """
+    length = ctx.hand.length(suit)
+    return (has_texas_game(ctx, suit) and length in (6, 7)
+            and ctx.hand.hcp + (7 - length) >= 17
+            and min(ctx.hand.length(other) for other in 'SHDC'
+                    if other != suit) >= 2)
 
 
 def shapely_game_texas(ctx, suit):
     points = named_evaluator(ctx, 'shapely_second_minor_strength_' + suit)
     return (points is not None and 4 <= points <= 6
-            and has_texas_game(ctx, suit))
+            and has_texas_game(ctx, suit)
+            and not six_card_slam_interest(ctx, suit))
 
 
 def texas_hearts(ctx):
