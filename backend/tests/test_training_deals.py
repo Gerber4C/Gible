@@ -30,6 +30,31 @@ class TrainingDealTests(unittest.TestCase):
         self.assertEqual(choose_bid(profile, Auction.parse('', dealer='n'), hands['n']).call, '1N')
         self.assertEqual(outcome, self.generate(profile, opening='1N', opener='n', seed=15, max_attempts=500))
 
+    def test_responder_constraints_narrow_the_search(self):
+        profile = load_profile('daqiush_2over1')
+        outcome = self.generate(
+            profile, opening='1NT', opener='n', seed=15, max_attempts=2000,
+            responder={'min_hcp': 5, 'max_hcp': 9,
+                       'min_lengths': {'S': 2}, 'max_lengths': {'H': 4}})
+        self.assertEqual(outcome['status'], 'matched')
+        south = Hand.parse(outcome['hands']['s'])
+        self.assertTrue(5 <= south.hcp <= 9)
+        self.assertGreaterEqual(south.length('S'), 2)
+        self.assertLessEqual(south.length('H'), 4)
+        self.assertEqual(outcome['responder']['min_hcp'], 5)
+
+    def test_invalid_responder_constraints_are_rejected(self):
+        profile = load_profile('daqiush_2over1')
+        for responder in (
+                {'min_hcp': 12, 'max_hcp': 5},
+                {'min_lengths': {'S': [6, 2]}},
+                {'min_lengths': {'X': 2}},
+                {'min_hcp': 'wide'},
+        ):
+            with self.subTest(responder=responder):
+                with self.assertRaises(ValueError):
+                    self.generate(profile, opening='1NT', responder=responder)
+
     def test_random_opener_is_reproducible_and_first_call_matches(self):
         profile = load_profile('daqiush_2over1')
         outcome = self.generate(profile, opening='1N', opener='random', seed=9, max_attempts=500)

@@ -21,6 +21,8 @@ export function BridgePanel({
   deal, setHolding, validation, showOpponents, setShowOpponents, onRandomDeal,
   trainingMode, setTrainingMode, targetOpening, setTargetOpening,
   targetResponse, setTargetResponse, targetOpener, setTargetOpener,
+  responderHcpMin, setResponderHcpMin, responderHcpMax, setResponderHcpMax,
+  responderLengths, setResponderLengths,
   trainingSeed, setTrainingSeed, trainingResult, trainingLoading,
   onGenerateTraining, onCancelTraining,
   onCompleteOpponents, onClearOpponents, canCompleteOpponents,
@@ -80,6 +82,24 @@ export function BridgePanel({
           [["ns", "North or South"], ["ew", "East or West"], ["random", "Random"],
             ["n", "North"], ["e", "East"], ["s", "South"], ["w", "West"]].map(
             ([value, label]) => e("option", { key: value, value }, label)))),
+        e("label", null, "Resp HCP", e("span", { className: "training-pair" },
+          e("input", { "aria-label": "Responder min HCP", value: responderHcpMin,
+            onChange: (event) => setResponderHcpMin(event.target.value),
+            placeholder: "min", inputMode: "numeric" }),
+          e("span", null, "–"),
+          e("input", { "aria-label": "Responder max HCP", value: responderHcpMax,
+            onChange: (event) => setResponderHcpMax(event.target.value),
+            placeholder: "max", inputMode: "numeric" }))),
+        e("label", null, "Resp suits", e("span", { className: "training-lengths" },
+          ["S", "H", "D", "C"].map((suit) => e("span", {
+            key: suit, className: `training-length ${suitClass(suit)}` },
+            e("b", null, suitSymbol(suit)),
+            e("input", {
+              "aria-label": `Responder ${suit} length range`,
+              value: responderLengths[suit],
+              onChange: (event) => setResponderLengths({
+                ...responderLengths, [suit]: event.target.value }),
+              placeholder: "2-6", inputMode: "numeric" }))))),
         e("label", null, "Seed", e("input", { "aria-label": "Training seed", value: trainingSeed,
           onChange: (event) => setTrainingSeed(event.target.value), placeholder: "Random", inputMode: "numeric" })),
         trainingLoading

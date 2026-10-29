@@ -90,6 +90,7 @@ def training_deal(request: dict) -> dict:
         response=request.get('response'),
         opener=request.get('opener', 'ns'),
         vulnerability=request.get('vulnerability', 'none'),
+        responder=request.get('responder'),
         seed=request.get('seed'),
         max_attempts=request.get('max_attempts', 2000),
     )

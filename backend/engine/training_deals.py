@@ -51,6 +51,72 @@ def _compact(hand: Hand) -> str:
     return ''.join(suit + (hand.holding(suit) or '-') for suit in 'SHDC')
 
 
+SuitRanges = dict[str, tuple[int, int]]
+
+
+def _length_ranges(raw, field: str) -> SuitRanges:
+    """Normalise per-suit length ranges from letters or full suit names."""
+
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise ValueError(f'{field} must be an object of suit ranges')
+    ranges: SuitRanges = {}
+    for key, value in raw.items():
+        suit = {'spades': 'S', 'hearts': 'H', 'diamonds': 'D', 'clubs': 'C'}.get(
+            str(key).lower(), str(key).upper())
+        if suit not in 'SHDC':
+            raise ValueError(f'unknown suit in {field}: {key!r}')
+        if isinstance(value, (list, tuple)) and len(value) == 2:
+            low, high = value
+        elif isinstance(value, int) and not isinstance(value, bool):
+            low = high = value
+        else:
+            raise ValueError(f'{field} values must be an integer or a [min, max] pair')
+        if (isinstance(low, bool) or isinstance(high, bool)
+                or not isinstance(low, int) or not isinstance(high, int)
+                or not 0 <= low <= high <= 13):
+            raise ValueError(f'invalid {field} range for {suit}: {value!r}')
+        ranges[suit] = (low, high)
+    return ranges
+
+
+def _responder_constraints(raw):
+    """Validate responder HCP and four-suit length bounds, or return None."""
+
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ValueError('responder must be an object')
+    low = raw.get('min_hcp', 0)
+    high = raw.get('max_hcp', 37)
+    if (isinstance(low, bool) or isinstance(high, bool)
+            or not isinstance(low, int) or not isinstance(high, int)
+            or not 0 <= low <= high <= 37):
+        raise ValueError('responder HCP bounds must be integers from 0 to 37')
+    min_lengths = _length_ranges(raw.get('min_lengths'), 'responder min_lengths')
+    max_lengths = _length_ranges(raw.get('max_lengths'), 'responder max_lengths')
+    for suit in set(min_lengths) & set(max_lengths):
+        if min_lengths[suit][0] > max_lengths[suit][0]:
+            raise ValueError(f'responder {suit} min length exceeds max length')
+    return {'min_hcp': low, 'max_hcp': high,
+            'min_lengths': min_lengths, 'max_lengths': max_lengths}
+
+
+def _responder_matches(hand: Hand, responder) -> bool:
+    if responder is None:
+        return True
+    if not responder['min_hcp'] <= hand.hcp <= responder['max_hcp']:
+        return False
+    for suit in 'SHDC':
+        length = hand.length(suit)
+        low, _ = responder['min_lengths'].get(suit, (0, 13))
+        _, high = responder['max_lengths'].get(suit, (0, 13))
+        if not low <= length <= high:
+            return False
+    return True
+
+
 def generate_training_deal(
     profile: PartnershipProfile,
     *,
@@ -58,6 +124,7 @@ def generate_training_deal(
     response: str | None = None,
     opener: str = 'ns',
     vulnerability: str = 'none',
+    responder: dict | None = None,
     seed: int | None = None,
     max_attempts: int = 2000,
     max_seconds: float = MAX_SECONDS,
@@ -79,6 +146,7 @@ def generate_training_deal(
         raise ValueError(f'max_seconds must be positive and at most {MAX_SECONDS}')
     if vulnerability not in ('none', 'ns', 'ew', 'both'):
         raise ValueError('Invalid vulnerability')
+    responder = _responder_constraints(responder)
 
     seed = random.SystemRandom().randrange(2**63) if seed is None else seed
     rng = random.Random(seed)
@@ -97,6 +165,8 @@ def generate_training_deal(
     while attempts < max_attempts and time.monotonic() < deadline:
         attempts += 1
         hands = _deal(rng)
+        if not _responder_matches(hands[PARTNER[chosen_opener]], responder):
+            continue
         first = choose_bid(profile, before, hands[chosen_opener], environment)
         if first.call != opening or first.selected_candidate is None or first.selected_candidate.source_kind == 'heuristic_fallback':
             continue
@@ -110,6 +180,7 @@ def generate_training_deal(
         return {
             'status': 'matched', 'profile': profile.id, 'profile_version': profile.version,
             'opening': opening, 'response': response, 'opener': chosen_opener,
+            'responder': responder,
             'dealer': chosen_opener, 'vulnerability': vulnerability, 'seed': seed,
             'attempts': attempts, 'calls': calls,
             'hands': {seat: _compact(hand) for seat, hand in hands.items()},
@@ -117,6 +188,7 @@ def generate_training_deal(
     return {
         'status': 'not_found', 'profile': profile.id, 'profile_version': profile.version,
         'opening': opening, 'response': response, 'opener': chosen_opener,
+        'responder': responder,
         'dealer': chosen_opener, 'vulnerability': vulnerability, 'seed': seed,
         'attempts': attempts, 'calls': [], 'hands': None,
         'message': 'No matching deal was found within the attempt/time budget; the requested calls were not relaxed.',

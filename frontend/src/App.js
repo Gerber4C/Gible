@@ -43,6 +43,9 @@ export default function App() {
   const [targetResponse, setTargetResponse] = React.useState("4C");
   const [targetOpener, setTargetOpener] = React.useState("ns");
   const [trainingSeed, setTrainingSeed] = React.useState("");
+  const [responderHcpMin, setResponderHcpMin] = React.useState("");
+  const [responderHcpMax, setResponderHcpMax] = React.useState("");
+  const [responderLengths, setResponderLengths] = React.useState({ S: "", H: "", D: "", C: "" });
   const [trainingResult, setTrainingResult] = React.useState(null);
   const [trainingLoading, setTrainingLoading] = React.useState(false);
   const trainingAbort = React.useRef(null);
@@ -128,10 +131,32 @@ export default function App() {
       const seedText = trainingSeed.trim();
       if (seedText && !/^-?\d+$/.test(seedText)) throw new Error("Seed must be an integer.");
       if (seedText && !Number.isSafeInteger(Number(seedText))) throw new Error("Seed must be a safe integer.");
+      const parseLength = (text) => {
+        const value = (text || "").trim();
+        if (!value) return null;
+        const pair = value.match(/^(\d+)\s*-\s*(\d+)$/);
+        if (pair) return [Number(pair[1]), Number(pair[2])];
+        if (/^\d+$/.test(value)) { const single = Number(value); return [single, single]; }
+        throw new Error(`Length range "${text}" must be a number or min-max.`);
+      };
+      const responder = {};
+      const hcpMin = responderHcpMin.trim();
+      const hcpMax = responderHcpMax.trim();
+      if (hcpMin) responder.min_hcp = Number(hcpMin);
+      if (hcpMax) responder.max_hcp = Number(hcpMax);
+      const minLengths = {};
+      const maxLengths = {};
+      for (const suit of ["S", "H", "D", "C"]) {
+        const range = parseLength(responderLengths[suit]);
+        if (range) { minLengths[suit] = range[0]; maxLengths[suit] = range[1]; }
+      }
+      if (Object.keys(minLengths).length) responder.min_lengths = minLengths;
+      if (Object.keys(maxLengths).length) responder.max_lengths = maxLengths;
       const result = await generateTrainingDeal({
         profile: { id: profileId }, opening: targetOpening,
         response: trainingMode === "response" ? targetResponse : null,
         opener: targetOpener, vulnerability,
+        responder: Object.keys(responder).length ? responder : null,
         seed: seedText ? Number(seedText) : null, max_attempts: 2000,
       }, controller.signal);
       if (trainingAbort.current !== controller) return;
@@ -461,6 +486,9 @@ export default function App() {
         targetOpening, setTargetOpening: (value) => { invalidateTrainingSearch(); setTargetOpening(value); },
         targetResponse, setTargetResponse: (value) => { invalidateTrainingSearch(); setTargetResponse(value); },
         targetOpener, setTargetOpener: (value) => { invalidateTrainingSearch(); setTargetOpener(value); },
+        responderHcpMin, setResponderHcpMin: (value) => { invalidateTrainingSearch(); setResponderHcpMin(value); },
+        responderHcpMax, setResponderHcpMax: (value) => { invalidateTrainingSearch(); setResponderHcpMax(value); },
+        responderLengths, setResponderLengths: (value) => { invalidateTrainingSearch(); setResponderLengths(value); },
         trainingSeed, setTrainingSeed: (value) => { if (trainingLoading) invalidateTrainingSearch(); setTrainingSeed(value); }, trainingResult, trainingLoading,
         onGenerateTraining: generateMatchingDeal, onCancelTraining: cancelTrainingSearch,
         onCompleteOpponents: fillOpponents,

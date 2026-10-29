@@ -1649,6 +1649,12 @@ textarea {
 .training-toolbar input, .training-toolbar select { min-height: 34px; min-width: 96px; max-width: 138px; padding: 5px 8px; border: 1px solid #c9d9d0; border-radius: 6px; background: white; color: #24362e; font-size: 13px; }
 .training-toolbar button { min-height: 34px; cursor: pointer; }
 .training-match { color: #176f5d; font-size: 12px; font-weight: 700; align-self: center; }
+.training-pair, .training-lengths { display: inline-flex; align-items: center; gap: 4px; }
+.training-pair input { min-width: 56px; max-width: 64px; }
+.training-lengths { gap: 6px; }
+.training-length { display: inline-flex; align-items: center; gap: 2px; }
+.training-length b { font-size: 12px; }
+.training-length input { min-width: 52px; max-width: 62px; }
 .deal-help { padding: 7px 10px; color: #596b62; font-size: 11px; background: #f8fafb; }
 .analysis-tools { display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; max-height: 40vh; border-top: 1px solid #dce8e1; }
 .analysis-tools-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 38px; padding: 4px 12px; color: #44554d; font-size: 12px; font-weight: 700; background: #f4f8f6; }
