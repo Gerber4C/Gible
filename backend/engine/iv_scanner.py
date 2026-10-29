@@ -16,7 +16,7 @@ from .coverage_scan import COVERAGE_SHAPES, scan_coverage
 from .loader import load_profile
 from .outcome_metrics import (
     RULE_ID, assess_auction_groups, board_result, case_process_key,
-    reclassify_analysis,
+    rates_for_boards, reclassify_analysis,
 )
 
 
@@ -46,7 +46,7 @@ def scan_options(request: dict) -> dict:
     """Validate a bounded North-1NT scan request."""
     if not isinstance(request, dict) or set(request) - {
             'profile', 'seed', 'hcp_min', 'hcp_max',
-            'pairs_per_cell', 'ew_samples'}:
+            'pairs_per_cell', 'ew_samples', 'north_cap', 'south_cap'}:
         raise ValueError('Unsupported scanner setting')
     profile_id = request.get('profile', 'daqiush_2over1')
     if not isinstance(profile_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]+', profile_id):
@@ -55,10 +55,13 @@ def scan_options(request: dict) -> dict:
                 'hcp_min': request.get('hcp_min', 0),
                 'hcp_max': request.get('hcp_max', 22),
                 'pairs_per_cell': request.get('pairs_per_cell', 2),
-                'ew_samples': request.get('ew_samples', 10)}
+                'ew_samples': request.get('ew_samples', 10),
+                'north_cap': request.get('north_cap', NORTH_CAP),
+                'south_cap': request.get('south_cap', SOUTH_CAP)}
     bounds = {'seed': (0, 2**32 - 1), 'hcp_min': (0, 22),
               'hcp_max': (0, 22), 'pairs_per_cell': (1, 20),
-              'ew_samples': (1, 20)}
+              'ew_samples': (1, 20), 'north_cap': (1, 200),
+              'south_cap': (1, 200)}
     for key, value in settings.items():
         lower, upper = bounds[key]
         if isinstance(value, bool) or not isinstance(value, int) or not lower <= value <= upper:
@@ -183,14 +186,20 @@ def _band(value, width):
         return 0
 
 
-def project_by_process(report: dict) -> list[dict]:
-    """Group every case by bidding process with North- and South-primary views.
+NORTH_CAP = 20
+SOUTH_CAP = 20
 
-    This replaces the cell-first framing: the same process is one big cell no
-    matter which South sampling cell produced it.  Within a process the North
-    view groups opener hands by shape, mode and a close HCP/K-R band (two
-    points), listing the South hands they were matched with; the South view
-    groups responder hands by shape and exact HCP, listing matched North hands.
+
+def project_by_process(report: dict, *, analyses=None,
+                       north_cap: int = NORTH_CAP,
+                       south_cap: int = SOUTH_CAP) -> list[dict]:
+    """Group cases by bidding process with North/South primary pools.
+
+    One process is one group across all sampling cells.  Each side keeps a
+    deduplicated hand pool; only the first ``north_cap`` / ``south_cap`` hands
+    are listed, while every case still contributes to the per-contract DDS
+    rates and to the per-bucket lose/down/wrong weights.  Surplus cases are
+    therefore counted but not stored as new hands.
     """
 
     collections = [
@@ -201,15 +210,26 @@ def project_by_process(report: dict) -> list[dict]:
     by_process = {}
     for items in collections:
         for case in items:
-            if not isinstance(case, Mapping):
-                continue
-            by_process.setdefault(case_process_key(case), []).append(case)
+            if isinstance(case, Mapping):
+                by_process.setdefault(case_process_key(case), []).append(case)
 
+    analyses = analyses or {}
     result = []
     for process, members in by_process.items():
+        boards_by_contract = {}
         north_groups = {}
         south_groups = {}
         for case in members:
+            analysis = analyses.get(case.get('id')) or case.get('analysis') or {}
+            categories = {FLAG_CATEGORY[flag]
+                          for flag in analysis.get('flags') or ()
+                          if flag in FLAG_CATEGORY}
+            contract = case.get('contract')
+            declarer = case.get('declarer')
+            if contract and declarer in ('n', 's'):
+                boards_by_contract.setdefault(
+                    (contract, declarer), []).extend(
+                    case.get('dds_tables') or ())
             hands = case.get('hands') or {}
             north_hand = hands.get('n')
             south_hand = hands.get('s')
@@ -226,9 +246,14 @@ def project_by_process(report: dict) -> list[dict]:
                 'north_shape': list(north_shape), 'opener_mode': north_mode,
                 'hcp_band': north_key[2], 'kr_band': north_key[3],
                 'north_hands': set(), 'matched_south_hands': set(),
+                'cases': 0, 'categories': {},
             })
             north_group['north_hands'].add(north_hand)
             north_group['matched_south_hands'].add(south_hand)
+            north_group['cases'] += 1
+            for category in categories:
+                north_group['categories'][category] = (
+                    north_group['categories'].get(category, 0) + 1)
 
             south_shape = tuple(case.get('south_shape')
                                 or cell.get('base_shape') or ())
@@ -237,25 +262,42 @@ def project_by_process(report: dict) -> list[dict]:
                 'south_shape': list(south_shape),
                 'south_hcp': case.get('south_hcp'),
                 'south_hands': set(), 'matched_north_hands': set(),
+                'cases': 0, 'categories': {},
             })
             south_group['south_hands'].add(south_hand)
             south_group['matched_north_hands'].add(north_hand)
+            south_group['cases'] += 1
+            for category in categories:
+                south_group['categories'][category] = (
+                    south_group['categories'].get(category, 0) + 1)
 
-        def _finish(group, hands_key, matched_key):
-            data = {key: value for key, value in group.items()
-                    if key not in ('north_hands', 'matched_south_hands',
-                                   'south_hands', 'matched_north_hands')}
-            data[hands_key] = sorted(group[hands_key])
-            data[matched_key] = sorted(group[matched_key])
+        def _finish(group, hands_key, matched_key, cap):
+            hands = sorted(group.pop(hands_key))
+            matched = sorted(group.pop(matched_key))
+            data = dict(group)
+            data[hands_key] = hands[:cap]
+            data[matched_key] = matched
+            data['stored'] = min(len(hands), cap)
+            data['dropped'] = max(0, len(hands) - cap)
             return data
+
+        contracts = []
+        for (contract, declarer), boards in boards_by_contract.items():
+            rates = rates_for_boards(contract, declarer, boards)[0] if boards else {}
+            contracts.append({'contract': contract, 'declarer': declarer,
+                              'boards': len(boards), 'rates': rates})
+        contracts.sort(key=lambda item: (item['contract'], item['declarer']))
 
         result.append({
             'process': list(process),
             'auction': members[0].get('auction'),
             'cases': len(members),
-            'north_groups': [_finish(group, 'north_hands', 'matched_south_hands')
+            'contracts': contracts,
+            'north_groups': [_finish(group, 'north_hands',
+                                     'matched_south_hands', north_cap)
                              for group in north_groups.values()],
-            'south_groups': [_finish(group, 'south_hands', 'matched_north_hands')
+            'south_groups': [_finish(group, 'south_hands',
+                                     'matched_north_hands', south_cap)
                              for group in south_groups.values()],
         })
     result.sort(key=lambda item: (-item['cases'], item.get('auction') or ''))
@@ -286,6 +328,12 @@ def project_report(report: dict, report_id: str, *,
     if not isinstance(process_target, int) or isinstance(process_target, bool) or process_target < 1:
         process_target = None
     min_boards, min_pairs = _budget_minimums(report)
+    north_cap = budget.get('north_cap', NORTH_CAP)
+    south_cap = budget.get('south_cap', SOUTH_CAP)
+    if not isinstance(north_cap, int) or isinstance(north_cap, bool) or north_cap < 1:
+        north_cap = NORTH_CAP
+    if not isinstance(south_cap, int) or isinstance(south_cap, bool) or south_cap < 1:
+        south_cap = SOUTH_CAP
 
     complete = collections['complete_cases']
     analyses = {}
@@ -412,7 +460,9 @@ def project_report(report: dict, report_id: str, *,
         'wrong_game_rule': RULE_ID,
         'coverage': {'north': _north_coverage(report)},
         'counts': counts, 'groups': groups,
-        'process_groups': project_by_process(report) if include_pairs else [],
+        'process_groups': (project_by_process(
+            report, analyses=analyses, north_cap=north_cap,
+            south_cap=south_cap) if include_pairs else []),
         'method_note': report.get('method_note'),
     })
 
@@ -521,7 +571,10 @@ class ScannerJobs:
                 profile, seed=options['seed'],
                 hcp_targets=tuple(range(options['hcp_min'], options['hcp_max'] + 1)),
                 shapes=options['shapes'], pairs_per_cell=options['pairs_per_cell'],
-                ew_samples=options['ew_samples'], progress=progress,
+                ew_samples=options['ew_samples'],
+                north_cap=options.get('north_cap', NORTH_CAP),
+                south_cap=options.get('south_cap', SOUTH_CAP),
+                progress=progress,
                 snapshot=snapshot,
                 snapshot_every=options.get('snapshot_every', 20))
             snapshot(report)

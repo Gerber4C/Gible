@@ -105,6 +105,23 @@ class IVScannerTests(unittest.TestCase):
         self.assertTrue(south['south_hands'])
         self.assertTrue(south['matched_north_hands'])
 
+    def test_process_projection_caps_stored_hands_and_keeps_weights(self):
+        from engine.iv_scanner import project_by_process
+        groups = project_by_process(self.sample_report(), north_cap=1,
+                                    south_cap=1)
+        nt = next(group for group in groups if group['auction'] == '1NP3NPPP')
+        north = nt['north_groups'][0]
+        self.assertEqual(north['stored'], 1)
+        self.assertGreaterEqual(north['dropped'], 1)
+        self.assertEqual(len(north['north_hands']), 1)
+        # Every case still counts toward the bucket weight and the rates.
+        self.assertEqual(north['cases'], 2)
+        self.assertTrue(nt['contracts'])
+        contract = next(item for item in nt['contracts']
+                        if item['contract'] == '3NT')
+        self.assertEqual(contract['boards'], 6)
+        self.assertIn('contract_failure', contract['rates'])
+
     def test_report_projection_exposes_process_groups(self):
         projected = project_report(self.sample_report(), 'sample.json')
         self.assertEqual(len(projected['process_groups']), 5)
@@ -330,7 +347,8 @@ class IVScannerTests(unittest.TestCase):
         from engine.iv_scanner import ScannerJobs
 
         def fake_scan(profile, *, seed, hcp_targets, shapes, pairs_per_cell,
-                      ew_samples, progress, snapshot, snapshot_every):
+                      ew_samples, north_cap, south_cap, progress, snapshot,
+                      snapshot_every):
             report = {
                 'schema_version': 2,
                 'profile': {'id': 'daqiush_2over1', 'name': 'x', 'version': '1'},

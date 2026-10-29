@@ -277,6 +277,33 @@ tenant isolation and resource limits. Deployment is an enabling task, not a reas
 to force the engine into a cloud-only design. Follow local development and tested
 updates after launch; do not make the public server the development workspace.
 
+### Fly.io deployment preparation (not implemented)
+
+The following work is recorded for the Fly.io deployment stage. It must preserve
+the existing local `gible.cmd` workflow and local repository-backed data paths.
+
+- [ ] Make the production server listen on `0.0.0.0` and the Fly-provided `PORT`,
+  using internal port `8080`, without changing the local backend's default
+  `127.0.0.1:8765` binding.
+- [ ] Serve the frontend static files from the Python production server so one Fly
+  service and hostname provide both the UI and API.
+- [ ] Use same-origin `/api/*` requests in production while retaining the local
+  frontend connection to `127.0.0.1:8765`.
+- [ ] Add a lightweight `/healthz` endpoint for deployment and service checks.
+- [ ] Add a configurable `GIBLE_DATA_DIR`: use `/data` on Fly and preserve the
+  current repository paths for local execution.
+- [ ] On the first start of an empty persistent data directory, copy the bundled
+  profiles into `/data/profiles`; subsequent System Editor changes must update
+  the persistent copies rather than the image contents.
+- [ ] Store IV Scanner output under `/data/reports/block_scans` in production.
+- [ ] Add and review `Dockerfile`, `.dockerignore`, and `fly.toml` deployment files.
+- [ ] Add pinned production Python dependencies, including `endplay==0.5.12`, and
+  verify that DDS-backed analysis works in the deployed Linux image.
+- [ ] Mount a Fly Volume at `/data`, keep the first deployment single-machine,
+  and test profile/report survival across restart, redeploy, backup, and rollback.
+- [ ] Protect the deployed editor and expensive endpoints before public DNS
+  cutover; direct access to the Fly origin must not bypass the chosen access layer.
+
 ## Supporting Product Backlog
 
 - Improve profile authoring, validation, explanations, and system-note generation

@@ -256,6 +256,9 @@ function ProcessView({ report }) {
     return e("p", { className: "iv-empty-list" },
       "No process groups yet. Run a scan to populate them.");
   }
+  const rate = (value) => (value == null ? "—" : Number(value).toFixed(2));
+  const flags = (counts) => Object.entries(counts || {})
+    .map(([key, value]) => `${key} ${value}`).join(", ") || "—";
   const table = (headers, rows) => e("table", { className: "iv-process-table" },
     e("thead", null, e("tr", null, headers.map((h) => e("th", { key: h }, h)))),
     e("tbody", null, rows.map((cells, index) => e("tr", { key: index },
@@ -263,29 +266,37 @@ function ProcessView({ report }) {
   return e("div", { className: "iv-process-view" },
     processes.map((process) => e("details", {
       key: (process.process || []).join(" ") || process.auction || process.cases,
-      className: "iv-process", open: false,
+      className: "iv-process",
     },
       e("summary", null,
         e("b", null, process.auction || (process.process || []).join(" ")),
         e("span", null, ` · ${process.cases} N/S pairs`)),
-      e("div", { className: "iv-process-columns" },
-        e("div", null,
-          e("h4", null, "North primary"),
-          table(["Shape", "Mode", "HCP band", "KR band", "N hands", "S matches"],
-            (process.north_groups || []).map((group) => [
-              (group.north_shape || []).join("-"), group.opener_mode,
-              group.hcp_band, group.kr_band,
-              (group.north_hands || []).length,
-              (group.matched_south_hands || []).length,
-            ]))),
-        e("div", null,
-          e("h4", null, "South primary"),
-          table(["Shape", "HCP", "S hands", "N matches"],
-            (process.south_groups || []).map((group) => [
-              (group.south_shape || []).join("-"), group.south_hcp,
-              (group.south_hands || []).length,
-              (group.matched_north_hands || []).length,
-            ]))))))
+      e("div", { className: "iv-process-body" },
+        e("h4", null, "Contracts (all sampled deals)"),
+        table(["Contract", "By", "Boards", "Fail", "Wrong", "Missed"],
+          (process.contracts || []).map((item) => [
+            item.contract, String(item.declarer || "").toUpperCase(),
+            item.boards, rate(item.rates?.contract_failure),
+            rate(item.rates?.wrong_game), rate(item.rates?.missed_game),
+          ])),
+        e("div", { className: "iv-process-columns" },
+          e("div", null,
+            e("h4", null, "North primary"),
+            table(["Shape", "Mode", "HCP", "KR", "Hands", "Dropped", "Flags"],
+              (process.north_groups || []).map((group) => [
+                (group.north_shape || []).join("-"), group.opener_mode,
+                group.hcp_band, group.kr_band,
+                `${group.stored}/${group.cases}`, group.dropped,
+                flags(group.categories),
+              ]))),
+          e("div", null,
+            e("h4", null, "South primary"),
+            table(["Shape", "HCP", "Hands", "Dropped", "Flags"],
+              (process.south_groups || []).map((group) => [
+                (group.south_shape || []).join("-"), group.south_hcp,
+                `${group.stored}/${group.cases}`, group.dropped,
+                flags(group.categories),
+              ])))))))
   );
 }
 
