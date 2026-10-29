@@ -433,7 +433,7 @@ def spade_stayman_answer(ctx):
     return ctx.hand is not None and ctx.hand.length('H') < 4 and ctx.hand.length('S') >= 4
 
 
-MINOR_THREE_NT_KR = 11.5
+MINOR_THREE_NT_KR = 11.0
 
 
 def non_good_minor_invite_2nt(ctx):
@@ -451,8 +451,8 @@ def non_good_minor_invite_2nt(ctx):
 def minor_three_notrump(ctx):
     """A six- or seven-card minor in the good-suit 3NT K-R band.
 
-    The floor is the owner's 9-HCP AT9764 hand (K-R 11.75); the ceiling is
-    the cue-bid slam-interest lower bound, so the band is
+    The owner lowered the floor to K-R 11.0; the ceiling is the cue-bid
+    slam-interest lower bound, so the band is
     [MINOR_THREE_NT_KR, minor-slam interest).
     """
     if ctx.hand is None:
