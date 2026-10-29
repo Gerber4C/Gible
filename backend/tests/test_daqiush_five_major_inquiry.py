@@ -1,4 +1,6 @@
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from engine.auction import Auction
 from engine.cards import Hand
@@ -303,6 +305,65 @@ class DaqiushFiveMajorInquiryEndToEndTests(unittest.TestCase):
                     if final:
                         self.assertIn('final_placement', meaning['call_act_types'])
                         self.assertTrue(meaning['purpose_completed'])
+
+
+class DaqiushFiveMajorInquirySelectorTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.profile = load_profile('daqiush_2over1')
+
+    def decision(self, auction, cards, estimates=None):
+        if estimates is None:
+            return choose_bid(self.profile, Auction.parse(auction),
+                              Hand.parse(cards))
+        with patch('engine.five_major_inquiry_policy._sampled_best',
+                   return_value=tuple(
+                       SimpleNamespace(contract=contract,
+                                       completion_rate=rate)
+                       for contract, rate in estimates)):
+            return choose_bid(self.profile, Auction.parse(auction),
+                              Hand.parse(cards))
+
+    def test_deterministic_source_when_dds_is_unavailable(self):
+        decision = self.decision('1NP3CP3DP3HP', 'S876HAKQ32D842C96')
+        self.assertEqual(decision.call, '3N')
+        self.assertEqual(decision.trace.simulation_decision['source'],
+                         'deterministic')
+
+    def test_dds_can_choose_an_authored_other_major_route(self):
+        decision = self.decision(
+            '1NP3CP3DP3HP', 'SAK76HJ32D842C963',
+            estimates=(('3NT', 0.0), ('5C', 0.0), ('5D', 0.0),
+                       ('4S', 1.0)))
+        self.assertEqual(decision.call, '4S')
+        self.assertEqual(decision.trace.simulation_decision['source'], 'dds')
+
+    def test_unauthored_dds_result_falls_back_to_deterministic(self):
+        decision = self.decision(
+            '1NP3CP3DP3HP', 'SAK76HJ32D842C963',
+            estimates=(('5H', 1.0),))
+        self.assertEqual(decision.call, '4S')
+        self.assertEqual(decision.trace.simulation_decision['source'],
+                         'deterministic')
+
+    def test_inconclusive_overlap_returns_td(self):
+        decision = self.decision('1NP3CP3DP3HP', 'SAK4HA32DQ876C842')
+        self.assertIsNone(decision.call)
+        self.assertEqual(decision.trace.simulation_decision['source'],
+                         'inconclusive')
+
+    def test_responder_slam_classification_uses_dds_then_fallback(self):
+        strong_fit = 'S9HKQ3DA9754CKQ76'
+        weak_fit = 'S2HQJ3DAJ954CK876'
+        decision = self.decision(
+            '1NP3CP3HP', strong_fit,
+            estimates=(('4H', 0.0), ('6H', 1.0)))
+        self.assertEqual(decision.call, '3S')
+        self.assertEqual(decision.trace.simulation_decision['source'], 'dds')
+        fallback = self.decision('1NP3CP3HP', weak_fit)
+        self.assertEqual(fallback.call, '4H')
+        self.assertEqual(fallback.trace.simulation_decision['source'],
+                         'deterministic')
 
 
 if __name__ == '__main__':

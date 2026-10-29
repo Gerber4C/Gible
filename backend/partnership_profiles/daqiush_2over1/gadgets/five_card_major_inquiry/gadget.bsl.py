@@ -161,9 +161,7 @@ class FiveCardMajorInquiry(Gadget):
                 game.applies = (lambda ctx, s=suit: inquiry_hand(ctx)
                                 and ctx.hand.length(s) >=
                                 (4 if sorted(ctx.hand.length(x) for x in 'SHDC')
-                                 == [3, 3, 3, 4] else 3)
-                                and (not major_fit(ctx, s)
-                                     or not minor_slam_interest(ctx.hand)))
+                                 == [3, 3, 3, 4] else 3))
                 game.meaning.action = 'five_card_major_game_placement'
                 game.meaning.nature = ['natural']
                 set_final(game, suit)
@@ -176,9 +174,7 @@ class FiveCardMajorInquiry(Gadget):
                 notrump.applies = (lambda ctx, s=suit: inquiry_hand(ctx)
                                    and ctx.hand.length(s) <
                                    (4 if sorted(ctx.hand.length(x) for x in 'SHDC')
-                                    == [3, 3, 3, 4] else 3)
-                                   and (not major_singleton(ctx, s)
-                                        or not minor_slam_interest(ctx.hand)))
+                                    == [3, 3, 3, 4] else 3))
                 notrump.meaning.action = 'five_card_major_game_placement'
                 notrump.meaning.nature = ['natural']
                 set_final(notrump, 'N')
@@ -187,8 +183,7 @@ class FiveCardMajorInquiry(Gadget):
                 strength = self.call('five_three_' + suit.lower() + '_strength_show')
                 strength.when = prefix
                 strength.bid = ('3S' if suit == 'H' else '4H')
-                strength.applies = (lambda ctx, s=suit: major_fit(ctx, s)
-                                    and minor_slam_interest(ctx.hand))
+                strength.applies = (lambda ctx, s=suit: major_fit(ctx, s))
                 strength.meaning.action = 'five_three_major_strength_show'
                 strength.meaning.nature = ['artificial']
                 strength.meaning.acts = ['slam_try', 'strength_showing']
@@ -204,8 +199,7 @@ class FiveCardMajorInquiry(Gadget):
                     minor.bid = '4' + five
                     minor.applies = (lambda ctx, s=suit, f=five, o=four:
                                      major_singleton(ctx, s)
-                                     and five_four_minor(ctx, f, o)
-                                     and minor_slam_interest(ctx.hand))
+                                     and five_four_minor(ctx, f, o))
                     minor.meaning.action = 'five_four_minor_shape'
                     minor.meaning.nature = ['natural']
                     minor.meaning.acts = ['descriptive', 'slam_try']
@@ -254,7 +248,8 @@ class FiveCardMajorInquiry(Gadget):
             finish = self.call('stopper_after_singleton_' + shortage.lower())
             finish.when = continuation
             finish.bid = '3NT'
-            finish.applies = lambda ctx, s=shortage: singleton_route(ctx, s) == '3NT'
+            finish.applies = lambda ctx, s=shortage: (ctx.hand is not None
+                                                      and inquiry_stopper(ctx.hand, s))
             finish.meaning.action = 'singleton_major_three_notrump'
             finish.meaning.nature = ['natural']
             set_final(finish, 'N')
@@ -263,7 +258,7 @@ class FiveCardMajorInquiry(Gadget):
             special = self.call('both_minors_after_singleton_' + shortage.lower())
             special.when = continuation
             special.bid = '4' + shortage
-            special.applies = lambda ctx, s=shortage: singleton_route(ctx, s) == '4' + s
+            special.applies = lambda ctx, s=shortage: both_minor_special(ctx, s)
             special.meaning.action = 'set_diamonds_with_both_minors'
             special.meaning.nature = ['artificial']
             special.meaning.acts = ['trump_setting']
@@ -277,7 +272,9 @@ class FiveCardMajorInquiry(Gadget):
                 choose_minor.when = continuation
                 choose_minor.bid = '4' + minor_suit
                 choose_minor.applies = (lambda ctx, s=shortage, m=minor_suit:
-                                        singleton_route(ctx, s) == '4' + m)
+                                        ctx.hand is not None
+                                        and ctx.hand.length(m) >= 4
+                                        and not both_minor_special(ctx, s))
                 choose_minor.meaning.action = 'set_minor_trump'
                 choose_minor.meaning.nature = ['natural']
                 choose_minor.meaning.acts = ['trump_setting']
@@ -291,7 +288,10 @@ class FiveCardMajorInquiry(Gadget):
             choose_major.when = continuation
             choose_major.bid = '4' + other
             choose_major.applies = (lambda ctx, s=shortage, o=other:
-                                    singleton_route(ctx, s) == '4' + o)
+                                    ctx.hand is not None
+                                    and ctx.hand.length(o) == 4
+                                    and all(ctx.hand.length(x) < 4 for x in 'CD')
+                                    and not both_minor_special(ctx, s))
             choose_major.meaning.action = 'other_major_four_three_fit'
             choose_major.meaning.nature = ['natural']
             choose_major.meaning.acts = ['descriptive']
@@ -304,8 +304,7 @@ class FiveCardMajorInquiry(Gadget):
                                    + shortage.lower())
             stop_other.when = other_prefix
             stop_other.bid = 'P'
-            stop_other.applies = (lambda ctx: five_four_shortage(ctx)
-                                  and not minor_slam_interest(ctx.hand))
+            stop_other.applies = lambda ctx: five_four_shortage(ctx)
             stop_other.meaning.action = 'other_major_game_signoff'
             stop_other.meaning.nature = ['natural']
             set_final(stop_other, other)
@@ -317,8 +316,7 @@ class FiveCardMajorInquiry(Gadget):
                 show_minor.when = other_prefix
                 show_minor.bid = '5' + five
                 show_minor.applies = (lambda ctx, f=five, o=four:
-                                      five_four_minor(ctx, f, o)
-                                      and minor_slam_interest(ctx.hand))
+                                      five_four_minor(ctx, f, o))
                 show_minor.meaning.action = 'other_major_show_five_card_minor'
                 show_minor.meaning.nature = ['natural']
                 show_minor.meaning.acts = ['descriptive', 'slam_try']
@@ -326,11 +324,33 @@ class FiveCardMajorInquiry(Gadget):
                 show_minor.meaning.five_card_suit = five
                 show_minor.description = 'Name the lowest legal five-card minor for final strain comparison.'
 
+                for finish_bid, finish_trump in (
+                        ('P', five), ('5' + other, other),
+                        ('6' + five, five), ('6' + other, other)):
+                    finish = self.call('finish_' + finish_bid.lower()
+                                       + '_after_' + five.lower()
+                                       + '_' + shortage.lower())
+                    finish.when = other_prefix + '5' + five + 'P'
+                    finish.bid = finish_bid
+                    finish.applies = lambda ctx: ctx.hand is not None
+                    finish.meaning.action = 'five_major_final_strain'
+                    finish.meaning.nature = ['natural']
+                    finish.meaning.acts = ['signoff', 'final_placement']
+                    finish.meaning.target_suit = finish_trump
+                    finish.meaning.agreed_suit = finish_trump
+                    finish.meaning.purpose_completed = True
+                    finish.effect('agreed_suit').suit = finish_trump
+                    finish.description = ('Compare the five-card minor and other '
+                                          'major; final placement.')
+
             three_three = self.call('three_three_minors_after_singleton_'
                                     + shortage.lower())
             three_three.when = continuation
             three_three.bid = '4NT'
-            three_three.applies = lambda ctx, s=shortage: singleton_route(ctx, s) == '4NT'
+            three_three.applies = (lambda ctx, s=shortage: (
+                ctx.hand is not None
+                and ctx.hand.length('C') == 3 and ctx.hand.length('D') == 3
+                and ctx.hand.length(other_major(s)) != 4))
             three_three.meaning.action = 'three_three_minor_placement_request'
             three_three.meaning.nature = ['artificial']
             three_three.meaning.acts = ['inquiry']
@@ -349,6 +369,17 @@ class FiveCardMajorInquiry(Gadget):
                 set_agreed_suit(fallback, five)
                 fallback.description = 'Name the five-card minor and stop at game without DDS.'
 
+                slam = self.call('three_three_slam_' + five.lower()
+                                 + '_after_' + shortage.lower())
+                slam.when = three_three_prefix
+                slam.bid = '6' + five
+                slam.applies = lambda ctx, f=five, o=four: five_four_minor(ctx, f, o)
+                slam.meaning.action = 'five_card_minor_slam_placement'
+                slam.meaning.nature = ['natural']
+                set_final(slam, five)
+                set_agreed_suit(slam, five)
+                slam.description = 'Name the five-card minor for the small slam.'
+
         for shown_major in 'HS':
             major_prefix = '1NP3CP3' + shown_major + 'P'
             for shown_minor, selectors in (
@@ -363,7 +394,7 @@ class FiveCardMajorInquiry(Gadget):
                                          + selector_bid.lower())
                     selector.when = selector_prefix
                     selector.bid = selector_bid
-                    selector.applies = lambda ctx: False
+                    selector.applies = lambda ctx: ctx.hand is not None
                     selector.meaning.action = 'select_minor_trump'
                     selector.meaning.nature = ['artificial']
                     selector.meaning.acts = ['trump_setting']

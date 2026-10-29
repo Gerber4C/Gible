@@ -25,6 +25,8 @@ from .slam_intent import detect_slam_intent
 from .cue_slam_policy import (cue_gate, cue_three_way, decide_from_hands,
                               partner_promised_kr, sample_process_hands,
                               signoff_override)
+from .five_major_inquiry_policy import (
+    decide_five_major_inquiry, inquiry_decision_kind)
 from .simulation_decision import (decide_minor_5422, is_minor_5422_decision,
                                   decide_minor_major_74, is_minor_major_74_decision,
                                   decide_two_major_spade_slam,
@@ -196,6 +198,31 @@ def choose_bid(
                                candidate_pool=CandidatePool(candidates, auction),
                                trace=trace, private_memory=actor_memory)
         trace.simulation_decision = simulated
+        candidates = (selected,)
+
+    inquiry_kind = inquiry_decision_kind(profile.id, auction)
+    if inquiry_kind is not None:
+        inquiry = decide_five_major_inquiry(
+            profile, auction, hand, trace=trace)
+        trace.simulation_decision = {
+            'kind': inquiry_kind, 'call': inquiry.call,
+            'source': inquiry.source, 'reason': inquiry.reason}
+        if inquiry.call is None:
+            trace.warn('Five-major inquiry fallback is inconclusive: '
+                       + inquiry.reason)
+            return BidDecision(call=None, selected_candidate=None,
+                               candidate_pool=CandidatePool(candidates, auction),
+                               trace=trace, private_memory=actor_memory)
+        from .calls import normalize_call
+        target_call = normalize_call(inquiry.call)
+        selected = next((item for item in candidates
+                         if item.call == target_call), None)
+        if selected is None:
+            trace.warn('Five-major inquiry selected a call absent from this '
+                       'profile: ' + inquiry.call)
+            return BidDecision(call=None, selected_candidate=None,
+                               candidate_pool=CandidatePool(candidates, auction),
+                               trace=trace, private_memory=actor_memory)
         candidates = (selected,)
 
     cue_context = cue_three_way(auction, trace)
