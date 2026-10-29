@@ -26,10 +26,27 @@ MAX_SECONDS = 20
 
 
 def _authored_call(profile: PartnershipProfile, auction: Auction, call: str) -> bool:
-    return any(spec.call == call and not spec.default_policy
-               and not spec.meaning.to_dict().get('historical_only')
-               and matches_context(spec.context, auction)
-               for spec in profile.call_specifications)
+    from .candidate_generation import _condition_passes
+    from .replay import active_environment_for, replay_auction
+
+    trace = None
+    environment = None
+    for spec in profile.call_specifications:
+        if spec.call != call or spec.default_policy:
+            continue
+        if spec.meaning.to_dict().get('historical_only'):
+            continue
+        if not matches_context(spec.context, auction):
+            continue
+        if spec.requires:
+            if trace is None:
+                trace = replay_auction(profile, auction)
+                environment = active_environment_for(profile, None, auction)
+            if not _condition_passes(spec.requires, auction, None,
+                                     trace, environment):
+                continue
+        return True
+    return False
 
 
 def _deal(rng: random.Random) -> dict[str, Hand]:

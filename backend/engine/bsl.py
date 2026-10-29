@@ -11,6 +11,8 @@ from .hand_quality import (inquiry_stopper, minor_game_control_points,
                            minor_slam_interest,
                            shapely_effective_points,
                            shapely_combined_effective_points, shapely_description_proxy)
+from .voidwood import (answer_bids, effective_keycards,
+                       is_safe_voidwood_ask, voidwood_jump)
 from .model import Author as RuntimeAuthor
 from .model import CallMeaning, StateEffect
 
@@ -1172,6 +1174,10 @@ def _base_namespace(collector: _Collector) -> dict[str, Any]:
         "inquiry_stopper": inquiry_stopper,
         "minor_game_control_points": minor_game_control_points,
         "minor_slam_interest": minor_slam_interest,
+        "answer_bids": answer_bids,
+        "effective_keycards": effective_keycards,
+        "is_safe_voidwood_ask": is_safe_voidwood_ask,
+        "voidwood_jump": voidwood_jump,
         "shapely_effective_points": shapely_effective_points,
         "shapely_combined_effective_points": shapely_combined_effective_points,
         "shapely_description_proxy": shapely_description_proxy,

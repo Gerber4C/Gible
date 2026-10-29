@@ -96,5 +96,42 @@ class VoidwoodSafetyTests(unittest.TestCase):
         self.assertEqual(effective_keycards(hand, 'D', 'C'), 3)
 
 
+class VoidwoodProfileTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        from engine.loader import load_profile
+        cls.profile = load_profile('daqiush_2over1')
+
+    def bid(self, auction, cards):
+        from engine.selector import choose_bid
+        return choose_bid(self.profile, Auction.parse(auction),
+                          Hand.parse(cards)).call
+
+    def test_profile_registers_only_voidwood(self):
+        ids = [gadget.id for gadget in self.profile.gadgets]
+        self.assertIn('voidwood', ids)
+        self.assertNotIn('exclusion_keycard', ids)
+        gadget = next(g for g in self.profile.gadgets if g.id == 'voidwood')
+        self.assertEqual(gadget.name, 'Voidwood（缺门关键张）')
+
+    def test_confirmed_diamond_state_from_two_auction_families(self):
+        spade_route = '1NP2HP2SP3DP3HP'
+        heart_route = '1NP2DP2HP3DP3SP'
+        self.assertEqual(
+            self.bid(spade_route, 'SAQJ76HKQ5DAKQJ4C-'), '5C')
+        self.assertEqual(
+            self.bid(heart_route, 'SKQ5HAQJ76DAJ954C-'), '5C')
+        self.assertEqual(
+            self.bid(spade_route + '5CP', 'S987HKJ4D9876CQJ2'), '5D')
+        self.assertEqual(
+            self.bid(heart_route + '5CP', 'S987H432DQ876CQJ2'), '5D')
+
+    def test_transfer_regression_still_works(self):
+        self.assertEqual(
+            self.bid('1NP2HP2SP', 'SAQJ76HKQ5DKQ764C-'), '5C')
+        self.assertEqual(
+            self.bid('1NP2DP2HP', 'S-HAQJ76DKQ5CKQ765'), '4S')
+
+
 if __name__ == '__main__':
     unittest.main()

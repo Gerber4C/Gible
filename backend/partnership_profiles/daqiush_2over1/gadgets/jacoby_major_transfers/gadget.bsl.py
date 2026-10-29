@@ -279,7 +279,9 @@ class JacobyMajorTransfers(Gadget):
             ordinary.meaning.nature = ['natural']
             ordinary.meaning.acts = ['descriptive']
             ordinary.meaning.target_suit = trump
-            ordinary.description = 'Ordinary Jacoby transfer acceptance.'
+            ordinary.meaning.agreed_suit = trump
+            ordinary.effect('agreed_suit').suit = trump
+            ordinary.description = 'Ordinary Jacoby transfer acceptance; confirms the major fit.'
 
             ordinary_prefix = '1NP' + transfer + 'P' + accept + 'P'
             if trump == 'H':

@@ -92,7 +92,9 @@ def deterministic_after_major(opener_major: str,
                               responder: Hand) -> InquiryDecision:
     """Responder's fallback after opener shows a five-card major."""
     major = _major_code(opener_major)
-    support = responder.length(major) >= 3
+    threshold = (4 if sorted(responder.length(s) for s in 'SHDC') == [3, 3, 3, 4]
+                 else 3)
+    support = responder.length(major) >= threshold
     singleton_shape = (responder.length(major) == 1
                        and sorted(responder.length(s) for s in 'CD') == [4, 5])
     if support:
@@ -117,8 +119,9 @@ def deterministic_after_major(opener_major: str,
             reason='Singleton in opener major without slam interest',
             final=True)
     return InquiryDecision(
-        call=None, source='inconclusive',
-        reason='Responder shape does not match a five-major continuation')
+        call='3NT', source='deterministic',
+        reason='No major support and no five-four minor shape',
+        final=True)
 
 
 def deterministic_after_minor(opener: Hand,
@@ -367,7 +370,9 @@ def _singleton_targets(hand: Hand, actor: str, shortage: str):
 
 def _major_targets(hand: Hand, actor: str, partner: str, major: str):
     from .contract_evaluation import ContractTarget
-    support = hand.length(major) >= 3
+    threshold = (4 if sorted(hand.length(s) for s in 'SHDC') == [3, 3, 3, 4]
+                 else 3)
+    support = hand.length(major) >= threshold
     singleton_shape = (hand.length(major) == 1
                        and sorted(hand.length(s) for s in 'CD') == [4, 5])
     if support:
@@ -383,7 +388,7 @@ def _major_targets(hand: Hand, actor: str, partner: str, major: str):
         mapping = {'3NT': '3NT', '5' + five: '4' + five,
                    '6' + five: '4' + five}
         return targets, mapping
-    return (), {}
+    return [ContractTarget(3, 'NT', partner)], {'3NT': '3NT'}
 
 
 def _minor_targets(hand: Hand, actor: str, shown: str):
