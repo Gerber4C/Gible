@@ -84,10 +84,11 @@ class DaqiushMinorInvitationTests(unittest.TestCase):
         self.assertEqual(self.bid('1NP2CP2HP', cards), '3H')
         self.assertEqual(self.bid('1NP2CP2SP', cards), '3S')
 
-    def test_good_six_card_minor_bids_three_notrump(self):
-        # Both are inside the owner's K-R 11-14 good-suit 3NT band.
+    def test_good_six_card_minor_uses_band_or_transfer(self):
+        # The AKJ hand is inside the K-R 11-14 band; the AQJ hand is below it
+        # and still transfers to invite.
         self.assertEqual(self.bid('1NP', 'S874H63D82CAKJ754'), '3N')
-        self.assertEqual(self.bid('1NP', 'SJ74H63DAQJ754C82'), '3N')
+        self.assertEqual(self.bid('1NP', 'SJ74H63DAQJ754C82'), '2N')
 
     def test_weak_minor_transfer_stops_in_three_minor(self):
         self.assertEqual(self.bid('1NP', 'S874H63D82CKJ9754'), '2S')
@@ -97,7 +98,7 @@ class DaqiushMinorInvitationTests(unittest.TestCase):
 
     def test_good_minor_band_places_three_notrump_directly(self):
         self.assertEqual(self.bid('1NP', 'S874H63D82CAKJ754'), '3N')
-        self.assertEqual(self.bid('1NP', 'SJ74H63DAQJ754C82'), '3N')
+        self.assertEqual(self.bid('1NP', 'SJ74H63DAQJ754C82'), '2N')
 
     def test_six_clubs_with_ca_kq_and_a_spade_uses_direct_three_clubs(self):
         self.assertEqual(self.bid('1NP', 'SAK2HQ3D42CAKQ987'), '3C')
