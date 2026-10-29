@@ -191,6 +191,44 @@ class CuePolicyHelperTests(unittest.TestCase):
         self.assertEqual(decision.call, '4N')
 
 
+class CueGateTests(unittest.TestCase):
+    MAKING = {'S': {'n': 13, 's': 13}, 'H': {'n': 13, 's': 13},
+              'D': {'n': 13, 's': 13}, 'C': {'n': 13, 's': 13},
+              'NT': {'n': 13, 's': 13}}
+    FAILING = {'S': {'n': 10, 's': 10}, 'H': {'n': 0, 's': 0},
+               'D': {'n': 0, 's': 0}, 'C': {'n': 0, 's': 0},
+               'NT': {'n': 10, 's': 10}}
+
+    def _gate(self, *, rolled, making):
+        from engine.auction import Auction
+        auction = Auction.parse('1NP2CP2SP4DP')
+        hand = Hand.parse('SAKQ2H876D432C543')
+        partner_hands = [Hand.parse('S5432HA65D54C5432')]
+        with patch.object(policy, '_roll_out_final', return_value=rolled), \
+             patch.object(policy, '_contract_evs',
+                          return_value={'4S': 420.0, '5S': 380.0,
+                                        '6S': 500.0}):
+            return policy.cue_gate(
+                None, auction, cue_call='5C', trump='S', game_call='4S',
+                partner='s', hand=hand, partner_hands=partner_hands,
+                environment={'dealer': 'n', 'vulnerability': 'none'},
+                solve_table=lambda deal: making)
+
+    def test_gate_accepts_a_positive_expected_gain(self):
+        gate = self._gate(rolled=('6S', 's'), making=self.MAKING)
+        self.assertTrue(gate['plus_ev'])
+        self.assertEqual(gate['final_contracts'], {'6S': 1})
+
+    def test_gate_rejects_when_the_rollout_ends_down(self):
+        gate = self._gate(rolled=('5S', 's'), making=self.FAILING)
+        self.assertFalse(gate['plus_ev'])
+
+    def test_gate_rejects_a_blocked_rollout(self):
+        gate = self._gate(rolled=None, making=self.MAKING)
+        self.assertFalse(gate['plus_ev'])
+        self.assertEqual(gate['blocked'], 1)
+
+
 class CueDecisionTests(unittest.TestCase):
     def setUp(self):
         self.low = Hand.parse('S5432H5432D5432C5')      # 13 cards, no HCP

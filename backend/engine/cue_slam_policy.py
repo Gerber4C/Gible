@@ -165,6 +165,28 @@ def _completion_rates(hand: Hand, trump: str, hands: Sequence[Hand],
     return {item.contract: item.completion_rate for item in estimates}, len(hands)
 
 
+def _contract_evs(hand: Hand, trump: str, partner_hands: Sequence[Hand],
+                  deals: Sequence[dict] | None, solve_table: Callable,
+                  vulnerable: bool) -> dict[str, float]:
+    """Duplicate-score expectation of stopping in 4M, 5M, and 6M."""
+
+    if deals is None:
+        deals = tuple({'n': hand, 's': partner} for partner in partner_hands)
+    targets = tuple(ContractTarget(level, trump, 's') for level in (4, 5, 6))
+    estimates = compare_contract_targets(tuple(deals), targets,
+                                         solve_table=solve_table)
+    rates = {item.contract: item.completion_rate for item in estimates}
+    evs = {}
+    for level in (4, 5, 6):
+        rate = rates.get(f'{level}{trump}', 0.0)
+        made = level * 30 + (500 if vulnerable else 300)
+        if level == 6:
+            made += 750 if vulnerable else 500
+        evs[f'{level}{trump}'] = rate * made + (1 - rate) * (
+            -100 if vulnerable else -50)
+    return evs
+
+
 def decide_from_hands(
     hand: Hand,
     trump: str,
@@ -243,6 +265,119 @@ def decide_from_hands(
                        'slam depends on partner extra strength', threshold,
                        no_extra_slam_rate=no_extra_rate,
                        extra_slam_rate=extra_rate)
+
+
+def _roll_out_final(profile, prefix_calls: list[str], actor: str, partner: str,
+                    hand: Hand, partner_hand: Hand, environment: Mapping,
+                    max_calls: int = 14) -> tuple[str, str] | None:
+    """Continue the authored auction from ``prefix_calls`` with the real rules.
+
+    Returns ``(contract, declarer)`` for the partnership, or ``None`` when the
+    route blocks, exceeds the call budget, or ends in the opponents' hands.
+    """
+
+    from .auction import Auction
+    from .cards import SUITS
+    from .legality import (
+        SIDE_BY_SEAT, auction_is_complete, last_contract_state,
+    )
+    from .selector import choose_bid
+
+    dealer = environment.get('dealer', actor)
+    vulnerability = environment.get('vulnerability', 'none')
+    calls = list(prefix_calls)
+    auction = Auction(calls=tuple(calls), dealer=dealer,
+                      vulnerability=vulnerability)
+    for _ in range(max_calls):
+        if auction_is_complete(auction):
+            break
+        seat = auction.actor_to_call
+        if seat == actor:
+            held = hand
+        elif seat == partner:
+            held = partner_hand
+        else:
+            held = None
+        call = 'P'
+        if held is not None:
+            decision = choose_bid(profile, auction, held, environment)
+            if decision.call is None:
+                return None  # the authored route blocks for this hand
+            call = decision.call
+        calls.append(call)
+        auction = Auction(calls=tuple(calls), dealer=dealer,
+                          vulnerability=vulnerability)
+    else:
+        return None
+    state = last_contract_state(auction)
+    if state is None or state.side not in (
+            SIDE_BY_SEAT[actor], SIDE_BY_SEAT[partner]):
+        return None
+    strain = state.call[1:]
+    declarer = next((auction.actor_at(index) for index, call in
+                     enumerate(auction.calls)
+                     if auction.actor_at(index) in (actor, partner)
+                     and len(call) >= 2 and call[0] in '1234567'
+                     and call[1:] == strain), None)
+    if declarer is None:
+        return None
+    contract = state.call[0] + ('NT' if strain == 'N' else strain)
+    return contract, declarer
+
+
+def cue_gate(profile, auction, *, cue_call: str, trump: str, game_call: str,
+             partner: str, hand: Hand, partner_hands: Sequence[Hand],
+             environment: Mapping, rng=None, deals: Sequence[dict] | None = None,
+             solve_table: Callable = calculate_available_table,
+             vulnerable: bool = False, ew_count: int = 2,
+             max_calls: int = 14) -> dict:
+    """Execution-layer gate for cueing above game with a major trump.
+
+    Rolls the authored auction forward from ``prefix + cue`` for every sampled
+    partner hand, DDS-scores the final contract, and compares the average
+    duplicate score with stopping in ``game_call``.  No game-theory module is
+    involved: both hands follow the same fixed authored conventions, so the
+    mutual dependency between the cue and the rebid is resolved by simply
+    applying that one rule set forward.
+    """
+
+    import random as _random
+
+    actor = auction.actor_to_call
+    if rng is None:
+        rng = _random.Random(_process_seed(auction, hand))
+    stop_ev = _contract_evs(hand, trump, partner_hands, deals, solve_table,
+                            vulnerable)[f'4{trump}']
+    scores = []
+    blocked = 0
+    final_contracts = {}
+    for partner_hand in partner_hands:
+        rolled = _roll_out_final(profile, list(auction.calls) + [cue_call],
+                                 actor, partner, hand, partner_hand,
+                                 environment, max_calls=max_calls)
+        if rolled is None:
+            blocked += 1
+            scores.append(-100 if vulnerable else -50)
+            continue
+        contract, declarer = rolled
+        final_contracts[contract] = final_contracts.get(contract, 0) + 1
+        level = int(contract[0])
+        made = level * 30 + (500 if vulnerable else 300)
+        if level == 6:
+            made += 750 if vulnerable else 500
+        down = -100 if vulnerable else -50
+        for deal in _complete_opponents(actor, partner, hand, partner_hand,
+                                         ew_count, rng):
+            table = solve_table(deal)
+            outcome = ('MAKE' if table[contract[1:]][declarer] >= level + 6
+                       else 'SET')
+            scores.append(made if outcome == 'MAKE' else down)
+    rollout_ev = sum(scores) / len(scores) if scores else None
+    return {
+        'plus_ev': rollout_ev is not None and rollout_ev > stop_ev,
+        'rollout_ev': rollout_ev, 'stop_ev': stop_ev,
+        'blocked': blocked, 'final_contracts': final_contracts,
+    }
 
 
 def _preferred_cue(hand: Hand, trump: str, cue_calls: Iterable[str]) -> str:
@@ -503,6 +638,7 @@ __all__ = (
     'CueDecision',
     'cue_allowed_above',
     'cue_continuation',
+    'cue_gate',
     'cue_public_kr',
     'cue_three_way',
     'decide_from_hands',

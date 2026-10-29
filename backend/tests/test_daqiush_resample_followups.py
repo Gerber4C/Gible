@@ -96,9 +96,9 @@ class DaqiushResampleFollowupTests(unittest.TestCase):
         cards = 'SAQT4HQ93DK5CA873'
         self.assertEqual(self.bid('1NP2CP2SP', cards), '4D')
         self.assertEqual(self.bid('1NP2CP2SP4DP', 'SKJ982HAK6DA76CQ2'), '4N')
-        # The 5-partner x 4-opponent simulation finds the slam depends on
-        # partner's extra strength, so the minimum hand keeps cue-bidding.
-        self.assertEqual(self.bid('1NP2CP2SP4DP', 'SAQT4HQ93DK5CA873'), '5C')
+        # The roll-out gate finds cueing above game is not +EV for the
+        # minimum opener: rolling 5C scores worse than settling in 4S.
+        self.assertEqual(self.bid('1NP2CP2SP4DP', 'SAQT4HQ93DK5CA873'), '4S')
 
     def test_five_card_spade_reply_does_not_infer_four_heart_slam_trigger(self):
         # G016 rejected the 4NT proposal: 3S does not publicly establish a

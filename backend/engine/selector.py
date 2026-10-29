@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from types import SimpleNamespace
 
 from typing import Any
@@ -21,7 +22,7 @@ from .purpose_axiom import complete_purpose, remember_selected_purpose, resolve_
 from .replay import active_environment_for, replay_auction
 from .slam_conventions import keycard_ask_restricted
 from .slam_intent import detect_slam_intent
-from .cue_slam_policy import (cue_three_way, decide_from_hands,
+from .cue_slam_policy import (cue_gate, cue_three_way, decide_from_hands,
                               partner_promised_kr, sample_process_hands,
                               signoff_override)
 from .simulation_decision import (decide_minor_5422, is_minor_5422_decision,
@@ -211,6 +212,8 @@ def choose_bid(
                           and {'control_showing', 'slam_try'} & set(
                               (c.public_meaning or {}).get('call_act_types', ()))]
         if keycard is not None and game is not None and cue_candidates:
+            side = 'ns' if auction.actor_to_call in 'ns' else 'ew'
+            vulnerable = auction.vulnerability in ('both', side)
             try:
                 deals = sample_process_hands(
                     profile, auction, trace, hand, partner)
@@ -228,6 +231,30 @@ def choose_bid(
                 except (DDSUnavailableError, RuntimeError, ValueError) as exc:
                     trace.warn('Cue-continuation simulation unavailable: ' + str(exc))
                 else:
+                    if (simulated.call not in ('4N', game.call)
+                            and trump in 'HS'):
+                        # Owner rule: a cue above 4M must show a positive
+                        # expected gain, measured by rolling the authored
+                        # auction forward from prefix + cue.
+                        gate = cue_gate(
+                            profile, auction, cue_call=simulated.call,
+                            trump=trump, game_call=game.call, partner=partner,
+                            hand=hand,
+                            partner_hands=tuple(deal[partner] for deal in deals),
+                            environment=active_environment, deals=deals,
+                            vulnerable=vulnerable)
+                        if not gate['plus_ev']:
+                            trace.warn(
+                                'Cue above game is not +EV: '
+                                f"roll-out {gate['rollout_ev']:.0f} vs stop "
+                                f"{gate['stop_ev']:.0f}, blocked "
+                                f"{gate['blocked']}, finals "
+                                f"{gate['final_contracts']}")
+                            simulated = replace(
+                                simulated,
+                                call=game.call,
+                                reason='cue above game is not +EV: '
+                                       + simulated.reason)
                     selected = next((c for c in candidates
                                      if c.call == simulated.call), None)
                     if selected is not None:
