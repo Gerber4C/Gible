@@ -29,7 +29,7 @@ Every command below starts at the repository root unless it uses
 - Create: `backend/tests/test_zar.py`
 - Create: `backend/engine/zar.py`
 
-- [ ] **Step 1: Write failing base-score tests**
+- [x] **Step 1: Write failing base-score tests**
 
 Create `backend/tests/test_zar.py` with imports deliberately targeting the
 missing module and tests equivalent to:
@@ -98,7 +98,7 @@ class ZarEvaluationTests(unittest.TestCase):
 Use only valid 13-card compact hands. Correct any example whose rank count is
 not 13 before running the test; do not weaken `Hand.parse` validation.
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run from the repository root:
 
@@ -108,7 +108,7 @@ Push-Location backend; python -m unittest tests.test_zar -v; Pop-Location
 
 Expected: FAIL because `engine.zar` does not exist.
 
-- [ ] **Step 3: Implement immutable result types and base score**
+- [x] **Step 3: Implement immutable result types and base score**
 
 Create `backend/engine/zar.py`:
 
@@ -172,7 +172,7 @@ def _fit_points(hand: Hand, fit: ZarFitContext) -> tuple[int, int]:
 
 Do not export or register the evaluator anywhere else.
 
-- [ ] **Step 4: Run base tests and verify GREEN**
+- [x] **Step 4: Run base tests and verify GREEN**
 
 Run:
 
@@ -182,7 +182,7 @@ Push-Location backend; python -m unittest tests.test_zar -v; Pop-Location
 
 Expected: all current base tests PASS.
 
-- [ ] **Step 5: Commit the base evaluator**
+- [x] **Step 5: Commit the base evaluator**
 
 ```powershell
 git add -- backend/engine/zar.py backend/tests/test_zar.py
@@ -195,7 +195,7 @@ git commit -m "feat: add base Zar hand evaluation"
 - Modify: `backend/tests/test_zar.py`
 - Modify: `backend/engine/zar.py`
 
-- [ ] **Step 1: Write failing primary-fit tests**
+- [x] **Step 1: Write failing primary-fit tests**
 
 Add tests that import `ZarFitContext` and assert:
 
@@ -243,7 +243,7 @@ Ensure all literal hands contain 13 cards. Expected formula is
 `max(combined_trumps - 8, 0) * shortage_rate`, where shortage rate is 2 for a
 side-suit void, 1 for a side-suit singleton, and 0 otherwise.
 
-- [ ] **Step 2: Run primary-fit tests and verify RED**
+- [x] **Step 2: Run primary-fit tests and verify RED**
 
 Run:
 
@@ -254,7 +254,7 @@ Push-Location backend; python -m unittest tests.test_zar -v; Pop-Location
 Expected: primary scoring and primary validation tests FAIL because
 `_fit_points` raises `NotImplementedError`.
 
-- [ ] **Step 3: Implement primary-fit normalization and scoring**
+- [x] **Step 3: Implement primary-fit normalization and scoring**
 
 In `backend/engine/zar.py`, import `normalize_suit_name`. Add a strict length
 validator that rejects booleans and non-integers. Normalize the trump suit,
@@ -290,7 +290,7 @@ def _fit_points(hand: Hand, fit: ZarFitContext) -> tuple[int, int]:
     return primary, 0
 ```
 
-- [ ] **Step 4: Run focused tests and verify GREEN**
+- [x] **Step 4: Run focused tests and verify GREEN**
 
 Run:
 
@@ -300,7 +300,7 @@ Push-Location backend; python -m unittest tests.test_zar -v; Pop-Location
 
 Expected: all tests written so far PASS.
 
-- [ ] **Step 5: Write the failing secondary-score test**
+- [x] **Step 5: Write the failing secondary-score test**
 
 Add only the happy-path scoring test first:
 
@@ -334,7 +334,7 @@ def test_unknown_secondary_suit_is_rejected(self):
         )
 ```
 
-- [ ] **Step 6: Run the secondary-score test and verify RED**
+- [x] **Step 6: Run the secondary-score test and verify RED**
 
 ```powershell
 Push-Location backend; python -m unittest tests.test_zar -v; Pop-Location
@@ -343,7 +343,7 @@ Push-Location backend; python -m unittest tests.test_zar -v; Pop-Location
 Expected: the score and unknown-secondary tests both FAIL on the deliberate
 secondary `NotImplementedError`.
 
-- [ ] **Step 7: Implement the secondary happy path**
+- [x] **Step 7: Implement the secondary happy path**
 
 Replace the secondary `NotImplementedError` branch with the minimal scoring
 needed for valid, complete contexts:
@@ -358,7 +358,7 @@ secondary_points = (0 if combined_secondary == 8
 return primary, secondary_points
 ```
 
-- [ ] **Step 8: Run the secondary-score test and verify GREEN**
+- [x] **Step 8: Run the secondary-score test and verify GREEN**
 
 ```powershell
 Push-Location backend; python -m unittest tests.test_zar -v; Pop-Location
@@ -366,7 +366,7 @@ Push-Location backend; python -m unittest tests.test_zar -v; Pop-Location
 
 Expected: both newly added tests PASS.
 
-- [ ] **Step 9: Write the failing paired-field and suit test**
+- [x] **Step 9: Write the failing paired-field and suit test**
 
 ```python
 def test_secondary_fields_and_suits_are_validated(self):
@@ -383,7 +383,7 @@ def test_secondary_fields_and_suits_are_validated(self):
                 self.evaluate(compact, context)
 ```
 
-- [ ] **Step 10: Run paired-field and suit test to verify RED**
+- [x] **Step 10: Run paired-field and suit test to verify RED**
 
 ```powershell
 Push-Location backend; python -m unittest tests.test_zar.ZarEvaluationTests.test_secondary_fields_and_suits_are_validated -v; Pop-Location
@@ -392,7 +392,7 @@ Push-Location backend; python -m unittest tests.test_zar.ZarEvaluationTests.test
 Expected: FAIL because incomplete and same-suit contexts are not rejected with
 the specified errors.
 
-- [ ] **Step 11: Implement paired-field and suit validation**
+- [x] **Step 11: Implement paired-field and suit validation**
 
 Add this before normalizing the secondary suit:
 
@@ -408,7 +408,7 @@ if secondary == trump:
     raise ValueError('secondary_suit must differ from trump_suit')
 ```
 
-- [ ] **Step 12: Run paired-field and suit test to verify GREEN**
+- [x] **Step 12: Run paired-field and suit test to verify GREEN**
 
 ```powershell
 Push-Location backend; python -m unittest tests.test_zar.ZarEvaluationTests.test_secondary_fields_and_suits_are_validated -v; Pop-Location
@@ -416,7 +416,7 @@ Push-Location backend; python -m unittest tests.test_zar.ZarEvaluationTests.test
 
 Expected: PASS.
 
-- [ ] **Step 13: Write the failing secondary-length test**
+- [x] **Step 13: Write the failing secondary-length test**
 
 ```python
 def test_secondary_length_is_a_legal_known_fit(self):
@@ -435,7 +435,7 @@ def test_secondary_length_is_a_legal_known_fit(self):
                 self.evaluate(compact, context)
 ```
 
-- [ ] **Step 14: Run secondary-length test to verify RED**
+- [x] **Step 14: Run secondary-length test to verify RED**
 
 ```powershell
 Push-Location backend; python -m unittest tests.test_zar.ZarEvaluationTests.test_secondary_length_is_a_legal_known_fit -v; Pop-Location
@@ -444,7 +444,7 @@ Push-Location backend; python -m unittest tests.test_zar.ZarEvaluationTests.test
 Expected: FAIL because secondary lengths are not yet type-, range-, or
 own-holding-validated.
 
-- [ ] **Step 15: Implement secondary-length validation**
+- [x] **Step 15: Implement secondary-length validation**
 
 Add:
 
@@ -457,7 +457,7 @@ if combined_secondary < own_secondary:
     raise ValueError('combined_secondary cannot be shorter than own secondary holding')
 ```
 
-- [ ] **Step 16: Run secondary-length test to verify GREEN**
+- [x] **Step 16: Run secondary-length test to verify GREEN**
 
 ```powershell
 Push-Location backend; python -m unittest tests.test_zar.ZarEvaluationTests.test_secondary_length_is_a_legal_known_fit -v; Pop-Location
@@ -465,7 +465,7 @@ Push-Location backend; python -m unittest tests.test_zar.ZarEvaluationTests.test
 
 Expected: PASS.
 
-- [ ] **Step 17: Write the failing three-card-participation test**
+- [x] **Step 17: Write the failing three-card-participation test**
 
 ```python
 def test_secondary_fit_requires_three_cards_in_each_hand(self):
@@ -480,7 +480,7 @@ def test_secondary_fit_requires_three_cards_in_each_hand(self):
                 self.evaluate(compact, context)
 ```
 
-- [ ] **Step 18: Run three-card-participation test to verify RED**
+- [x] **Step 18: Run three-card-participation test to verify RED**
 
 ```powershell
 Push-Location backend; python -m unittest tests.test_zar.ZarEvaluationTests.test_secondary_fit_requires_three_cards_in_each_hand -v; Pop-Location
@@ -488,7 +488,7 @@ Push-Location backend; python -m unittest tests.test_zar.ZarEvaluationTests.test
 
 Expected: FAIL because a one- or two-card holding is still accepted.
 
-- [ ] **Step 19: Implement three-card participation validation**
+- [x] **Step 19: Implement three-card participation validation**
 
 Add:
 
@@ -498,7 +498,7 @@ if own_secondary < 3 or partner_secondary < 3:
     raise ValueError('secondary fit requires at least three cards in each hand')
 ```
 
-- [ ] **Step 20: Run three-card-participation test to verify GREEN**
+- [x] **Step 20: Run three-card-participation test to verify GREEN**
 
 ```powershell
 Push-Location backend; python -m unittest tests.test_zar.ZarEvaluationTests.test_secondary_fit_requires_three_cards_in_each_hand -v; Pop-Location
@@ -506,7 +506,7 @@ Push-Location backend; python -m unittest tests.test_zar.ZarEvaluationTests.test
 
 Expected: PASS.
 
-- [ ] **Step 21: Write the failing joint partner-length test**
+- [x] **Step 21: Write the failing joint partner-length test**
 
 ```python
 def test_two_fits_cannot_require_more_than_thirteen_partner_cards(self):
@@ -518,7 +518,7 @@ def test_two_fits_cannot_require_more_than_thirteen_partner_cards(self):
         )
 ```
 
-- [ ] **Step 22: Run joint partner-length test to verify RED**
+- [x] **Step 22: Run joint partner-length test to verify RED**
 
 ```powershell
 Push-Location backend; python -m unittest tests.test_zar.ZarEvaluationTests.test_two_fits_cannot_require_more_than_thirteen_partner_cards -v; Pop-Location
@@ -526,7 +526,7 @@ Push-Location backend; python -m unittest tests.test_zar.ZarEvaluationTests.test
 
 Expected: FAIL because the impossible context is accepted.
 
-- [ ] **Step 23: Implement joint partner-length validation**
+- [x] **Step 23: Implement joint partner-length validation**
 
 Add:
 
@@ -536,7 +536,7 @@ if partner_trumps + partner_secondary > 13:
     raise ValueError('combined fits require more than thirteen partner cards')
 ```
 
-- [ ] **Step 24: Run the full evaluator file to verify GREEN**
+- [x] **Step 24: Run the full evaluator file to verify GREEN**
 
 ```powershell
 Push-Location backend; python -m unittest tests.test_zar -v; Pop-Location
@@ -544,7 +544,7 @@ Push-Location backend; python -m unittest tests.test_zar -v; Pop-Location
 
 Expected: all Zar tests PASS with no warnings.
 
-- [ ] **Step 25: Commit conservative fit scoring**
+- [x] **Step 25: Commit conservative fit scoring**
 
 ```powershell
 git add -- backend/engine/zar.py backend/tests/test_zar.py
@@ -557,7 +557,7 @@ git commit -m "feat: add conservative Zar fit adjustments"
 - Modify: `docs/03_engine_architecture.md`
 - Modify: `docs/11_axioms.md`
 
-- [ ] **Step 1: Document module ownership and non-integration**
+- [x] **Step 1: Document module ownership and non-integration**
 
 In `docs/03_engine_architecture.md`, add `backend/engine/zar.py` beside
 `hand_quality.py` and state:
@@ -577,7 +577,7 @@ In `docs/11_axioms.md`, after the K–R section, document:
 - the selected conservative fit table source:
   <https://en.wikipedia.org/wiki/Zar_Points>.
 
-- [ ] **Step 2: Run focused evaluator and K–R regression tests**
+- [x] **Step 2: Run focused evaluator and K–R regression tests**
 
 Run from the repository root:
 
@@ -587,7 +587,7 @@ Push-Location backend; python -m unittest tests.test_zar tests.test_hand_quality
 
 Expected: all tests PASS. Existing K–R outputs remain unchanged.
 
-- [ ] **Step 3: Run the full backend suite**
+- [x] **Step 3: Run the full backend suite**
 
 Run from the repository root:
 
@@ -599,7 +599,7 @@ Expected: full suite PASS. If an unrelated pre-existing failure appears, record
 the exact test and verify it also fails on the pre-Zar commit before deciding
 whether it belongs to this work.
 
-- [ ] **Step 4: Check the diff for accidental integration or unrelated files**
+- [x] **Step 4: Check the diff for accidental integration or unrelated files**
 
 Run from repository root:
 
@@ -614,14 +614,14 @@ Expected: no whitespace errors; no existing IV Scanner files are staged or
 modified by this implementation; the final search prints no call-site imports
 of `engine.zar`.
 
-- [ ] **Step 5: Commit documentation**
+- [x] **Step 5: Commit documentation**
 
 ```powershell
 git add -- docs/03_engine_architecture.md docs/11_axioms.md
 git commit -m "docs: describe conservative Zar evaluation"
 ```
 
-- [ ] **Step 6: Report the available API**
+- [x] **Step 6: Report the available API**
 
 Handoff must state that callers may import:
 
@@ -630,3 +630,20 @@ from engine.zar import ZarFitContext, evaluate_zar
 ```
 
 and that the feature is deliberately not active in bidding yet.
+
+## Execution record (2026-10-29)
+
+- All 36 steps executed on branch `feature/zar-evaluator`
+  (commits `b612e48`, `f6e42b4`, `7c97a6b`) and merged into `main`.
+- `backend/tests/test_zar.py`: 20 tests PASS.
+- Full backend suite on the merged `main`: 448 tests PASS (skipped=1).
+- Spec examples re-verified against `evaluate_zar`:
+  - a four-spade hand with `S/9` is accepted;
+  - `S/9` plus `C/8` is accepted;
+  - `S/13` plus `C/10` is rejected (implied partner lengths exceed 13 cards);
+  - a one-card secondary holding is rejected by the three-card
+    participation rule.
+- No call site imports `engine.zar`; it stays an independent service.
+- Available API: `from engine.zar import ZarFitContext, evaluate_zar`.
+  Deliberately not wired into bidding, axioms, profiles, scanners, or K–R
+  in this release.
