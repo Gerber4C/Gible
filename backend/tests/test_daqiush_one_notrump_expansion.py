@@ -24,13 +24,10 @@ class DaqiushOneNotrumpExpansionTests(unittest.TestCase):
         very_strong_long_diamond = 'SAKQHADAKQJT98C23'
         self.assertEqual(self.bid('1NP', very_strong_long_diamond), '7N')
 
-    def test_five_card_major_inquiry_keeps_4333_in_notrump_without_four_card_support(self):
-        responder = 'SQ32HA64DKJ92C987'
-        self.assertEqual(self.bid('1NP', responder), '3C')
-        self.assertEqual(self.bid('1NP3CP', 'SAQ4HKJ872DA63CQ7'), '3H')
-        self.assertEqual(self.bid('1NP3CP3HP', responder), '3N')
-        self.assertEqual(self.bid('1NP3CP', 'SAJ65H96DAQ3CKQJ3'), '3D')
-        self.assertEqual(self.bid('1NP3CP3DP', responder), '3N')
+    def test_four_minor_333_goes_notrump_and_four_major_333_asks(self):
+        # A 4m333 does not use the 3C five-major inquiry; a 4M333 does.
+        self.assertEqual(self.bid('1NP', 'SQ32HA64DKJ92C987'), '3N')
+        self.assertEqual(self.bid('1NP', 'SAQ32HK64DQ92C987'), '3C')
 
     def test_five_card_major_inquiry_shows_singleton_after_denial(self):
         responder = 'SKQ3H9DA9754CKQ76'
@@ -95,8 +92,12 @@ class DaqiushOneNotrumpExpansionTests(unittest.TestCase):
         invite = 'SQ32HKJ763DQ42C76'
         game = 'SA32HKQJ76D432C76'
         self.assertEqual(self.bid('1NP2DP2HP', invite), '2N')
-        self.assertIsNone(self.bid('1NP2DP2HP2NP', 'SAQ7HKJ8DA762CQ54'))
-        self.assertIsNone(self.bid('1NP2DP2HP2NP', 'SAJ65HK762DQ73CKQ'))
+        # A 4-3-3-3 opener counts only four-card support; 16 HCP without
+        # another five-card major accepts with 3NT, while 15 HCP rebids 3H.
+        self.assertEqual(
+            self.bid('1NP2DP2HP2NP', 'SAQ7HKJ8DA762CQ54'), '3N')
+        self.assertEqual(
+            self.bid('1NP2DP2HP2NP', 'SAJ65HK762DQ73CKQ'), '3H')
         self.assertEqual(self.bid('1NP2DP2HP', game), '3N')
         self.assertEqual(self.bid('1NP2DP2HP3NP', 'SAQ7HKJ8DA762CQ54'), 'P')
         self.assertEqual(self.bid('1NP2DP2HP3NP', 'SAQ7HKJ8DA7652CQ5'), '4H')

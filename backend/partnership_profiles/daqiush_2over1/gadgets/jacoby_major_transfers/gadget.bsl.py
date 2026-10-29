@@ -104,17 +104,26 @@ def five_minor_five_major_invite(ctx, trump):
 
 
 def five_card_invite_acceptance(ctx, trump, bid):
-    """Opener answers the 2NT five-card invitation after a transfer."""
+    """Opener answers the 2NT five-card invitation after a transfer.
+
+    A 4333 hand counts only four-card support as support; a 3-card fit in a
+    4333 is treated as no fit on the invitation.
+    """
     if ctx.hand is None:
         return False
-    support = ctx.hand.length(trump) >= 3
+    threshold = (4 if sorted(ctx.hand.length(s) for s in 'SHDC') == [3, 3, 3, 4]
+                 else 3)
+    support = ctx.hand.length(trump) >= threshold
     maximum = ctx.hand.hcp >= 16
+    other = 'S' if trump == 'H' else 'H'
     if bid == 'P':
         return not support and not maximum
     if bid == '3' + trump:
         return support and not maximum
+    if bid == '3' + other:
+        return (not support and maximum and ctx.hand.length(other) >= 5)
     if bid == '3NT':
-        return not support and maximum
+        return not support and maximum and ctx.hand.length(other) < 5
     if bid == '4' + trump:
         return support and maximum
     return False
@@ -889,8 +898,10 @@ class JacobyMajorTransfers(Gadget):
                         no_fit.meaning.target_suit = 'N'
                         no_fit.meaning.purpose_completed = True
 
+            other_major = 'S' if trump == 'H' else 'H'
             for bid, has_fit, action in (
                 ('P', False, 'reject'), ('3' + trump, True, 'reject'),
+                ('3' + other_major, False, 'accept_other'),
                 ('3NT', False, 'accept'), ('4' + trump, True, 'accept'),
             ):
                 follow = self.call('jacoby_' + trump.lower() + '_five_invite_' + action + '_' + bid.lower())
@@ -901,10 +912,38 @@ class JacobyMajorTransfers(Gadget):
                 follow.meaning.action = 'jacoby_five_invitation_' + action
                 follow.meaning.nature = ['natural']
                 follow.meaning.acts = [action] if bid == 'P' else [action, 'final_placement']
-                follow.meaning.target_suit = 'N' if bid in ('P', '3NT') else trump
-                if bid != 'P':
+                if bid in ('P', '3NT'):
+                    follow.meaning.target_suit = 'N'
+                elif bid == '3' + other_major:
+                    follow.meaning.target_suit = other_major
+                else:
+                    follow.meaning.target_suit = trump
+                if bid not in ('P', '3' + other_major):
                     follow.meaning.purpose_completed = True
+                if bid == '3' + other_major:
+                    follow.meaning.acts = ['accept']
+                    follow.meaning.purpose_completed = False
                 follow.description = 'Opener accepts or rejects the five-card major game invitation.'
+
+                if bid == '3' + other_major:
+                    for answer_bid, answer_action in (
+                            ('3NT', 'notrump'), ('4' + other_major, 'game')):
+                        answer = self.call('jacoby_' + trump.lower()
+                                           + '_five_invite_other_' + answer_action)
+                        answer.when = ordinary_prefix + '2NTP' + bid + 'P'
+                        answer.bid = answer_bid
+                        answer.applies = (lambda ctx, t=trump, o=other_major,
+                                          b=answer_bid: (
+                            ctx.hand is not None
+                            and (ctx.hand.length(o) >= 4) == (b == '4' + o)))
+                        answer.meaning.action = 'five_card_invitation_other_' + answer_action
+                        answer.meaning.nature = ['natural']
+                        answer.meaning.acts = ['signoff', 'final_placement']
+                        answer.meaning.target_suit = ('N' if answer_bid == '3NT'
+                                                      else other_major)
+                        answer.meaning.purpose_completed = True
+                        answer.description = ('Choose between notrump and the '
+                                              'other-major game.')
 
             for bid, action in (('P', 'reject'), ('4' + trump, 'accept')):
                 follow = self.call('jacoby_' + trump.lower() + '_six_invite_' + action)

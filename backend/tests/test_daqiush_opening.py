@@ -141,7 +141,7 @@ class DaqiushOpeningTests(unittest.TestCase):
         profile = self.profile()
         hand = Hand.parse(EXAMPLES[0][1])
         self.assertEqual(choose_bid(profile, Auction.parse('1NP'),
-                                    Hand.parse('SK32HQ32DAJ3CKQJ8')).call, '3C')
+                                    Hand.parse('SK32HQ32DAJ3CKQJ8')).call, '3N')
         for auction, cards in [('1CP', hand), ('1N2D', hand)]:
             with self.subTest(auction=auction):
                 report = explain(choose_bid(profile, Auction.parse(auction), cards))

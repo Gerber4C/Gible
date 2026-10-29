@@ -51,15 +51,16 @@ def game_featureless(ctx):
 
 def ordinary_invite(ctx):
     return (featureless(ctx) and ctx.hand.hcp in (8, 9)
-            and not poor_eight(ctx) and not strong_nine(ctx)
+            and not poor_eight(ctx)
+            and (not strong_nine(ctx) or non_good_minor_invite_2nt(ctx))
             and not any(direct_minor_game(ctx, s) or solid_minor_three_notrump(ctx, s)
                         for s in 'CD')
             and not (sorted(ctx.hand.length(s) for s in 'CD') == [5, 6]
                      and min(ctx.hand.length(s) for s in 'HS') <= 1)
             and not (ctx.hand.length('C') == 5 and ctx.hand.length('D') == 5
                      and min(ctx.hand.length('H'), ctx.hand.length('S')) == 1)
-            and not any(minor_invite(ctx, s) or shapely_invite(ctx, s) for s in 'CD'))
-
+            and not any(minor_invite(ctx, s) or shapely_invite(ctx, s)
+                        for s in 'CD'))
 
 def spade_invite(ctx):
     return (ctx.hand is not None and ctx.hand.length('S') == 4
@@ -320,8 +321,8 @@ def strong_nine_minor(ctx, suit):
 def minor_invite(ctx, suit):
     return (ctx.hand is not None and ctx.hand.length(suit) >= 6
             and ctx.hand.hcp in (8, 9) and not poor_eight(ctx)
-            and (strong_nine_minor(ctx, suit)
-                 or (not strong_nine(ctx) and good_minor(ctx, suit)))
+            and not strong_nine(ctx) and good_minor(ctx, suit)
+            and not minor_three_notrump(ctx)
             and max(ctx.hand.length(s) for s in 'HS') <= 3)
 
 
@@ -432,6 +433,58 @@ def spade_stayman_answer(ctx):
     return ctx.hand is not None and ctx.hand.length('H') < 4 and ctx.hand.length('S') >= 4
 
 
+MINOR_THREE_NT_KR = 11.5
+
+
+def non_good_minor_invite_2nt(ctx):
+    """Below the good-suit 3NT band, a non-good six/seven minor invites."""
+    if ctx.hand is None:
+        return False
+    minor = 'C' if ctx.hand.length('C') >= ctx.hand.length('D') else 'D'
+    return (ctx.hand.length(minor) in (6, 7)
+            and ctx.hand.hcp in (8, 9)
+            and not good_minor(ctx, minor)
+            and ctx.hand_quality['kr_points'] < MINOR_THREE_NT_KR
+            and max(ctx.hand.length(s) for s in 'HS') <= 3)
+
+
+def minor_three_notrump(ctx):
+    """A six- or seven-card minor in the good-suit 3NT K-R band.
+
+    The floor is the owner's 9-HCP AT9764 hand (K-R 11.75); the ceiling is
+    the cue-bid slam-interest lower bound, so the band is
+    [MINOR_THREE_NT_KR, minor-slam interest).
+    """
+    if ctx.hand is None:
+        return False
+    minor = 'C' if ctx.hand.length('C') >= ctx.hand.length('D') else 'D'
+    return (ctx.hand.length(minor) in (6, 7)
+            and max(ctx.hand.length(s) for s in 'HS') <= 3
+            and ctx.hand_quality['kr_points'] >= MINOR_THREE_NT_KR
+            and not minor_slam_interest(ctx.hand))
+
+
+def minor_featureless_invite(ctx):
+    """A six/seven-card non-good minor invite below the 3NT K-R band."""
+    if ctx.hand is None:
+        return False
+    minor = 'C' if ctx.hand.length('C') >= ctx.hand.length('D') else 'D'
+    return (ctx.hand.length(minor) in (6, 7)
+            and max(ctx.hand.length(s) for s in 'HS') <= 3
+            and ctx.hand.hcp in (8, 9)
+            and not poor_eight(ctx)
+            and not good_minor(ctx, minor)
+            and ctx.hand_quality['kr_points'] < MINOR_THREE_NT_KR
+            and not minor_slam_interest(ctx.hand))
+
+
+def flat_minor_333_three_notrump(ctx):
+    return (ctx.hand is not None
+            and sorted(ctx.hand.length(s) for s in 'SHDC') == [3, 3, 3, 4]
+            and max(ctx.hand.length('H'), ctx.hand.length('S')) == 3
+            and 10 <= ctx.hand.hcp <= 17)
+
+
 class OneNotrumpInvitations(Gadget):
     id = 'one_notrump_invitations'
     namespace = 'daqiush_2over1'
@@ -481,8 +534,12 @@ class OneNotrumpInvitations(Gadget):
 
         for bid, applies, action in (
             ('P', weak_featureless, 'weak_signoff'),
-            ('3NT', lambda ctx: game_featureless(ctx) or any(
-                solid_minor_three_notrump(ctx, suit) for suit in 'CD'), 'good_nine_game'),
+            ('3NT', lambda ctx: (game_featureless(ctx)
+                                 or any(solid_minor_three_notrump(ctx, suit)
+                                        for suit in 'CD')
+                                 or minor_three_notrump(ctx)
+                                 or flat_minor_333_three_notrump(ctx)),
+             'good_nine_game'),
         ):
             direct = self.call('featureless_' + action)
             direct.when = '1NP'

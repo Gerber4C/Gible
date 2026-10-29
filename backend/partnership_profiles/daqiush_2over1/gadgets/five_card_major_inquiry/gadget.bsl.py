@@ -10,14 +10,16 @@ def inquiry_hand(ctx):
                 and not (max(ctx.hand.length(s) for s in 'CD') >= 5
                          and ctx.hand.hcp >= 12 and ctx.hand_quality['kr_points'] >= 14)
                 and not (ctx.hand.length('C') == 4 and ctx.hand.length('D') == 4
-                         and ctx.hand.hcp >= 12 and ctx.hand_quality['kr_points'] >= 14))
+                         and ctx.hand.hcp >= 12 and ctx.hand_quality['kr_points'] >= 14)
+                and not (sorted(ctx.hand.length(s) for s in 'SHDC') == [3, 3, 3, 4]
+                         and max(majors) == 3))
     shortage = (sorted(majors) == [1, 3]
                 and sorted(ctx.hand.length(s) for s in 'CD') == [4, 5])
     solid_clubs = (ctx.hand.length('C') == 6 and max(majors) == 3
                    and ctx.hand.honor_count('C', ('A', 'K', 'Q')) == 3
                    and ctx.hand.hcp >= 8)
     flat_game = (sorted(ctx.hand.length(s) for s in 'SHDC') == [3, 3, 3, 4]
-                 and 10 <= ctx.hand.hcp <= 17)
+                 and max(majors) == 4 and 10 <= ctx.hand.hcp <= 17)
     return (((ordinary or shortage) and 10 <= ctx.hand.hcp <= 15)
             or good_minor_5422(ctx) or solid_clubs or flat_game)
 
