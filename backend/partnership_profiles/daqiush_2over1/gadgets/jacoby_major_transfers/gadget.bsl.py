@@ -47,10 +47,10 @@ def starts_jacoby(ctx, trump):
         return False  # A weak 6M-5m-1-1 describes only the major game via Texas.
     if named_evaluator(ctx, 'texas_slam_keycard_' + trump):
         return False
-    if named_evaluator(ctx, 'six_card_slam_interest_' + trump):
-        return True
     if max(ctx.hand.length(suit) for suit in 'CD') >= 4:
         return True  # A second minor needs its own Jacoby continuation.
+    if named_evaluator(ctx, 'six_card_slam_interest_' + trump):
+        return False  # Single-suit slam interest uses Texas, then 4NT keycard.
     return ctx.hand_quality['kr_points'] + 15 < 25  # Below the game-only Texas route.
 
 
@@ -545,10 +545,12 @@ class JacobyMajorTransfers(Gadget):
                                                     and ctx.hand.length(m) >= 6),
                      'six_minor_signoff', minor),
                     ('4NT',
-                     lambda ctx, t=trump, m=minor: ((five_four_second_minor(ctx, t, m)
-                                                     or flat_five_major(ctx, t))
-                                                    and second_minor_slam_interest(ctx, t)
-                                                    and ctx.hand.hcp in (15, 16)),
+                     lambda ctx, t=trump, m=minor: (
+                         ((five_four_second_minor(ctx, t, m)
+                           and ctx.hand.hcp <= 16)
+                          or (flat_five_major(ctx, t)
+                              and ctx.hand.hcp in (15, 16)))
+                         and second_minor_slam_interest(ctx, t)),
                      'quantitative_invite', 'N'),
                     ('6NT',
                      lambda ctx, t=trump, m=minor: ((five_four_second_minor(ctx, t, m)
@@ -768,37 +770,9 @@ class JacobyMajorTransfers(Gadget):
                         'min_lengths': {trump: 5}}
                 rebid.description = 'Weak stop, natural invitation, or game after ordinary Jacoby acceptance.'
 
-            # Ordinary-acceptance continuations. A six-plus major with slam
-            # interest asks keycards; an exactly five-card 5332 hand instead
-            # uses the quantitative, minor-slam-choice, or grand-slam
-            # invitation route. Rare shapes ride the five-card route through
-            # K-R strength instead of each authoring a separate call.
-            keycard = self.call('jacoby_' + trump.lower() + '_ordinary_keycard')
-            keycard.when = ordinary_prefix
-            keycard.bid = '4NT'
-            keycard.applies = (lambda ctx, t=trump: ctx.hand is not None
-                               and ctx.hand.length(t) >= 6
-                               and not exclusion_slam_available(ctx, t)
-                               and named_evaluator(ctx, 'six_card_slam_interest_' + t))
-            keycard.meaning.action = 'rkcb_1430'
-            keycard.meaning.nature = ['artificial']
-            keycard.meaning.acts = ['inquiry', 'keycard_asking']
-            keycard.meaning.target_suit = trump
-            keycard.meaning.agreed_suit = trump
-            keycard.effect('agreed_suit').suit = trump
-            context = keycard.effect('keycard_context')
-            context.trump_suit = trump
-            context.ask_call = '4N'
-            context.method = 'rkcb_1430'
-            context.status = 'pending'
-            keycard.description = ('Six-card slam-interest major asks keycards '
-                                   'after the ordinary acceptance.')
-            # The hand selects this spec (six-plus cards) or the quantitative
-            # spec (exactly five); replay also has to pick one when it does
-            # not know the responder's hand, so the keycard meaning ranks
-            # first.
-            keycard.priority = 1
-
+            # Ordinary-acceptance continuations: 4NT is the quantitative
+            # 5332 route. A six-plus single-suit major asks keycards through
+            # Texas (4C/4D, then 4NT), not through this 4NT.
             quantitative = self.call('jacoby_' + trump.lower() + '_ordinary_quantitative')
             quantitative.when = ordinary_prefix
             quantitative.bid = '4NT'
@@ -977,55 +951,70 @@ class JacobyMajorTransfers(Gadget):
 
             for answer in tuple(bid for bid, _ in SUPERACCEPTS[trump]) + ('3' + trump,):
                 prefix = '1NP' + transfer + 'P' + answer + 'P'
-                if answer != '3' + trump:
+                if answer == '3' + trump:
+                    done_prefix = prefix
+                else:
                     retransfer = '3D' if trump == 'H' else '3H'
-                    return_call = self.call('jacoby_' + trump.lower() + '_retransfer_after_' + answer.lower())
+                    return_call = self.call('jacoby_' + trump.lower()
+                                            + '_retransfer_after_' + answer.lower())
                     return_call.when = prefix
                     return_call.bid = retransfer
-                    return_call.applies = lambda ctx, t=trump: weak_jacoby(ctx, t)
+                    return_call.applies = (lambda ctx, t=trump: (
+                        ctx.hand is not None and ctx.hand.length(t) >= 5))
                     return_call.meaning.action = 'major_retransfer'
                     return_call.meaning.nature = ['artificial']
                     return_call.meaning.acts = ['directive']
                     return_call.meaning.target_suit = trump
-                    return_call.description = 'Weak major hand uses 3M−1 to retransfer after superaccept.'
+                    return_call.description = ('After the superaccept, retransfer to '
+                                               'three of the major before game or keycard.')
 
-                    complete = self.call('jacoby_' + trump.lower() + '_complete_retransfer_after_' + answer.lower())
+                    complete = self.call('jacoby_' + trump.lower()
+                                         + '_complete_retransfer_after_' + answer.lower())
                     complete.when = prefix + retransfer + 'P'
                     complete.bid = '3' + trump
                     complete.applies = lambda ctx: ctx.hand is not None
                     complete.meaning.action = 'major_retransfer_acceptance'
                     complete.meaning.nature = ['natural']
-                    complete.meaning.acts = ['signoff', 'final_placement']
+                    complete.meaning.acts = ['descriptive']
                     complete.meaning.target_suit = trump
-                    complete.meaning.purpose_completed = True
                     complete.description = 'Complete the retransfer to the agreed major.'
-                else:
-                    stop = self.call('jacoby_' + trump.lower() + '_pass_three_major')
-                    stop.when = prefix
-                    stop.bid = 'P'
-                    stop.applies = lambda ctx, t=trump: weak_jacoby(ctx, t)
-                    stop.meaning.action = 'weak_major_stop'
-                    stop.meaning.nature = ['natural']
-                    stop.meaning.acts = ['signoff']
-                    stop.meaning.target_suit = trump
-                    stop.description = 'The superaccept already placed the major at level three.'
 
-                game = self.call('jacoby_' + trump.lower() + '_game_after_' + answer.lower())
-                game.when = prefix
+                    done_prefix = prefix + retransfer + 'P3' + trump + 'P'
+
+                stop = self.call('jacoby_' + trump.lower()
+                                 + '_pass_three_major_after_' + answer.lower())
+                stop.when = done_prefix
+                stop.bid = 'P'
+                stop.applies = lambda ctx, t=trump: weak_jacoby(ctx, t)
+                stop.meaning.action = 'weak_major_stop'
+                stop.meaning.nature = ['natural']
+                stop.meaning.acts = ['signoff', 'final_placement']
+                stop.meaning.target_suit = trump
+                stop.meaning.purpose_completed = True
+                stop.description = 'Weak hand stops at three of the major.'
+
+                game = self.call('jacoby_' + trump.lower() + '_game_after_'
+                                 + answer.lower())
+                game.when = done_prefix
                 game.bid = '4' + trump
-                game.applies = lambda ctx, t=trump: (ctx.hand is not None and
-                                                      ((ctx.hand.length(t) == 5 and
-                                                        (inviting_jacoby(ctx, t) or game_five_major(ctx, t)))
-                                                       or (t == 'S' and major_two_suit_force(ctx))))
+                game.applies = lambda ctx, t=trump: (
+                    ctx.hand is not None
+                    and ((ctx.hand.length(t) == 5
+                          and (inviting_jacoby(ctx, t) or game_five_major(ctx, t)))
+                         or (ctx.hand.length(t) >= 6
+                             and not named_evaluator(ctx, 'six_card_slam_interest_' + t))
+                         or (t == 'S' and major_two_suit_force(ctx))))
                 game.meaning.action = 'major_game_after_superaccept'
                 game.meaning.nature = ['natural']
                 game.meaning.acts = ['signoff', 'final_placement']
                 game.meaning.target_suit = trump
                 game.meaning.purpose_completed = True
-                game.description = 'Superaccept shows maximum support; place game with a five-card major.'
+                game.description = ('Retransfer first, then place game with a '
+                                    'five-card major.')
 
-                ask = self.call('jacoby_' + trump.lower() + '_after_' + answer.lower() + '_keycard')
-                ask.when = '1NP' + transfer + 'P' + answer + 'P'
+                ask = self.call('jacoby_' + trump.lower() + '_after_'
+                                + answer.lower() + '_keycard')
+                ask.when = done_prefix
                 ask.bid = '4NT'
                 ask.applies = lambda ctx, t=trump: (
                     named_evaluator(ctx, 'six_card_slam_interest_' + t)
@@ -1041,4 +1030,5 @@ class JacobyMajorTransfers(Gadget):
                 keycards.ask_call = '4N'
                 keycards.method = 'rkcb_1430'
                 keycards.status = 'pending'
-                ask.description = 'All confirmed slam-interest hands ask keycards immediately after this superaccept.'
+                ask.description = ('Retransfer first, then ask keycards after '
+                                   'the superaccept.')

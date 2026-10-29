@@ -106,7 +106,7 @@ class DaqiushOneNotrumpExpansionTests(unittest.TestCase):
         self.assertEqual(self.bid('1NP2DP2SP', weak_hearts), '3D')
         self.assertEqual(self.bid('1NP2DP2SP3DP', 'S97HKQ32DAK76CA76'), '3H')
         self.assertEqual(self.bid('1NP2DP2SP3DP3HP', weak_hearts), 'P')
-        self.assertEqual(self.bid('1NP2DP2SP', 'SA32HKQJ76D432C76'), '4H')
+        self.assertEqual(self.bid('1NP2DP2SP', 'SA32HKQJ76D432C76'), '3D')
 
         weak_spades = 'SKJ763H632D842C76'
         self.assertEqual(self.bid('1NP2HP2NP', weak_spades), '3H')

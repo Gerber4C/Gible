@@ -13,6 +13,12 @@ from .hand_quality import (inquiry_stopper, minor_game_control_points,
                            shapely_combined_effective_points, shapely_description_proxy)
 from .voidwood import (answer_bids, effective_keycards,
                        is_safe_voidwood_ask, voidwood_jump)
+from .zar import ZarFitContext, evaluate_zar
+
+
+def _zar_total(hand, trump, combined_trumps):
+    return evaluate_zar(
+        hand, ZarFitContext(trump, combined_trumps)).total_points
 from .model import Author as RuntimeAuthor
 from .model import CallMeaning, StateEffect
 
@@ -1178,6 +1184,7 @@ def _base_namespace(collector: _Collector) -> dict[str, Any]:
         "effective_keycards": effective_keycards,
         "is_safe_voidwood_ask": is_safe_voidwood_ask,
         "voidwood_jump": voidwood_jump,
+        "zar_total": _zar_total,
         "shapely_effective_points": shapely_effective_points,
         "shapely_combined_effective_points": shapely_combined_effective_points,
         "shapely_description_proxy": shapely_description_proxy,

@@ -89,7 +89,8 @@ def king_in(ctx, suit, void):
     if ctx.hand is None:
         return False
     if suit == void:
-        return ctx.hand.contains_rank(suit, 'A')
+        return (ctx.hand.contains_rank(suit, 'A')
+                or ctx.hand.contains_rank(suit, 'K'))
     return ctx.hand.contains_rank(suit, 'K')
 
 
@@ -128,6 +129,128 @@ def state_voidwood_answer(ctx, ask, step):
     if count not in counts:
         return False
     return queen is None or ctx.hand.contains_rank(trump, 'Q') == queen
+
+
+def last_non_pass(auction):
+    index = len(auction.calls) - 1
+    while index >= 0:
+        call = auction.calls[index]
+        if call not in ('P', 'X', 'R'):
+            return call
+        index -= 1
+    return None
+
+
+def canonical_bid(bid):
+    return bid + 'T' if bid.endswith('N') and not bid.endswith('NT') else bid
+
+
+def engine_bid(bid):
+    return bid[:-1] if bid.endswith('NT') else bid
+
+
+def asker_seat(auction, ask):
+    index = len(auction.calls) - 1
+    while index >= 0:
+        if auction.calls[index] == ask:
+            return auction.actor_at(index)
+        index -= 1
+    return None
+
+
+def partner_seat(seat):
+    return {'n': 's', 's': 'n', 'e': 'w', 'w': 'e'}[seat]
+
+
+def queen_ask_bid(ask, trump):
+    answers = answer_bids(ask)
+    if len(answers) != 5:
+        return None
+    q = step_bid(canonical_bid(answers[0]), 1)
+    if q == '5' + trump:
+        q = step_bid(q, 1)
+    return q
+
+
+def queen_ask_applies(ctx, ask, trump):
+    asker = asker_seat(ctx.auction, ask)
+    if asker is None or ctx.auction.actor_to_call != asker:
+        return False
+    if last_non_pass(ctx.auction) != answer_bids(ask)[0]:
+        return False
+    q = queen_ask_bid(ask, trump)
+    if q is None:
+        return False
+    if CALL_ORDER.index(q) >= CALL_ORDER.index('5' + trump):
+        asker_zar = zar_total(ctx.hand, trump, ctx.hand.length(trump) + 5)
+        return asker_zar + 31 >= 67
+    return True
+
+
+def lowest_side_suit(ctx, trump, q):
+    for suit in 'CDHS':
+        if suit == trump:
+            continue
+        bid = '6' + suit
+        if CALL_ORDER.index(bid) > CALL_ORDER.index(q):
+            return bid
+    return None
+
+
+def queen_expected_bid(ctx, ask, trump, void, high_zar=31):
+    asker = asker_seat(ctx.auction, ask)
+    if asker is None or ctx.auction.actor_to_call != partner_seat(asker):
+        return None
+    q = queen_ask_bid(ask, trump)
+    if q is None or last_non_pass(ctx.auction) != engine_bid(q):
+        return None
+    has_queen = ctx.hand.contains_rank(trump, 'Q')
+    zar = zar_total(ctx.hand, trump, 5 + ctx.hand.length(trump))
+    high = zar >= high_zar
+    kings = [suit for suit in 'CDHS'
+             if suit != trump and king_in(ctx, suit, void)
+             and CALL_ORDER.index('6' + suit) <= CALL_ORDER.index('6' + trump)]
+    five_trump = CALL_ORDER.index('5' + trump)
+    five_nt = CALL_ORDER.index('5NT')
+    q_rank = CALL_ORDER.index(q)
+    if not has_queen:
+        if q_rank < five_trump:
+            return '5' + trump
+        return '6' + trump
+    if kings:
+        if q_rank >= five_trump and high:
+            return '7' + trump
+        return '6' + kings[0]
+    if q_rank < five_trump:
+        return '6' + trump if not high else '5NT'
+    if q_rank < five_nt:
+        return '5NT'
+    return lowest_side_suit(ctx, trump, q)
+
+
+def grand_invite_applies(ctx, ask, trump):
+    asker = asker_seat(ctx.auction, ask)
+    if asker is None or ctx.auction.actor_to_call != asker:
+        return False
+    if not state_exists(ctx, 'voidwood', ask=ask, status='pending'):
+        return False
+    q = queen_ask_bid(ask, trump)
+    if q is None or last_non_pass(ctx.auction) != engine_bid(q):
+        return False
+    asker_zar = zar_total(ctx.hand, trump, ctx.hand.length(trump) + 5)
+    return asker_zar + 31 >= 67
+
+
+def grand_accept_applies(ctx, trump, void, ask):
+    asker = asker_seat(ctx.auction, ask)
+    if asker is None or ctx.auction.actor_to_call != partner_seat(asker):
+        return False
+    if not state_exists(ctx, 'voidwood', ask=ask, status='pending'):
+        return False
+    zar = zar_total(ctx.hand, trump, 5 + ctx.hand.length(trump))
+    has_king = any(king_in(ctx, suit, void) for suit in 'CDHS'
+                   if suit != trump)
+    return (ctx.hand.contains_rank(trump, 'Q') and zar >= 31 and has_king)
 
 
 class Voidwood(Gadget):
@@ -416,3 +539,85 @@ class Voidwood(Gadget):
                             answer.meaning.trump_queen = queen
                         answer.description = ('Voidwood answer ' + answers[step]
                                               + ' for the ' + void + ' void.')
+                    q = queen_ask_bid(ask, trump)
+                    if q is not None:
+                        qcall = self.call('state_voidwood_' + trump.lower()
+                                          + '_void_' + void.lower() + '_'
+                                          + ask.lower() + '_queen_ask')
+                        qcall.when = '*'
+                        qcall.requires = StateExists('voidwood', ask=ask,
+                                                    trump=trump, void=void,
+                                                    status='pending')
+                        qcall.bid = q
+                        qcall.applies = (lambda ctx, a=ask, t=trump:
+                                         queen_ask_applies(ctx, a, t))
+                        qcall.meaning.action = 'voidwood_queen_ask'
+                        qcall.meaning.nature = ['artificial']
+                        qcall.meaning.acts = ['inquiry']
+                        qcall.meaning.target_suit = trump
+                        qcall.description = 'Ask for the trump queen after 0/3.'
+
+                        for q_bid in ('5NT', '6C', '6D', '6H', '6S', '6NT',
+                                      '7C', '7D', '7H', '7S', '7NT'):
+                            if CALL_ORDER.index(q_bid) <= CALL_ORDER.index(q):
+                                continue
+                            qans = self.call('state_voidwood_' + trump.lower()
+                                             + '_void_' + void.lower() + '_'
+                                             + ask.lower() + '_queen_answer_'
+                                             + q_bid.lower())
+                            qans.when = '*'
+                            qans.requires = StateExists('voidwood', ask=ask,
+                                                        trump=trump, void=void,
+                                                        status='pending')
+                            qans.bid = q_bid
+                            qans.applies = (lambda ctx, a=ask, t=trump, v=void,
+                                            b=q_bid:
+                                            queen_expected_bid(ctx, a, t, v) == b)
+                            qans.meaning.action = 'voidwood_queen_answer'
+                            qans.meaning.nature = ['artificial']
+                            qans.meaning.acts = ['descriptive']
+                            qans.meaning.target_suit = trump
+                            qans.description = 'Answer the trump-queen ask.'
+
+                        invite = self.call('state_voidwood_' + trump.lower()
+                                           + '_void_' + void.lower() + '_'
+                                           + ask.lower() + '_grand_invite')
+                        invite.when = '*'
+                        invite.requires = StateExists('voidwood', ask=ask,
+                                                      trump=trump, void=void,
+                                                      status='pending')
+                        invite.bid = '6' + trump
+                        invite.applies = (lambda ctx, a=ask, t=trump:
+                                          grand_invite_applies(ctx, a, t))
+                        invite.meaning.action = 'voidwood_grand_invitation'
+                        invite.meaning.nature = ['natural']
+                        invite.meaning.acts = ['invite']
+                        invite.meaning.target_suit = trump
+                        invite.description = 'Invite the grand slam after the queen answer.'
+
+                        for g_bid in ('P', '7' + trump):
+                            gans = self.call('state_voidwood_' + trump.lower()
+                                             + '_void_' + void.lower() + '_'
+                                             + ask.lower() + '_grand_'
+                                             + g_bid.lower())
+                            gans.when = '*'
+                            gans.requires = StateExists('voidwood', ask=ask,
+                                                        trump=trump, void=void,
+                                                        status='pending')
+                            gans.bid = g_bid
+                            if g_bid == 'P':
+                                gans.applies = (lambda ctx, t=trump:
+                                                last_non_pass(ctx.auction)
+                                                == '6' + t)
+                            else:
+                                gans.applies = (lambda ctx, t=trump, v=void:
+                                                last_non_pass(ctx.auction)
+                                                == '6' + t
+                                                and grand_accept_applies(ctx, t, v, ask))
+                            gans.meaning.action = 'voidwood_grand_' + (
+                                'accept' if g_bid != 'P' else 'decline')
+                            gans.meaning.nature = ['natural']
+                            gans.meaning.acts = ['accept' if g_bid != 'P' else 'signoff',
+                                                 'final_placement']
+                            gans.meaning.target_suit = trump
+                            gans.meaning.purpose_completed = True

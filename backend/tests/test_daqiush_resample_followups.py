@@ -19,11 +19,15 @@ class DaqiushResampleFollowupTests(unittest.TestCase):
     def bid(self, auction, cards):
         return choose_bid(self.profile, Auction.parse(auction), Hand.parse(cards)).call
 
-    def test_two_major_superaccept_samples_matching_openers(self):
+    def test_two_major_superaccept_retransfers_then_decides(self):
+        cards = 'SAQT75HJT532DATCA'
         decision = choose_bid(self.profile, Auction.parse('1NP2HP3CP'),
-                              Hand.parse('SAQT75HJT532DATCA'))
+                              Hand.parse(cards))
+        self.assertEqual(decision.call, '3H')
+        decision = choose_bid(self.profile,
+                              Auction.parse('1NP2HP3CP3HP3SP'),
+                              Hand.parse(cards))
         self.assertIn(decision.call, ('4S', '4N'))
-        self.assertGreaterEqual(decision.trace.simulation_decision['sample_count'], 8)
 
     def test_stayman_fit_with_shortage_starts_slam_probe(self):
         for cards in ('SA852HK76DQCAKJ32', 'SK874HK7DACKJT986'):

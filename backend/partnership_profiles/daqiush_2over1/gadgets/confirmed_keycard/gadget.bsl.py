@@ -62,7 +62,9 @@ class ConfirmedKeycard(Gadget):
                 texas = self.call('texas_' + trump.lower() + '_after_' + answer.lower() + '_keycard_ask')
                 texas.when = '1NP' + transfer + 'P' + answer + 'P'
                 texas.bid = '4NT'
-                texas.applies = lambda ctx, t=trump: named_evaluator(ctx, 'texas_slam_keycard_' + t)
+                texas.applies = (lambda ctx, t=trump: (
+                    named_evaluator(ctx, 'texas_slam_keycard_' + t)
+                    or named_evaluator(ctx, 'six_card_slam_interest_' + t)))
                 texas.meaning.action = 'rkcb_1430'
                 texas.meaning.nature = ['artificial']
                 texas.meaning.acts = ['inquiry', 'keycard_asking']
@@ -80,13 +82,16 @@ class ConfirmedKeycard(Gadget):
             ('2D', 'H', ('2S', '2N', '3C', '3H')),
             ('2H', 'S', ('2N', '3C', '3D', '3S')),
         ):
+            retransfer = '3D' if trump == 'H' else '3H'
             for answer in superaccepts:
                 prefix = '1NP' + transfer + 'P' + answer + 'P4NP'
                 asks.append(('jacoby_' + trump + '_' + answer, prefix, trump))
+                retransfer_prefix = ('1NP' + transfer + 'P' + answer + 'P'
+                                     + retransfer + 'P3' + trump + 'P4NP')
+                asks.append(('jacoby_' + trump + '_' + answer
+                             + '_retransfer', retransfer_prefix, trump))
         for transfer, accept, trump in (('2D', '2H', 'H'), ('2H', '2S', 'S')):
             # Six-plus-card slam interest after the ordinary acceptance.
-            asks.append(('jacoby_' + trump + '_ordinary',
-                         '1NP' + transfer + 'P' + accept + 'P4NP', trump))
             for minor in 'CD':
                 table = '1NP' + transfer + 'P' + accept + 'P3' + minor + 'P3NTP'
                 # Six-four shape: the cue agrees the major, then keycard.

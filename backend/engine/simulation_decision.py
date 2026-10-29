@@ -23,12 +23,16 @@ from .honor_quality import assess_honor_texture
 MINOR_5422_AUCTION = ('1N', 'P', '3C', 'P', '3D', 'P', '4N', 'P')
 TWO_MAJOR_SPADE_SLAM_AUCTION = ('1N', 'P', '2H', 'P', '2S', 'P',
                                 '3H', 'P', '3S', 'P')
+_TWO_MAJOR_DOUBLETONS = {'2N': 'H', '3C': 'C', '3D': 'D'}
 TWO_MAJOR_SPADE_SUPERACCEPTS = {
-    ('1N', 'P', '2H', 'P', '2N', 'P'): 'H',
-    ('1N', 'P', '2H', 'P', '3C', 'P'): 'C',
-    ('1N', 'P', '2H', 'P', '3D', 'P'): 'D',
+    # The 3S 4333 superaccept acts directly; lower superaccepts retransfer
+    # through 3H to 3S before game or keycard.
     ('1N', 'P', '2H', 'P', '3S', 'P'): None,
 }
+for _answer, _doubleton in _TWO_MAJOR_DOUBLETONS.items():
+    TWO_MAJOR_SPADE_SUPERACCEPTS[
+        ('1N', 'P', '2H', 'P', _answer, 'P', '3H', 'P', '3S', 'P')] = _doubleton
+del _answer, _doubleton
 SIX_FOUR_MAJOR_THREE_NOTRUMP = {
     ('1N', 'P', '2C', 'P', '2D', 'P', '3H', 'P', '3N', 'P'): 'S',
     ('1N', 'P', '2C', 'P', '2D', 'P', '3S', 'P', '3N', 'P'): 'H',
@@ -143,7 +147,7 @@ def decide_two_major_spade_slam(profile, auction: Auction, hand: Hand) -> dict:
         raise ValueError('Profile lacks the public 1NT opening predicate')
     if superaccept:
         sampled = _sample_superaccept_openers(
-            hand, shown_doubleton, auction.calls[-2] == '3S',
+            hand, shown_doubleton, shown_doubleton is None,
             _seed(auction, hand), opening)
         deals = sampled.deals
     else:

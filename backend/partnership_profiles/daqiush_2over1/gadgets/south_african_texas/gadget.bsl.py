@@ -116,6 +116,15 @@ def slam_keycard_texas(ctx, suit):
     return ctx.hand.hcp >= 17
 
 
+def texas_ordinary_slam(ctx, suit):
+    """A single-suit six/seven-card major asks keycards through Texas."""
+    return (ctx.hand is not None
+            and ctx.hand.length(suit) in (6, 7)
+            and six_card_slam_interest(ctx, suit)
+            and max(ctx.hand.length(s) for s in 'CD') < 4
+            and min(ctx.hand.length(s) for s in 'HS') < 4)
+
+
 def shapely_game_texas(ctx, suit):
     points = named_evaluator(ctx, 'shapely_second_minor_strength_' + suit)
     return (points is not None and 4 <= points <= 6
@@ -140,13 +149,15 @@ def exclusion_void_hand(ctx, suit):
 def texas_hearts(ctx):
     return (not exclusion_void_hand(ctx, 'H')
             and (game_only_texas(ctx, 'H') or shapely_game_texas(ctx, 'H')
-                 or slam_keycard_texas(ctx, 'H')))
+                 or slam_keycard_texas(ctx, 'H')
+                 or texas_ordinary_slam(ctx, 'H')))
 
 
 def texas_spades(ctx):
     return (not exclusion_void_hand(ctx, 'S')
             and (game_only_texas(ctx, 'S') or shapely_game_texas(ctx, 'S')
-                 or slam_keycard_texas(ctx, 'S')))
+                 or slam_keycard_texas(ctx, 'S')
+                 or texas_ordinary_slam(ctx, 'S')))
 
 
 def public_hearts(ctx):

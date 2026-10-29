@@ -58,10 +58,18 @@ class DaqiushJacobyTests(unittest.TestCase):
         self.assertEqual(self.bid('1NP2HP2SP3DP3SP', 'SAKQJ9H432D9876C2'), '4S')
         self.assertEqual(self.bid('1NP2DP2HP3CP3HP', 'S2HAKQJ9D432C9876'), '4H')
 
-    def test_confirmed_six_card_slam_interest_transfers_but_game_only_uses_texas(self):
-        self.assertEqual(self.bid('1NP', 'SA62HAQJT72DJ7CJ4'), '2D')
-        self.assertEqual(self.bid('1NP', 'SAQJT72HA62DJ7CJ4'), '2H')
+    def test_six_card_slam_interest_uses_texas_before_keycard(self):
+        self.assertEqual(self.bid('1NP', 'SA62HAQJT72DJ7CJ4'), '4C')
+        self.assertEqual(self.bid('1NP', 'SAQJT72HA62DJ7CJ4'), '4D')
         self.assertEqual(self.bid('1NP', 'ST2HAQT976D53CKJ2'), '4C')
+        for auction in ('1NP4CP4DP', '1NP4CP4HP'):
+            with self.subTest(auction=auction):
+                self.assertEqual(
+                    self.bid(auction, 'SA62HAQJT72DJ7CJ4'), '4N')
+
+    def test_five_four_after_second_minor_three_notrump_invites(self):
+        self.assertEqual(
+            self.bid('1NP2HP2SP3DP3NTP', 'SAK982H9DQJT3CK64'), '4N')
 
     def test_absolute_maximum_superaccept_shows_the_specified_doubleton(self):
         cases = (
@@ -87,28 +95,39 @@ class DaqiushJacobyTests(unittest.TestCase):
         self.assertEqual(self.bid('1NP2DP', 'SAQ7HKJ8DA762CQ54'), '2H')
         self.assertEqual(self.bid('1NP2HP', 'SAQ7HKJ8DA762CQ54'), '2S')
 
-    def test_confirmed_slam_hands_ask_keycards_immediately_after_every_superaccept(self):
+    def test_confirmed_slam_hands_retransfer_then_ask_keycards(self):
         for transfer, trump, responder, answers in (
             ('2D', 'H', 'SA62HAQJT72DJ7CJ4', ('2S', '2N', '3C', '3H')),
             ('2H', 'S', 'SAQJT72HA62DJ7CJ4', ('2N', '3C', '3D', '3S')),
         ):
+            retransfer = '3D' if trump == 'H' else '3H'
             for answer in answers:
                 with self.subTest(transfer=transfer, answer=answer):
                     prefix = '1NP' + transfer + 'P' + answer + 'P'
-                    decision = choose_bid(self.profile, Auction.parse(prefix), Hand.parse(responder))
+                    if answer == '3' + trump:
+                        ask_prefix = prefix
+                    else:
+                        first = choose_bid(self.profile, Auction.parse(prefix),
+                                           Hand.parse(responder))
+                        self.assertEqual(first.call, retransfer)
+                        ask_prefix = prefix + retransfer + 'P3' + trump + 'P'
+                    decision = choose_bid(self.profile, Auction.parse(ask_prefix),
+                                          Hand.parse(responder))
                     self.assertEqual(decision.call, '4N')
                     self.assertEqual(decision.private_memory.purposes[-1].kind, 'keycard_slam')
                     self.assertEqual(decision.private_memory.purposes[-1].trump, trump)
-                    trace = replay_auction(self.profile, Auction.parse(prefix + '4N'))
+                    trace = replay_auction(self.profile, Auction.parse(ask_prefix + '4N'))
                     self.assertTrue(trace.state_exists({'key': 'keycard_context', 'trump_suit': trump}))
 
     def test_superaccept_keycard_answer_and_non_slam_responder_limit(self):
-        self.assertEqual(self.bid('1NP2DP2SP4NP', 'S97HKQ32DAK76CA76'), '5D')
-        self.assertIsNone(self.bid('1NP2DP2SP', 'ST2HAQT976D53CKJ2'))
-        # A six-card slam-interest major asks keycards after the ordinary
-        # acceptance; 4NT is the quantitative 5332 route only with exactly
-        # five cards.
-        self.assertEqual(self.bid('1NP2DP2HP', 'SA62HAQJT72DJ7CJ4'), '4N')
+        self.assertEqual(
+            self.bid('1NP2DP2SP3DP3HP4NP', 'S97HKQ32DAK76CA76'), '5D')
+        self.assertEqual(
+            self.bid('1NP2DP2SP', 'ST2HAQT976D53CKJ2'), '3D')
+        # The ordinary transfer acceptance's 4NT is quantitative only; a
+        # six-card slam-interest major uses Texas first (4C/4D) and then 4NT
+        # asks keycards, so this synthetic state has no ordinary keycard.
+        self.assertIsNone(self.bid('1NP2DP2HP', 'SA62HAQJT72DJ7CJ4'))
 
 
 if __name__ == '__main__':

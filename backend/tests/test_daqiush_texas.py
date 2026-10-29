@@ -29,13 +29,13 @@ class DaqiushTexasTests(unittest.TestCase):
             with self.subTest(cards=cards):
                 self.assertEqual(self.bid('1NP', cards), '4C')
 
-    def test_owner_labelled_slam_interest_hands_choose_jacoby_instead_of_texas(self):
+    def test_owner_labelled_slam_interest_hands_use_texas(self):
         for cards in ('SA62HAQJT72DJ7CJ4', 'SK53HKQT962DJ8CA4',
                       'SA74HKQ9765D42CA9', 'SKT3HAK8532DJT5C8',
                       'SJ84HAQJT95DKT7C9', 'SQT4HAJT943DA76C6',
                       'S762HAKJ982DK83C8'):
             with self.subTest(cards=cards):
-                self.assertEqual(self.bid('1NP', cards), '2D')
+                self.assertEqual(self.bid('1NP', cards), '4C')
 
     def test_screenshot_opener_has_two_unprotected_kq_and_wants_declarer(self):
         self.assertEqual(self.bid('1NP4CP', 'SAQ7HKJ8DA762CQ54'), '4H')
