@@ -84,9 +84,10 @@ class DaqiushMinorInvitationTests(unittest.TestCase):
         self.assertEqual(self.bid('1NP2CP2HP', cards), '3H')
         self.assertEqual(self.bid('1NP2CP2SP', cards), '3S')
 
-    def test_good_six_card_minor_invites_three_notrump_by_transfer(self):
-        self.assertEqual(self.bid('1NP', 'S874H63D82CAKJ754'), '2S')
-        self.assertEqual(self.bid('1NP', 'SJ74H63DAQJ754C82'), '2N')
+    def test_good_six_card_minor_bids_three_notrump(self):
+        # Both are inside the owner's K-R 11-14 good-suit 3NT band.
+        self.assertEqual(self.bid('1NP', 'S874H63D82CAKJ754'), '3N')
+        self.assertEqual(self.bid('1NP', 'SJ74H63DAQJ754C82'), '3N')
 
     def test_weak_minor_transfer_stops_in_three_minor(self):
         self.assertEqual(self.bid('1NP', 'S874H63D82CKJ9754'), '2S')
@@ -94,10 +95,9 @@ class DaqiushMinorInvitationTests(unittest.TestCase):
         self.assertEqual(self.bid('1NP2SP2NP', 'S874H63D82CKJ9754'), '3C')
         self.assertEqual(self.bid('1NP2SP2NP3CP', 'SAQ7HKJ8DA762CQ54'), 'P')
 
-    def test_good_minor_invite_accepts_superaccept_at_three_notrump(self):
-        self.assertEqual(self.bid('1NP2SP2NP', 'S874H63D82CAKJ754'), '3N')
-        self.assertEqual(self.bid('1NP2NP', 'SAQ7HKJ8DA762CQ54'), '3C')
-        self.assertEqual(self.bid('1NP2NP3CP', 'SJ74H63DAQJ754C82'), '3N')
+    def test_good_minor_band_places_three_notrump_directly(self):
+        self.assertEqual(self.bid('1NP', 'S874H63D82CAKJ754'), '3N')
+        self.assertEqual(self.bid('1NP', 'SJ74H63DAQJ754C82'), '3N')
 
     def test_six_clubs_with_ca_kq_and_a_spade_uses_direct_three_clubs(self):
         self.assertEqual(self.bid('1NP', 'SAK2HQ3D42CAKQ987'), '3C')
@@ -114,7 +114,7 @@ class DaqiushMinorInvitationTests(unittest.TestCase):
             's': 'S874H63D82CAKJ754',
         })
         self.assertEqual(result.status, 'complete')
-        self.assertEqual(result.calls, ('1N', 'P', '2S', 'P', '2N', 'P', '3N', 'P', 'P', 'P'))
+        self.assertEqual(result.calls, ('1N', 'P', '3N', 'P', 'P', 'P'))
 
     def test_shapely_seven_card_minor_invites_five_minor(self):
         self.assertEqual(self.bid('1NP', 'S84H632D8CKQJ9754'), '2S')
