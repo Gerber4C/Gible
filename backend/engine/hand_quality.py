@@ -35,6 +35,13 @@ DEFAULT_WEIGHTS = {
     "threshold": 0.5,
 }
 
+MINOR_SLAM_KR = 14.0
+
+
+def minor_slam_interest(hand: Hand) -> bool:
+    """Return the shared Daqiush K-R fallback for minor-slam interest."""
+    return assess_quality(hand)['kr_points'] >= MINOR_SLAM_KR
+
 
 def shapely_control_points(hand: Hand, known_long_suits) -> float:
     """Keep raw HCP in each publicly known 4+ partner suit; adjust the rest.

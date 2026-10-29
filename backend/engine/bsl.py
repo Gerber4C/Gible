@@ -7,7 +7,8 @@ from typing import Any
 
 from .evaluator import evaluate_expression
 from .short_suit_valuation import splinter_adjusted_hcp
-from .hand_quality import (minor_game_control_points, shapely_effective_points,
+from .hand_quality import (minor_game_control_points, minor_slam_interest,
+                           shapely_effective_points,
                            shapely_combined_effective_points, shapely_description_proxy)
 from .model import Author as RuntimeAuthor
 from .model import CallMeaning, StateEffect
@@ -1168,6 +1169,7 @@ def _base_namespace(collector: _Collector) -> dict[str, Any]:
         "state_attribute": state_attribute,
         "splinter_adjusted_hcp": splinter_adjusted_hcp,
         "minor_game_control_points": minor_game_control_points,
+        "minor_slam_interest": minor_slam_interest,
         "shapely_effective_points": shapely_effective_points,
         "shapely_combined_effective_points": shapely_combined_effective_points,
         "shapely_description_proxy": shapely_description_proxy,

@@ -358,9 +358,6 @@ def solid_six_club_route(ctx):
             and ctx.hand.honor_count('C', ('A', 'K', 'Q')) == 3)
 
 
-MINOR_SLAM_KR = 14.0
-
-
 def minor_slam_transfer(ctx, suit):
     """A six-plus minor with slam strength and no four-card major transfers.
 
@@ -369,7 +366,7 @@ def minor_slam_transfer(ctx, suit):
     shapes (6-5, 8-4) so they need no separate definition.
     """
     return (ctx.hand is not None and ctx.hand.length(suit) >= 6
-            and ctx.hand_quality['kr_points'] >= MINOR_SLAM_KR
+            and minor_slam_interest(ctx.hand)
             and max(ctx.hand.length(s) for s in 'HS') <= 3)
 
 
