@@ -522,6 +522,7 @@ export function IVScanner({ profileId }) {
         ),
         report && e("div", { className: "iv-summary-line" },
           `${report.summary?.pairs ?? 0} N/S pairs · ${report.summary?.dds_boards ?? 0} DDS boards · `,
+          `${report.summary?.overflow ?? 0} overflow hands (weighted, not stored) · `,
           `${report.summary?.unassessed ?? 0} completed cases without enough comparable boards`),
         report && e("div", { className: "iv-thresholds", role: "group",
           "aria-label": "Alarm thresholds" },

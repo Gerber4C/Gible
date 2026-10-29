@@ -16,7 +16,8 @@ from .coverage_scan import COVERAGE_SHAPES, scan_coverage
 from .loader import load_profile
 from .outcome_metrics import (
     RULE_ID, assess_auction_groups, board_result, case_process_key,
-    rates_for_boards, reclassify_analysis,
+    north_bucket_key, rates_for_boards, reclassify_analysis,
+    south_bucket_key,
 )
 
 
@@ -191,21 +192,23 @@ SOUTH_CAP = 20
 
 
 def project_by_process(report: dict, *, analyses=None,
+                       overflow_cases: list | None = None,
                        north_cap: int = NORTH_CAP,
                        south_cap: int = SOUTH_CAP) -> list[dict]:
     """Group cases by bidding process with North/South primary pools.
 
     One process is one group across all sampling cells.  Each side keeps a
     deduplicated hand pool; only the first ``north_cap`` / ``south_cap`` hands
-    are listed, while every case still contributes to the per-contract DDS
-    rates and to the per-bucket lose/down/wrong weights.  Surplus cases are
-    therefore counted but not stored as new hands.
+    are listed, while every case — including scan-time overflow cases whose
+    hands were deleted — still contributes to the per-contract DDS rates and
+    to the per-bucket lose/down/wrong weights.
     """
 
     collections = [
         report.get('cases') or [],
         report.get('complete_cases') or [],
         report.get('limit_cases') or [],
+        list(overflow_cases or []),
     ]
     by_process = {}
     for items in collections:
@@ -233,43 +236,40 @@ def project_by_process(report: dict, *, analyses=None,
             hands = case.get('hands') or {}
             north_hand = hands.get('n')
             south_hand = hands.get('s')
-            if not north_hand or not south_hand:
-                continue
-            cell = case.get('coverage_cell') or {}
-            north_shape = tuple(cell.get('opener_shape')
-                                or case.get('north_shape') or ())
-            north_mode = cell.get('opener_mode') or 'normal'
-            north_key = (north_shape, north_mode,
-                         _band(case.get('north_hcp', 0), 2),
-                         _band(case.get('north_kr', 0), 2.0))
+            north_key = north_bucket_key(case)
+            south_key = south_bucket_key(case)
             north_group = north_groups.setdefault(north_key, {
-                'north_shape': list(north_shape), 'opener_mode': north_mode,
+                'north_shape': list(north_key[0]),
+                'opener_mode': north_key[1],
                 'hcp_band': north_key[2], 'kr_band': north_key[3],
                 'north_hands': set(), 'matched_south_hands': set(),
-                'cases': 0, 'categories': {},
+                'cases': 0, 'dropped': 0, 'categories': {},
             })
-            north_group['north_hands'].add(north_hand)
-            north_group['matched_south_hands'].add(south_hand)
             north_group['cases'] += 1
             for category in categories:
                 north_group['categories'][category] = (
                     north_group['categories'].get(category, 0) + 1)
+            if north_hand and south_hand:
+                north_group['north_hands'].add(north_hand)
+                north_group['matched_south_hands'].add(south_hand)
+            else:
+                north_group['dropped'] += 1
 
-            south_shape = tuple(case.get('south_shape')
-                                or cell.get('base_shape') or ())
-            south_key = (south_shape, case.get('south_hcp'))
             south_group = south_groups.setdefault(south_key, {
-                'south_shape': list(south_shape),
-                'south_hcp': case.get('south_hcp'),
+                'south_shape': list(south_key[0]),
+                'south_hcp': south_key[1],
                 'south_hands': set(), 'matched_north_hands': set(),
-                'cases': 0, 'categories': {},
+                'cases': 0, 'dropped': 0, 'categories': {},
             })
-            south_group['south_hands'].add(south_hand)
-            south_group['matched_north_hands'].add(north_hand)
             south_group['cases'] += 1
             for category in categories:
                 south_group['categories'][category] = (
                     south_group['categories'].get(category, 0) + 1)
+            if north_hand and south_hand:
+                south_group['south_hands'].add(south_hand)
+                south_group['matched_north_hands'].add(north_hand)
+            else:
+                south_group['dropped'] += 1
 
         def _finish(group, hands_key, matched_key, cap):
             hands = sorted(group.pop(hands_key))
@@ -278,7 +278,7 @@ def project_by_process(report: dict, *, analyses=None,
             data[hands_key] = hands[:cap]
             data[matched_key] = matched
             data['stored'] = min(len(hands), cap)
-            data['dropped'] = max(0, len(hands) - cap)
+            data['dropped'] = group['dropped'] + max(0, len(hands) - cap)
             return data
 
         contracts = []
@@ -461,8 +461,8 @@ def project_report(report: dict, report_id: str, *,
         'coverage': {'north': _north_coverage(report)},
         'counts': counts, 'groups': groups,
         'process_groups': (project_by_process(
-            report, analyses=analyses, north_cap=north_cap,
-            south_cap=south_cap) if include_pairs else []),
+            report, analyses=analyses, overflow_cases=report.get('overflow_cases'),
+            north_cap=north_cap, south_cap=south_cap) if include_pairs else []),
         'method_note': report.get('method_note'),
     })
 

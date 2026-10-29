@@ -153,6 +153,35 @@ def case_process_key(case: Mapping) -> tuple[str, ...]:
     return (str(case.get('auction') or ''),)
 
 
+HCP_BAND_WIDTH = 2
+KR_BAND_WIDTH = 2.0
+
+
+def _band(value, width):
+    try:
+        return math.floor(float(value) / width) * width
+    except (TypeError, ValueError):
+        return 0
+
+
+def north_bucket_key(case: Mapping) -> tuple:
+    """Opener-side storage bucket: shape, mode, and close HCP/K-R bands."""
+    cell = case.get('coverage_cell')
+    cell = cell if isinstance(cell, Mapping) else {}
+    shape = tuple(cell.get('opener_shape') or case.get('north_shape') or ())
+    mode = cell.get('opener_mode') or 'normal'
+    return (shape, mode,
+            _band(case.get('north_hcp', 0), HCP_BAND_WIDTH),
+            _band(case.get('north_kr', 0), KR_BAND_WIDTH))
+
+
+def south_bucket_key(case: Mapping) -> tuple:
+    """Responder-side storage bucket: exact shape and HCP."""
+    shape = case.get('south_shape')
+    shape = tuple(shape) if isinstance(shape, (list, tuple)) else ()
+    return (shape, case.get('south_hcp'))
+
+
 def _case_sort_key(case: Mapping):
     value = case.get('id')
     return (0, value) if isinstance(value, int) else (1, str(value))

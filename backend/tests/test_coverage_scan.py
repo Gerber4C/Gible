@@ -31,6 +31,32 @@ class CoverageSamplingTests(unittest.TestCase):
         self.assertEqual(snapshots[0]['summary']['generation_errors'], 0)
         self.assertEqual(report['summary']['pairs'], 2)
 
+    def test_pool_caps_drop_overflow_hands_but_keep_their_weight(self):
+        from engine.iv_scanner import project_by_process
+        from engine.loader import load_profile
+        profile = load_profile('daqiush_2over1')
+        report = scan_coverage(
+            profile, seed=5, hcp_targets=(0, 1, 2), shapes=COVERAGE_SHAPES[:4],
+            pairs_per_cell=3, ew_samples=1, min_class_boards=1,
+            min_class_pairs=1, north_cap=1, south_cap=1)
+        self.assertGreater(report['summary']['overflow'], 0)
+        self.assertEqual(report['summary']['overflow'],
+                         len(report['overflow_cases']))
+        for case in report['overflow_cases']:
+            self.assertNotIn('hands', case)
+            self.assertTrue(case['dds_tables'])
+            self.assertFalse(case['stored'])
+        projected = project_by_process(
+            report, overflow_cases=report['overflow_cases'],
+            north_cap=1, south_cap=1)
+        boards = sum(item['boards']
+                     for group in projected for item in group['contracts'])
+        self.assertEqual(boards, report['summary']['complete'])
+        self.assertTrue(any(
+            bucket['dropped'] > 0
+            for group in projected
+            for bucket in group['north_groups'] + group['south_groups']))
+
     def test_extreme_responder_hcp_and_shapes_are_constructed_as_full_deals(self):
         rng = random.Random(64)
         for hcp, shape in ((0, (4, 3, 3, 3)), (22, (8, 3, 1, 1)),

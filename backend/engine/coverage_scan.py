@@ -40,8 +40,11 @@ from .outcome_metrics import (
     RULE_ID,
     assess_auction_groups,
     available_level,
+    case_process_key,
     game_success_ratio,
+    north_bucket_key,
     reached_game,
+    south_bucket_key,
 )
 from .selector import choose_bid
 from .simulator import simulate_auction
@@ -265,7 +268,7 @@ def _build_report(*, profile, seed, hcp_targets, shapes, pairs_per_cell,
                   point_first, observed_hcp, observed_longest,
                   observed_top_two, observed_shapes, observed_cells,
                   generated_pairs, north_hcp_by_mode, cell_failures,
-                  assignments):
+                  overflow_cases, pool_overflow, assignments):
     """Assemble the report from the current scan state without mutating it.
 
     Snapshot callers rely on this being side-effect free so a mid-run report
@@ -344,6 +347,12 @@ def _build_report(*, profile, seed, hcp_targets, shapes, pairs_per_cell,
         'cases': cases,
         'complete_cases': analyzed,
         'limit_cases': limit_cases,
+        'overflow_cases': overflow_cases,
+        'pool_overflow': [
+            {'process': list(process), 'side': side,
+             'bucket': list(bucket) if isinstance(bucket, tuple) else bucket,
+             'dropped': dropped}
+            for (process, side, bucket), dropped in pool_overflow.items()],
         'suspicious_cases': suspicious_cases,
         'solver': 'DDS via available adapter',
         'method_note': ('DDS double-dummy completion is a test proxy, not an '
@@ -398,11 +407,14 @@ def scan_coverage(
     cases = []
     complete_cases = []
     limit_cases = []
+    overflow_cases = []
+    pool_counts = {}
+    pool_overflow = {}
     points = Counter()
     point_first = {}
     summary = {'pairs': 0, 'complete': 0, 'blocked': 0, 'limit': 0,
                'dds_boards': 0, 'suspicious': 0, 'unassessed': 0,
-               'generation_errors': 0}
+               'generation_errors': 0, 'overflow': 0}
     observed_hcp = set()
     observed_longest = set()
     observed_top_two = set()
@@ -428,6 +440,7 @@ def scan_coverage(
         'explicit': explicit,
         'summary': summary, 'cases': cases,
         'complete_cases': complete_cases, 'limit_cases': limit_cases,
+        'overflow_cases': overflow_cases, 'pool_overflow': pool_overflow,
         'points': points, 'point_first': point_first,
         'observed_hcp': observed_hcp, 'observed_longest': observed_longest,
         'observed_top_two': observed_top_two,
@@ -549,7 +562,28 @@ def scan_coverage(
                 boards.append(solve_table(deal))
             case['dds_tables'] = boards
             summary['dds_boards'] += len(boards)
-            complete_cases.append(case)
+            # Pool capping: once a process bucket holds its cap of stored
+            # hands, further deals keep their DDS evidence but lose their
+            # stored hands, contributing only lose/down/wrong weight.
+            process = case_process_key(case)
+            north_key = north_bucket_key(case)
+            south_key = south_bucket_key(case)
+            stored_north = pool_counts.get((process, 'n', north_key), 0)
+            stored_south = pool_counts.get((process, 's', south_key), 0)
+            if ((north_cap and stored_north >= north_cap)
+                    or (south_cap and stored_south >= south_cap)):
+                del case['hands']
+                case['stored'] = False
+                overflow_cases.append(case)
+                summary['overflow'] += 1
+                for side, key in (('n', north_key), ('s', south_key)):
+                    drop_key = (process, side, key)
+                    pool_overflow[drop_key] = pool_overflow.get(drop_key, 0) + 1
+            else:
+                case['stored'] = True
+                complete_cases.append(case)
+                pool_counts[(process, 'n', north_key)] = stored_north + 1
+                pool_counts[(process, 's', south_key)] = stored_south + 1
         elif simulation.status == 'limit':
             case['status'] = 'limit'
             limit_cases.append(case)
