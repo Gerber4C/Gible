@@ -310,10 +310,18 @@ def good_minor(ctx, suit):
     return ctx.hand.honor_count(suit, ('A', 'K', 'Q')) >= 2
 
 
+def strong_nine_minor(ctx, suit):
+    """A strong nine with a six-card minor invites 3NT through the transfer."""
+    return (ctx.hand is not None and ctx.hand.length(suit) >= 6
+            and strong_nine(ctx)
+            and max(ctx.hand.length(s) for s in 'HS') <= 3)
+
+
 def minor_invite(ctx, suit):
     return (ctx.hand is not None and ctx.hand.length(suit) >= 6
             and ctx.hand.hcp in (8, 9) and not poor_eight(ctx)
-            and not strong_nine(ctx) and good_minor(ctx, suit)
+            and (strong_nine_minor(ctx, suit)
+                 or (not strong_nine(ctx) and good_minor(ctx, suit)))
             and max(ctx.hand.length(s) for s in 'HS') <= 3)
 
 

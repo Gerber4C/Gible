@@ -103,7 +103,20 @@ def five_minor_five_major_invite(ctx, trump):
             and 7 <= shapely_combined_effective_points(ctx.hand) < 9)
 
 
-def five_card_invite_acceptance_not_calibrated(ctx):
+def five_card_invite_acceptance(ctx, trump, bid):
+    """Opener answers the 2NT five-card invitation after a transfer."""
+    if ctx.hand is None:
+        return False
+    support = ctx.hand.length(trump) >= 3
+    maximum = ctx.hand.hcp >= 16
+    if bid == 'P':
+        return not support and not maximum
+    if bid == '3' + trump:
+        return support and not maximum
+    if bid == '3NT':
+        return not support and maximum
+    if bid == '4' + trump:
+        return support and maximum
     return False
 
 
@@ -883,7 +896,8 @@ class JacobyMajorTransfers(Gadget):
                 follow = self.call('jacoby_' + trump.lower() + '_five_invite_' + action + '_' + bid.lower())
                 follow.when = ordinary_prefix + '2NTP'
                 follow.bid = bid
-                follow.applies = five_card_invite_acceptance_not_calibrated
+                follow.applies = (lambda ctx, t=trump, b=bid:
+                                  five_card_invite_acceptance(ctx, t, b))
                 follow.meaning.action = 'jacoby_five_invitation_' + action
                 follow.meaning.nature = ['natural']
                 follow.meaning.acts = [action] if bid == 'P' else [action, 'final_placement']
