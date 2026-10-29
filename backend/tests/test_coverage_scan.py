@@ -15,6 +15,12 @@ from engine.model import Author, Gadget, PartnershipProfile
 from engine.outcome_metrics import RULE_ID, assess_auction_groups
 
 
+def fake_solve_table(deal):
+    """Full deterministic table so pool/snapshot tests need no DDS install."""
+    return {strain: {seat: 13 for seat in 'nesw'}
+            for strain in ('S', 'H', 'D', 'C', 'NT')}
+
+
 class CoverageSamplingTests(unittest.TestCase):
     def test_scan_emits_incremental_snapshots(self):
         from engine.loader import load_profile
@@ -23,7 +29,8 @@ class CoverageSamplingTests(unittest.TestCase):
         report = scan_coverage(
             profile, seed=7, hcp_targets=(0, 1), shapes=((4, 4, 3, 2),),
             pairs_per_cell=1, ew_samples=1, min_class_boards=1,
-            min_class_pairs=1, snapshot=snapshots.append, snapshot_every=1)
+            min_class_pairs=1, snapshot=snapshots.append, snapshot_every=1,
+            solve_table=fake_solve_table)
         # Two trials -> two partial reports, each a valid growing snapshot.
         self.assertEqual(len(snapshots), 2)
         self.assertLessEqual(len(snapshots[0]['complete_cases']),
@@ -38,7 +45,8 @@ class CoverageSamplingTests(unittest.TestCase):
         report = scan_coverage(
             profile, seed=5, hcp_targets=(0, 1, 2), shapes=COVERAGE_SHAPES[:4],
             pairs_per_cell=3, ew_samples=1, min_class_boards=1,
-            min_class_pairs=1, north_cap=1, south_cap=1)
+            min_class_pairs=1, north_cap=1, south_cap=1,
+            solve_table=fake_solve_table)
         self.assertGreater(report['summary']['overflow'], 0)
         self.assertEqual(report['summary']['overflow'],
                          len(report['overflow_cases']))

@@ -344,11 +344,22 @@ Tests must demonstrate:
 - Using DDS or concealed opponent cards to choose bids.
 - Treating IV Scanner counts as population-frequency estimates.
 
-## Owner bug report — 1NT responder routes (2026-10-27, pending)
+## Owner bug report — 1NT responder routes (2026-10-27, implemented)
+
+Implementation status (2026-10-27): items 1–4 are authored in the daqiush
+profile (Texas/Jacoby KR bands, minor transfer + other-minor + cue routes,
+and the second-minor 3NT continuation table). The exclusion keycard routes
+and the grand-slam acceptance quantiles are described in
+`docs/15_daqiush_slam.md`. The 3C minor-ask route below is still a design
+specification, not yet authored.
 
 1. **7-card major transfers.** Jacoby weak transfers allow 6 and 7 cards;
-   Texas likewise, with a seventh card converting to strength (worth one
-   HCP, thresholds shift by one). IMPLEMENTED (commit 92f7d2e).
+   Texas likewise, with the seventh card measured by K-R: game strength
+   uses Texas, an invitation transfers and raises to three, and a weaker
+   hand transfers and passes. A 5M332 hand with 17–18 HCP names its lowest
+   three-card side minor with 6C/6D (partner may continue with a five-card
+   suit; an eight-card fit stops, otherwise 6NT); 5NT is the grand-slam
+   invitation. IMPLEMENTED.
 2. **Strong 7-card minor.** A very strong 7C hand settles in 5C and misses
    slam. Owner route: bid 2S (transfer to 3C), then 3M cue — the 3M cue
    initiates the trump agreement while cue-bidding (different from

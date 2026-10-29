@@ -220,6 +220,8 @@ def choose_bid(
             except (SamplingExhausted, RuntimeError, ValueError) as exc:
                 trace.warn('Cue-continuation sampling unavailable: ' + str(exc))
                 deals = ()
+            deterministic = ((keycard,) if keycard is not None and hand.hcp >= 16
+                             else (game,))
             if deals:
                 try:
                     simulated = decide_from_hands(
@@ -230,6 +232,10 @@ def choose_bid(
                         promised_kr=partner_promised_kr(trace, partner))
                 except (DDSUnavailableError, RuntimeError, ValueError) as exc:
                     trace.warn('Cue-continuation simulation unavailable: ' + str(exc))
+                    # Deterministic first: without samples or DDS, use the
+                    # authored keycard gate, otherwise the authored game.
+                    # A cue above game still needs the +EV roll-out gate.
+                    candidates = deterministic
                 else:
                     if (simulated.call not in ('4N', game.call)
                             and trump in 'HS'):
@@ -263,6 +269,8 @@ def choose_bid(
                             'reason': simulated.reason,
                             'extra_kr_threshold': simulated.extra_kr_threshold}
                         candidates = (selected,)
+            else:
+                candidates = deterministic
 
     override = signoff_override(trace, auction.actor_to_call)
     if override is not None:
@@ -298,6 +306,11 @@ def choose_bid(
                         promised_kr=partner_promised_kr(trace, signoff_bidder))
                 except (DDSUnavailableError, RuntimeError, ValueError) as exc:
                     trace.warn('Signoff-override simulation unavailable: ' + str(exc))
+                    # Deterministic fallback: a hand far above the range that
+                    # signed off may still ask keycards; otherwise respect the
+                    # signoff. The simulation refines this when DDS is present.
+                    candidates = ((keycard,) if hand.hcp >= 18
+                                  else (pass_candidate,))
                 else:
                     selected = keycard if simulated.call == '4N' else pass_candidate
                     trace.simulation_decision = {
@@ -305,6 +318,8 @@ def choose_bid(
                         'reason': 'signoff override: ' + simulated.reason,
                         'extra_kr_threshold': simulated.extra_kr_threshold}
                     candidates = (selected,)
+            else:
+                candidates = ((keycard,) if hand.hcp >= 18 else (pass_candidate,))
 
     decision = choose_candidate(
         candidates,

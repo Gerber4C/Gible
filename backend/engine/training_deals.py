@@ -147,6 +147,12 @@ def generate_training_deal(
     if vulnerability not in ('none', 'ns', 'ew', 'both'):
         raise ValueError('Invalid vulnerability')
     responder = _responder_constraints(responder)
+    if responder is None and profile.id == 'daqiush_2over1' and response in ('4C', '4D'):
+        # South African Texas needs a six-card major; pre-constrain the
+        # search instead of relying on a lucky random deal.
+        suit = 'H' if response == '4C' else 'S'
+        responder = {'min_hcp': 0, 'max_hcp': 37,
+                     'min_lengths': {suit: (6, 13)}, 'max_lengths': {}}
 
     seed = random.SystemRandom().randrange(2**63) if seed is None else seed
     rng = random.Random(seed)

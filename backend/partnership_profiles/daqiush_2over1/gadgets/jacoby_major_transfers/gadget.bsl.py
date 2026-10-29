@@ -39,6 +39,8 @@ def starts_jacoby(ctx, trump):
         return ctx.hand.length(other) <= 3
     if ctx.hand.length(trump) not in (6, 7) or ctx.hand.length(other) >= 4:
         return False
+    if exclusion_slam_available(ctx, trump):
+        return True  # Keep the space below game for exclusion keycard.
     shaped_points = shapely_second_minor_strength(ctx, trump)
     weak_window = 4 + (1 if ctx.hand.length(trump) == 7 else 0)
     if shaped_points is not None and weak_window <= shaped_points <= 6:
@@ -53,6 +55,8 @@ def starts_jacoby(ctx, trump):
 
 
 def weak_jacoby(ctx, trump):
+    if ctx.hand is not None and ctx.hand.length(trump) >= 7:
+        return named_evaluator(ctx, 'long_major_band_' + trump) == 'weak'
     return (ctx.hand is not None and ctx.hand.length(trump) >= 5
             and not (min(ctx.hand.length('H'), ctx.hand.length('S')) >= 5
                      and shapely_combined_effective_points(ctx.hand) >= 5)
@@ -67,6 +71,8 @@ def weak_jacoby(ctx, trump):
 
 
 def inviting_jacoby(ctx, trump):
+    if ctx.hand is not None and ctx.hand.length(trump) >= 7:
+        return named_evaluator(ctx, 'long_major_band_' + trump) == 'invite'
     shaped_points = shapely_second_minor_strength(ctx, trump)
     return (ctx.hand is not None and ctx.hand.length(trump) >= 5
             and not (min(ctx.hand.length('H'), ctx.hand.length('S')) >= 5)
@@ -118,8 +124,17 @@ def game_five_major(ctx, trump):
                  or (ctx.hand.hcp == 9 and ctx.hand_quality['kr_delta'] >= 1.0)))
 
 
+def exclusion_slam_available(ctx, trump):
+    """A void plus slam strength uses the exclusion keycard jump instead."""
+    return (ctx.hand is not None and ctx.hand_quality['kr_points'] >= 17
+            and any(ctx.hand.length(suit) == 0 for suit in 'SHDC'
+                    if suit != trump))
+
+
 def second_minor_game_force(ctx, trump, minor):
     if ctx.hand is None or ctx.hand.length(trump) < 5 or ctx.hand.length(minor) < 4:
+        return False
+    if exclusion_slam_available(ctx, trump):
         return False
     if ctx.hand.length('H' if trump == 'S' else 'S') > 3:
         return False
@@ -188,6 +203,50 @@ def three_card_flat(ctx, trump):
     return (ctx.hand is not None and ctx.hand.length(trump) == 3
             and sorted(ctx.hand.length(suit) for suit in 'SHDC')
             == [3, 3, 3, 4])
+
+
+SECOND_MINOR_SLAM_KR = 15.0
+
+
+def flat_five_major(ctx, trump):
+    """Exactly five in the major with 3-3-2 around it (5M332)."""
+    return (ctx.hand is not None and ctx.hand.length(trump) == 5
+            and sorted(ctx.hand.length(suit) for suit in 'SHDC') == [2, 3, 3, 5])
+
+
+def lowest_three_card_side_minor(ctx, trump):
+    """The lowest three-card side minor of a 5M332 hand, or None.
+
+    The two three-card side suits always include at least one minor, so a
+    6C/6D call can always name the lowest one.
+    """
+    if not flat_five_major(ctx, trump):
+        return None
+    for suit in 'CD':
+        if ctx.hand.length(suit) == 3:
+            return suit
+    return None
+
+
+def second_minor_slam_interest(ctx, trump):
+    return (ctx.hand is not None and ctx.hand.length(trump) >= 5
+            and ctx.hand_quality['kr_points'] >= SECOND_MINOR_SLAM_KR)
+
+
+def two_suiter_five_plus(ctx, trump, minor):
+    """A five-plus minor with the transferred major: 5-5, 5-6, or 6-5."""
+    return (ctx.hand is not None and ctx.hand.length(trump) >= 5
+            and ctx.hand.length(minor) >= 5)
+
+
+def five_four_second_minor(ctx, trump, minor):
+    return (ctx.hand is not None and ctx.hand.length(trump) == 5
+            and ctx.hand.length(minor) == 4)
+
+
+def six_four_second_minor(ctx, trump, minor):
+    return (ctx.hand is not None and ctx.hand.length(trump) >= 6
+            and ctx.hand.length(minor) == 4)
 
 
 class JacobyMajorTransfers(Gadget):
@@ -459,6 +518,229 @@ class JacobyMajorTransfers(Gadget):
                 shaped_game.meaning.purpose_completed = True
                 shaped_game.description = 'Without four-card support for the second minor, return to the six-card major game.'
 
+                # Continuation table after opener's natural 3NT. Without slam
+                # interest a six-card major or six-card minor is placed; with
+                # interest the five-four, six-four, and five-five (or longer)
+                # shapes have distinct routes. Rare 6-5 and 7-4 shapes are
+                # read through the same minimum-length tests plus K-R strength.
+                table_prefix = minor_prefix + '3NTP'
+                for bid, applies, action, target in (
+                    ('P',
+                     lambda ctx, t=trump, m=minor: (ctx.hand is not None
+                                                    and ctx.hand_quality['kr_points'] < SECOND_MINOR_SLAM_KR
+                                                    and ctx.hand.length(t) < 6
+                                                    and ctx.hand.length(m) < 6),
+                     'notrump_signoff', 'N'),
+                    ('4' + trump,
+                     lambda ctx, t=trump: (ctx.hand is not None
+                                           and ctx.hand_quality['kr_points'] < SECOND_MINOR_SLAM_KR
+                                           and ctx.hand.length(t) >= 6),
+                     'six_major_signoff', trump),
+                    ('5' + minor,
+                     lambda ctx, t=trump, m=minor: (ctx.hand is not None
+                                                    and ctx.hand_quality['kr_points'] < SECOND_MINOR_SLAM_KR
+                                                    and ctx.hand.length(t) < 6
+                                                    and ctx.hand.length(m) >= 6),
+                     'six_minor_signoff', minor),
+                    ('4NT',
+                     lambda ctx, t=trump, m=minor: ((five_four_second_minor(ctx, t, m)
+                                                     or flat_five_major(ctx, t))
+                                                    and second_minor_slam_interest(ctx, t)
+                                                    and ctx.hand.hcp in (15, 16)),
+                     'quantitative_invite', 'N'),
+                    ('6NT',
+                     lambda ctx, t=trump, m=minor: ((five_four_second_minor(ctx, t, m)
+                                                     or flat_five_major(ctx, t))
+                                                    and second_minor_slam_interest(ctx, t)
+                                                    and ctx.hand.hcp == 17),
+                     'small_slam_notrump', 'N'),
+                    ('5NT',
+                     lambda ctx, t=trump, m=minor: ((five_four_second_minor(ctx, t, m)
+                                                     or flat_five_major(ctx, t))
+                                                    and second_minor_slam_interest(ctx, t)
+                                                    and ctx.hand.hcp >= 18),
+                     'grand_slam_invitation', 'N'),
+                    ('4' + minor,
+                     lambda ctx, t=trump, m=minor: (two_suiter_five_plus(ctx, t, m)
+                                                    and second_minor_slam_interest(ctx, t)),
+                     'two_suiter_agreement', minor),
+                ):
+                    call = self.call('jacoby_' + trump.lower() + '_' + minor.lower()
+                                     + '_after_3nt_' + bid.lower())
+                    call.when = table_prefix
+                    call.bid = bid
+                    call.applies = applies
+                    call.meaning.action = action
+                    call.meaning.nature = ['natural']
+                    call.meaning.acts = (['invite'] if bid in ('4NT', '5NT')
+                                         else ['signoff', 'final_placement'])
+                    call.meaning.target_suit = target
+                    if bid in ('4NT', '5NT'):
+                        call.meaning.acts = ['invite']
+                    if action == 'two_suiter_agreement':
+                        call.meaning.agreed_suit = minor
+                        call.effect('agreed_suit').suit = minor
+                        call.meaning.acts = ['slam_try', 'game_forcing']
+                        call.meaning.forcing = 'game_forcing'
+                    if bid in ('5' + minor, '6NT'):
+                        call.meaning.purpose_completed = True
+                    call.description = ('Four-level two-suiter, cue, or slam choice '
+                                        'after opener offers 3NT.')
+
+                # Six-four: cue a new suit while agreeing the major.
+                cues = [suit for suit in 'CDHS' if suit not in (trump, minor)]
+                for index in range(len(cues)):
+                    cue = cues[index]
+                    earlier = tuple(cues[:index])
+                    hint = self.call('jacoby_' + trump.lower() + '_' + minor.lower()
+                                     + '_after_3nt_cue_' + cue.lower())
+                    hint.when = table_prefix
+                    hint.bid = '4' + cue
+                    hint.applies = (lambda ctx, t=trump, m=minor, s=cue, prior=earlier:
+                                    six_four_second_minor(ctx, t, m)
+                                    and second_minor_slam_interest(ctx, t)
+                                    and second_round_control(ctx, s)
+                                    and not any(second_round_control(ctx, x) for x in prior))
+                    hint.meaning.action = 'six_four_major_control_cue'
+                    hint.meaning.nature = ['artificial']
+                    hint.meaning.acts = ['slam_try', 'control_showing']
+                    hint.meaning.control_suit = cue
+                    hint.meaning.agreed_suit = trump
+                    hint.meaning.target_suit = trump
+                    hint.effect('agreed_suit').suit = trump
+                    hint.description = 'A six-four hand cues a new suit and agrees the major.'
+
+                    closeout = self.call('jacoby_' + trump.lower() + '_' + minor.lower()
+                                         + '_after_3nt_cue_' + cue.lower() + '_game')
+                    closeout.when = table_prefix + '4' + cue + 'P'
+                    closeout.bid = '4' + trump
+                    closeout.applies = lambda ctx: ctx.hand is not None
+                    closeout.meaning.action = 'major_game_after_control_cue'
+                    closeout.meaning.nature = ['natural']
+                    closeout.meaning.acts = ['signoff', 'final_placement']
+                    closeout.meaning.target_suit = trump
+                    closeout.meaning.purpose_completed = True
+
+                    ask = self.call('jacoby_' + trump.lower() + '_' + minor.lower()
+                                    + '_after_3nt_cue_' + cue.lower() + '_keycard')
+                    ask.when = table_prefix + '4' + cue + 'P'
+                    ask.bid = '4NT'
+                    ask.applies = (lambda ctx: ctx.hand is not None
+                                   and ctx.hand.hcp >= 16)
+                    ask.meaning.action = 'rkcb_1430'
+                    ask.meaning.nature = ['artificial']
+                    ask.meaning.acts = ['inquiry', 'keycard_asking']
+                    ask.meaning.target_suit = trump
+                    ask.meaning.agreed_suit = trump
+                    ask.effect('agreed_suit').suit = trump
+                    context = ask.effect('keycard_context')
+                    context.trump_suit = trump
+                    context.ask_call = '4N'
+                    context.method = 'rkcb_1430'
+                    context.status = 'pending'
+
+                # Two-suiter: opener's four-level suit (including the major)
+                # is a cue with the minor agreed; 4NT denies a fit.
+                two_suiter_prefix = table_prefix + '4' + minor + 'P'
+                for cue in [suit for suit in 'CDHS'
+                            if suit != minor and '4' + suit > '4' + minor]:
+                    show = self.call('jacoby_' + trump.lower() + '_' + minor.lower()
+                                     + '_two_suiter_cue_' + cue.lower())
+                    show.when = two_suiter_prefix
+                    show.bid = '4' + cue
+                    show.applies = (lambda ctx, s=cue: ctx.hand is not None
+                                    and second_round_control(ctx, s))
+                    show.meaning.action = 'two_suiter_control_cue'
+                    show.meaning.nature = ['artificial']
+                    show.meaning.acts = ['slam_try', 'control_showing']
+                    show.meaning.control_suit = cue
+                    show.meaning.agreed_suit = minor
+                    show.meaning.target_suit = minor
+                    show.effect('agreed_suit').suit = minor
+
+                    # The responder simulates after opener's cue.
+                    cue_done = two_suiter_prefix + '4' + cue + 'P'
+                    for finish_bid, finish_action in (
+                        ('5' + minor, 'minor_game_signoff'),
+                        ('6' + minor, 'minor_slam_placement'),
+                        ('4NT', 'rkcb_1430'),
+                    ):
+                        finish = self.call('jacoby_' + trump.lower() + '_' + minor.lower()
+                                           + '_two_suiter_cue_' + cue.lower()
+                                           + '_' + finish_bid.lower())
+                        finish.when = cue_done
+                        finish.bid = finish_bid
+                        finish.applies = lambda ctx: ctx.hand is not None
+                        finish.meaning.action = finish_action
+                        finish.meaning.nature = ['artificial' if finish_bid == '4NT' else 'natural']
+                        finish.meaning.acts = (['inquiry', 'keycard_asking']
+                                               if finish_bid == '4NT'
+                                               else ['signoff', 'final_placement'])
+                        finish.meaning.target_suit = minor
+                        if finish_bid == '4NT':
+                            finish.meaning.agreed_suit = minor
+                            finish.effect('agreed_suit').suit = minor
+                            context = finish.effect('keycard_context')
+                            context.trump_suit = minor
+                            context.ask_call = '4N'
+                            context.method = 'rkcb_1430'
+                            context.status = 'pending'
+                        else:
+                            finish.meaning.purpose_completed = (finish_bid == '6' + minor)
+                            close = self.call('jacoby_' + trump.lower() + '_' + minor.lower()
+                                              + '_two_suiter_cue_' + cue.lower()
+                                              + '_' + finish_bid.lower() + '_close')
+                            close.when = cue_done + finish_bid + 'P'
+                            close.bid = 'P'
+                            close.applies = lambda ctx: ctx.hand is not None
+                            close.meaning.action = 'two_suiter_game_close'
+                            close.meaning.nature = ['natural']
+                            close.meaning.acts = ['signoff', 'final_placement']
+                            close.meaning.target_suit = minor
+                            close.meaning.purpose_completed = True
+
+                no_fit = self.call('jacoby_' + trump.lower() + '_' + minor.lower()
+                                   + '_two_suiter_no_fit')
+                no_fit.when = two_suiter_prefix
+                no_fit.bid = '4NT'
+                no_fit.applies = (lambda ctx, m=minor: ctx.hand is not None
+                                  and ctx.hand.length(m) < 4)
+                no_fit.meaning.action = 'two_suiter_no_fit'
+                no_fit.meaning.nature = ['artificial']
+                no_fit.meaning.acts = ['descriptive']
+                no_fit.meaning.target_suit = minor
+
+                fit_game = self.call('jacoby_' + trump.lower() + '_' + minor.lower()
+                                     + '_two_suiter_fit_game')
+                fit_game.when = two_suiter_prefix
+                fit_game.bid = '5' + minor
+                fit_game.applies = (lambda ctx, m=minor, t=trump: ctx.hand is not None
+                                    and ctx.hand.length(m) >= 4
+                                    and not any(second_round_control(ctx, suit)
+                                                for suit in 'CDHS'
+                                                if suit not in (t, m)))
+                fit_game.meaning.action = 'two_suiter_minor_game'
+                fit_game.meaning.nature = ['natural']
+                fit_game.meaning.acts = ['signoff', 'final_placement']
+                fit_game.meaning.target_suit = minor
+                fit_game.meaning.agreed_suit = minor
+                fit_game.meaning.purpose_completed = True
+
+                # The responder now simulates after opener's no-fit 4NT: all
+                # responder calls are signoffs.
+                for bid, action in (('5' + minor, 'minor_game_signoff'),
+                                    ('6' + minor, 'minor_slam_placement')):
+                    finish = self.call('jacoby_' + trump.lower() + '_' + minor.lower()
+                                       + '_no_fit_' + bid.lower())
+                    finish.when = two_suiter_prefix + '4NTP'
+                    finish.bid = bid
+                    finish.applies = lambda ctx: ctx.hand is not None
+                    finish.meaning.action = action
+                    finish.meaning.nature = ['natural']
+                    finish.meaning.acts = ['signoff', 'final_placement']
+                    finish.meaning.target_suit = minor
+                    finish.meaning.purpose_completed = (bid == '6' + minor)
+
             for bid, applies, action in (
                 ('P', lambda ctx, t=trump: weak_jacoby(ctx, t), 'weak_stop'),
                 ('2NT', lambda ctx, t=trump: ctx.hand.length(t) == 5
@@ -466,7 +748,7 @@ class JacobyMajorTransfers(Gadget):
                  and not six_minor_five_major_invite(ctx, t)
                  and not five_minor_five_major_invite(ctx, t), 'five_card_invite'),
                 ('3' + trump, lambda ctx, t=trump: inviting_jacoby(ctx, t)
-                 and (ctx.hand.length(t) == 6 or six_minor_five_major_invite(ctx, t)
+                 and (ctx.hand.length(t) >= 6 or six_minor_five_major_invite(ctx, t)
                       or five_minor_five_major_invite(ctx, t)), 'six_card_invite'),
                 ('3NT', lambda ctx, t=trump: game_five_major(ctx, t), 'five_card_game'),
             ):
@@ -483,6 +765,140 @@ class JacobyMajorTransfers(Gadget):
                         'minimum': 6,
                         'min_lengths': {trump: 5}}
                 rebid.description = 'Weak stop, natural invitation, or game after ordinary Jacoby acceptance.'
+
+            # Ordinary-acceptance continuations. A six-plus major with slam
+            # interest asks keycards; an exactly five-card 5332 hand instead
+            # uses the quantitative, minor-slam-choice, or grand-slam
+            # invitation route. Rare shapes ride the five-card route through
+            # K-R strength instead of each authoring a separate call.
+            keycard = self.call('jacoby_' + trump.lower() + '_ordinary_keycard')
+            keycard.when = ordinary_prefix
+            keycard.bid = '4NT'
+            keycard.applies = (lambda ctx, t=trump: ctx.hand is not None
+                               and ctx.hand.length(t) >= 6
+                               and not exclusion_slam_available(ctx, t)
+                               and named_evaluator(ctx, 'six_card_slam_interest_' + t))
+            keycard.meaning.action = 'rkcb_1430'
+            keycard.meaning.nature = ['artificial']
+            keycard.meaning.acts = ['inquiry', 'keycard_asking']
+            keycard.meaning.target_suit = trump
+            keycard.meaning.agreed_suit = trump
+            keycard.effect('agreed_suit').suit = trump
+            context = keycard.effect('keycard_context')
+            context.trump_suit = trump
+            context.ask_call = '4N'
+            context.method = 'rkcb_1430'
+            context.status = 'pending'
+            keycard.description = ('Six-card slam-interest major asks keycards '
+                                   'after the ordinary acceptance.')
+            # The hand selects this spec (six-plus cards) or the quantitative
+            # spec (exactly five); replay also has to pick one when it does
+            # not know the responder's hand, so the keycard meaning ranks
+            # first.
+            keycard.priority = 1
+
+            quantitative = self.call('jacoby_' + trump.lower() + '_ordinary_quantitative')
+            quantitative.when = ordinary_prefix
+            quantitative.bid = '4NT'
+            quantitative.applies = (lambda ctx, t=trump: flat_five_major(ctx, t)
+                                    and ctx.hand.hcp in (15, 16))
+            quantitative.meaning.action = 'quantitative_invite'
+            quantitative.meaning.nature = ['natural']
+            quantitative.meaning.acts = ['invite']
+            quantitative.meaning.target_suit = 'N'
+            quantitative.description = '5M332 with 15-16 HCP invites 6NT quantitatively.'
+
+            for bid, applies, action, target in (
+                ('5NT', lambda ctx, t=trump: flat_five_major(ctx, t)
+                 and ctx.hand.hcp >= 19, 'grand_slam_invitation', 'N'),
+                ('6C', lambda ctx, t=trump: lowest_three_card_side_minor(ctx, t) == 'C'
+                 and ctx.hand.hcp in (17, 18), 'minor_slam_choice', 'C'),
+                ('6D', lambda ctx, t=trump: lowest_three_card_side_minor(ctx, t) == 'D'
+                 and ctx.hand.hcp in (17, 18), 'minor_slam_choice', 'D'),
+            ):
+                choice = self.call('jacoby_' + trump.lower() + '_ordinary_' + bid.lower())
+                choice.when = ordinary_prefix
+                choice.bid = bid
+                choice.applies = applies
+                choice.meaning.action = action
+                choice.meaning.nature = ['natural']
+                choice.meaning.acts = (['invite'] if bid == '5NT'
+                                       else ['slam_try', 'final_placement'])
+                choice.meaning.target_suit = target
+                if bid != '5NT':
+                    choice.meaning.purpose_completed = True
+                choice.description = (
+                    '5M332 grand-slam invitation.' if bid == '5NT'
+                    else '5M332 names the lowest three-card side minor and chooses the small slam.')
+
+            nt_prefix = ordinary_prefix + '5NTP'
+            for bid, count, action in (
+                ('6NT', None, 'reject'),
+                ('6C', None, 'waiting'),
+                ('6D', (1, 4), 'ace_14'),
+                ('6H', (0, 3), 'ace_03'),
+                ('6S', (2,), 'ace_2'),
+            ):
+                answer = self.call('jacoby_' + trump.lower() + '_grand_answer_' + bid.lower())
+                answer.when = nt_prefix
+                answer.bid = bid
+                if bid == '6NT':
+                    answer.applies = lambda ctx: ctx.hand is not None and ctx.hand.hcp < 16
+                elif bid == '6C':
+                    answer.applies = (lambda ctx: ctx.hand is not None
+                                      and ctx.hand.hcp >= 16
+                                      and max(ctx.hand.length(suit) for suit in 'SHDC') >= 5)
+                else:
+                    answer.applies = (lambda ctx, c=count: ctx.hand is not None
+                                      and ctx.hand.hcp >= 16
+                                      and ctx.hand.ace_count() in c)
+                answer.meaning.action = 'grand_slam_answer_' + action
+                answer.meaning.nature = ['natural']
+                answer.meaning.acts = ['descriptive']
+                answer.meaning.target_suit = 'N' if bid == '6NT' else bid[-1]
+                if count is not None:
+                    answer.meaning.ace_counts = list(count)
+                answer.description = 'Answer the 5NT grand-slam invitation by 1NT limit and aces.'
+
+            for minor in 'CD':
+                prefix = ordinary_prefix + '6' + minor + 'P'
+                for suit in [s for s in 'CDHS' if '6' + s > '6' + minor]:
+                    reply = self.call('jacoby_' + trump.lower() + '_' + minor.lower()
+                                      + '_answer_' + suit.lower())
+                    reply.when = prefix
+                    reply.bid = '6' + suit
+                    reply.applies = (lambda ctx, s=suit: ctx.hand is not None
+                                     and ctx.hand.length(s) >= 5)
+                    reply.meaning.action = 'minor_slam_five_card_suit'
+                    reply.meaning.nature = ['natural']
+                    reply.meaning.acts = ['descriptive']
+                    reply.meaning.target_suit = suit
+                    reply.description = 'Opener shows a five-card suit at the six level.'
+
+                    stop = self.call('jacoby_' + trump.lower() + '_' + minor.lower()
+                                     + '_fit_' + suit.lower())
+                    stop.when = prefix + '6' + suit + 'P'
+                    stop.bid = 'P'
+                    stop.applies = (lambda ctx, s=suit: ctx.hand is not None
+                                    and ctx.hand.length(s) >= 3)
+                    stop.meaning.action = 'minor_slam_fit_stop'
+                    stop.meaning.nature = ['natural']
+                    stop.meaning.acts = ['signoff', 'final_placement']
+                    stop.meaning.target_suit = suit
+                    stop.meaning.purpose_completed = True
+
+                    if '6NT' > '6' + suit:
+                        no_fit = self.call('jacoby_' + trump.lower() + '_' + minor.lower()
+                                           + '_no_fit_' + suit.lower())
+                        no_fit.when = prefix + '6' + suit + 'P'
+                        no_fit.bid = '6NT'
+                        no_fit.applies = (lambda ctx, s=suit: ctx.hand is not None
+                                          and ctx.hand.length(s) < 3)
+                        no_fit.meaning.action = 'minor_slam_no_fit_notrump'
+                        no_fit.meaning.nature = ['natural']
+                        no_fit.meaning.acts = ['signoff', 'final_placement']
+                        no_fit.meaning.target_suit = 'N'
+                        no_fit.meaning.purpose_completed = True
 
             for bid, has_fit, action in (
                 ('P', False, 'reject'), ('3' + trump, True, 'reject'),

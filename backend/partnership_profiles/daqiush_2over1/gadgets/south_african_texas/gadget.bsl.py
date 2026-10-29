@@ -20,9 +20,28 @@ def has_texas_game(ctx, suit):
             or shaped_points is not None and 4 <= shaped_points <= 6)
 
 
-def _length_strength_bonus(ctx, suit):
-    """Owner rule: a seventh card converts to strength (worth one HCP)."""
-    return max(0, ctx.hand.length(suit) - 6)
+# A seventh (or later) trump is converted through K-R rather than by adding
+# a raw HCP: K-R already pays for the extra length, so the same honour
+# strength reaches a higher total and the game/slam bands below are K-R
+# floors. Seven-card hands with game strength use Texas; invitational ones
+# transfer and raise to three; weaker ones transfer and pass.
+SEVEN_GAME_KR = 10.0
+SEVEN_INVITE_KR = 8.0
+SEVEN_SLAM_KR = 16.0
+SEVEN_SLAM_SINGLETON_KR = 14.0
+SEVEN_KEYCARD_KR = 17.0
+
+
+def long_major_band(ctx, suit):
+    """K-R strength band for a seven-plus card major."""
+    if ctx.hand is None or ctx.hand.length(suit) < 7:
+        return None
+    kr = ctx.hand_quality['kr_points']
+    if kr >= SEVEN_GAME_KR:
+        return 'game'
+    if kr >= SEVEN_INVITE_KR:
+        return 'invite'
+    return 'weak'
 
 
 def _side_class(ctx, suit):
@@ -47,7 +66,7 @@ def _side_class(ctx, suit):
 
 def six_card_slam_interest(ctx, suit):
     length = None if ctx.hand is None else ctx.hand.length(suit)
-    if length not in (6, 7):
+    if length is None or length < 6:
         return False
     side_class, _ = _side_class(ctx, suit)
     if side_class == 'no_shortage':
@@ -56,46 +75,45 @@ def six_card_slam_interest(ctx, suit):
         threshold = SLAM_INTEREST['small_singleton']
     else:
         return False
-    # Raw HCP sets the minimum for slam exploration, with a seventh card
-    # converting to strength. K-R minus raw HCP then compares honor quality
-    # against the usual bonus of this long shape.
-    hcp = ctx.hand.hcp + _length_strength_bonus(ctx, suit)
-    return hcp >= threshold['hcp'] and ctx.hand_quality['kr_delta'] >= threshold['kr_delta']
+    if length >= 7:
+        floor = (SEVEN_SLAM_SINGLETON_KR if side_class == 'small_singleton'
+                 else SEVEN_SLAM_KR)
+        return ctx.hand_quality['kr_points'] >= floor
+    # A six-card hand compares raw HCP plus honour quality (K-R delta).
+    return (ctx.hand.hcp >= threshold['hcp']
+            and ctx.hand_quality['kr_delta'] >= threshold['kr_delta'])
 
 
 def game_only_texas(ctx, suit):
     length = ctx.hand.length(suit)
-    if not has_texas_game(ctx, suit) or length not in (6, 7):
+    if not has_texas_game(ctx, suit) or length < 6:
         return False
     if sorted((ctx.hand.length('H'), ctx.hand.length('S'))) == [4, 6]:
         return True
-    if length == 7:
-        # Seven trumps always carry the game; slam-interest hands instead
-        # transfer (keeping slam space below game) when their continuation
-        # exists.
-        supported = not six_card_slam_interest(ctx, suit)
+    if length >= 7:
+        supported = long_major_band(ctx, suit) == 'game'
     else:
+        if max(ctx.hand.length(s) for s in 'CD') == 4:
+            return False  # A second four-card minor needs its Jacoby continuations.
         side_class, _ = _side_class(ctx, suit)
         supported = side_class in ('no_shortage', 'small_singleton')
     return (supported and not six_card_slam_interest(ctx, suit)
             and not slam_keycard_texas(ctx, suit))
 
 
-def seven_card_texas(ctx, suit):
-    return (ctx.hand is not None and ctx.hand.length(suit) >= 7
-            and has_texas_game(ctx, suit) and ctx.hand.hcp <= 10)
-
-
 def slam_keycard_texas(ctx, suit):
     """The 6322 six-card hand already committed to slam if keycards permit.
 
-    A seventh card converts to strength: the HCP floor drops by one.
+    A seventh card is measured in K-R rather than by discounting HCP.
     """
     length = ctx.hand.length(suit)
-    return (has_texas_game(ctx, suit) and length in (6, 7)
-            and ctx.hand.hcp + (7 - length) >= 17
-            and min(ctx.hand.length(other) for other in 'SHDC'
-                    if other != suit) >= 2)
+    if not has_texas_game(ctx, suit) or length not in (6, 7):
+        return False
+    if min(ctx.hand.length(other) for other in 'SHDC' if other != suit) < 2:
+        return False
+    if length >= 7:
+        return ctx.hand_quality['kr_points'] >= SEVEN_KEYCARD_KR
+    return ctx.hand.hcp >= 17
 
 
 def shapely_game_texas(ctx, suit):
@@ -105,14 +123,30 @@ def shapely_game_texas(ctx, suit):
             and not six_card_slam_interest(ctx, suit))
 
 
+def exclusion_void_hand(ctx, suit):
+    """A void plus slam strength keeps the transfer space for exclusion keycard.
+
+    The first response already chooses between this route and Texas-4NT, so a
+    hand that will ask exclusion keycards must not consume the space with
+    Texas. The expected-value comparison is approximated by preferring the
+    more accurate exclusion count whenever a side void exists; without a void
+    ordinary 4NT remains the only keycard route.
+    """
+    return (ctx.hand is not None and ctx.hand_quality['kr_points'] >= 17
+            and any(ctx.hand.length(other) == 0 for other in 'SHDC'
+                    if other != suit))
+
+
 def texas_hearts(ctx):
-    return (game_only_texas(ctx, 'H') or shapely_game_texas(ctx, 'H')
-            or slam_keycard_texas(ctx, 'H') or seven_card_texas(ctx, 'H'))
+    return (not exclusion_void_hand(ctx, 'H')
+            and (game_only_texas(ctx, 'H') or shapely_game_texas(ctx, 'H')
+                 or slam_keycard_texas(ctx, 'H')))
 
 
 def texas_spades(ctx):
-    return (game_only_texas(ctx, 'S') or shapely_game_texas(ctx, 'S')
-            or slam_keycard_texas(ctx, 'S') or seven_card_texas(ctx, 'S'))
+    return (not exclusion_void_hand(ctx, 'S')
+            and (game_only_texas(ctx, 'S') or shapely_game_texas(ctx, 'S')
+                 or slam_keycard_texas(ctx, 'S')))
 
 
 def public_hearts(ctx):
@@ -158,6 +192,8 @@ class SouthAfricanTexas(Gadget):
         self.evaluator('texas_S_public', public_spades)
         self.evaluator('six_card_slam_interest_H', lambda ctx: six_card_slam_interest(ctx, 'H'))
         self.evaluator('six_card_slam_interest_S', lambda ctx: six_card_slam_interest(ctx, 'S'))
+        self.evaluator('long_major_band_H', lambda ctx: long_major_band(ctx, 'H'))
+        self.evaluator('long_major_band_S', lambda ctx: long_major_band(ctx, 'S'))
         self.evaluator('texas_slam_keycard_H', lambda ctx: slam_keycard_texas(ctx, 'H'))
         self.evaluator('texas_slam_keycard_S', lambda ctx: slam_keycard_texas(ctx, 'S'))
         for suit, ask, weak, strong, eligible in (

@@ -13,7 +13,7 @@ from types import SimpleNamespace
 from .auction import Auction
 from .cards import Hand
 from .contract_evaluation import ContractTarget, compare_contract_targets
-from .dds_adapter import calculate_available_table
+from .dds_adapter import DDSUnavailableError, calculate_available_table
 from .deal_sampler import SamplingExhausted, SamplingResult, _hand_from_cards, sample_deals
 from .constrained_deals import DECK, HandConstraints, _HandPlan
 from .hand_quality import assess_quality, shapely_combined_effective_points
@@ -155,9 +155,18 @@ def decide_two_major_spade_slam(profile, auction: Auction, hand: Hand) -> dict:
                                                  hand_quality=assess_quality(deal[partner])))['eligible'])
     if len(deals) < 8:
         raise ValueError(f'Only {len(deals)} sampled hands matched the public 1NT promise')
-    estimates = compare_contract_targets(
-        deals, (ContractTarget(4, 'S', partner), ContractTarget(6, 'S', partner)),
-        solve_table=calculate_available_table)
+    try:
+        estimates = compare_contract_targets(
+            deals, (ContractTarget(4, 'S', partner), ContractTarget(6, 'S', partner)),
+            solve_table=calculate_available_table)
+    except DDSUnavailableError:
+        # Deterministic first: without DDS, use the combined-HCP keycard band
+        # rather than blocking the two-major route.
+        call = '4N' if hand.hcp + 15 >= 33 else '4S'
+        return {'call': call, 'sample_count': len(deals),
+                'seed': sampled.seed, 'attempts': sampled.attempts,
+                'completion_rates': {},
+                'comparison': 'deterministic combined-HCP fallback (no DDS)'}
     rates = {item.contract: item.completion_rate for item in estimates}
     vulnerable = _vulnerable(auction)
     def expected(contract):

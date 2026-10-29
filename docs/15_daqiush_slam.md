@@ -296,3 +296,32 @@ Implementation core: `backend/engine/cue_slam_policy.py`. Selector wiring and
 5NT可能的含义：选将牌、或问顶张（1/2/3或0/1/2）、或（同伴扣控制或5M后）第一轮控制齐全
 问A后邀请大满贯，越过的（更低）花色不要K，未达的（更高）花色未知是否要K所以有K只能反邀。
 ```
+
+## Implementation notes — exclusion keycard and grand-slam acceptance
+
+Exclusion keycard (`exclusion_keycard` gadget; owner routes):
+
+- `1NT-2H-2S`: 5C / 5D / 5H show a void in C / D / H, spades trump.
+- `1NT-2D-2H`: 4S / 5C / 5D show a void in S / C / D, hearts trump.
+- Five-step answers: 0/3; 1/4 without trump Q; 1/4 with trump Q; 2
+  without Q; 2 with Q. The void suit's ace is not a keycard.
+- After 0/3, +1 asks the trump Q and +2 (while below 5NT) asks kings;
+  after a 1/4 answer below 5NT, +1 asks kings. The void ace counts as that
+  suit's king; a king answer may not pass six of the trump.
+- An answer of 5NT or higher leaves every continuation by the asker as a
+  grand-slam invitation.
+
+Grand-slam acceptance (`engine/grand_slam_policy.py`):
+
+- A non-quantitative grand invitation (king ask, control invite) is made
+  on the assumption that the acceptor's hand is in the best 15% of its
+  promised range. Accept seven only inside that quantile.
+- Quantitative 5NT is different: it invites the top 50% of the range
+  (analogous to quantitative 4NT for a small slam). This applies to
+  `1NT-5NT`, `1NT-2C-2D-5NT`, `1NT-3C-3D-5NT`, and `1NT-2H-2S-5NT`.
+- With sampled deals and a double-dummy solver, the seven-level completion
+  rate must also reach 50%. When the solver is unavailable, the
+  deterministic quantile decides (deterministic before DDS).
+- The exclusion gadget's six-of-trump grand invite accepts with a top-15%
+  1NT hand (17 HCP or K-R 18) holding the trump queen.
+

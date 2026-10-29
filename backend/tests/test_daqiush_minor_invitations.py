@@ -84,8 +84,11 @@ class DaqiushMinorInvitationTests(unittest.TestCase):
     def test_six_clubs_with_ca_kq_and_a_spade_uses_direct_three_clubs(self):
         self.assertEqual(self.bid('1NP', 'SAK2HQ3D42CAKQ987'), '3C')
 
-    def test_seven_clubs_with_eight_effective_points_places_five_clubs(self):
-        self.assertEqual(self.bid('1NP', 'SAHQ3D42JCAKQ9876'), '5C')
+    def test_seven_clubs_with_high_kr_transfers_for_slam(self):
+        # Seven-plus card strength is measured by K-R (owner rule), so this
+        # 16-HCP seven-card suit is slam interest and transfers rather than
+        # placing five clubs.
+        self.assertEqual(self.bid('1NP', 'SAHQ3D42JCAKQ9876'), '2S')
 
     def test_good_minor_private_plan_survives_normalized_notrump_calls(self):
         result = simulate_auction(self.profile, {

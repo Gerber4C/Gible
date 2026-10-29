@@ -272,10 +272,12 @@ def minor_stayman_probe(ctx):
 
 
 def minor_slam_probe(ctx):
+    club_length = 0 if ctx.hand is None else ctx.hand.length('C')
+    diamond_length = 0 if ctx.hand is None else ctx.hand.length('D')
     return (ctx.hand is not None and ctx.hand.hcp >= 12
             and ctx.hand_quality['kr_points'] >= 14
             and max(ctx.hand.length(s) for s in 'HS') <= 3
-            and max(ctx.hand.length(s) for s in 'CD') >= 5
+            and max(club_length, diamond_length) == 5
             and not solid_six_club_route(ctx)
             and not (ctx.hand.length('C') == 5 and ctx.hand.length('D') == 5)
             and not good_minor_5422(ctx)
@@ -328,6 +330,8 @@ def shapely_invite(ctx, suit):
 def direct_minor_game(ctx, suit):
     if ctx.hand is None or ctx.hand.length(suit) < 7:
         return False
+    if minor_slam_transfer(ctx, suit):
+        return False  # Slam interest transfers first to keep the space below game.
     if (shapely_effective_points(ctx.hand, suit) >= 8
             and max(ctx.hand.length(s) for s in 'HS') <= 3):
         return True
@@ -354,6 +358,35 @@ def solid_six_club_route(ctx):
             and ctx.hand.honor_count('C', ('A', 'K', 'Q')) == 3)
 
 
+MINOR_SLAM_KR = 14.0
+
+
+def minor_slam_transfer(ctx, suit):
+    """A six-plus minor with slam strength and no four-card major transfers.
+
+    Only the minimum length and the major-length ceiling matter: the second
+    minor can be anywhere from one to five cards, and K-R converts the rare
+    shapes (6-5, 8-4) so they need no separate definition.
+    """
+    return (ctx.hand is not None and ctx.hand.length(suit) >= 6
+            and ctx.hand_quality['kr_points'] >= MINOR_SLAM_KR
+            and max(ctx.hand.length(s) for s in 'HS') <= 3)
+
+
+def minor_control(ctx, suit):
+    return shortage_has_control(ctx, suit)
+
+
+def slam_transfer_shape(ctx, suit):
+    """Six-four (or a single long minor) uses the cue route; 6-5 keeps 4NT."""
+    other = 'D' if suit == 'C' else 'C'
+    return ctx.hand is not None and ctx.hand.length(other) <= 4
+
+
+def minor_stopper(ctx, suit):
+    return ctx.hand is not None and ctx.hand.honor_count(suit, ('A', 'K', 'Q')) >= 1
+
+
 def weak_minor(ctx, suit):
     return (ctx.hand is not None and ctx.hand.length(suit) >= 6
             and (ctx.hand.hcp <= 7 or poor_eight(ctx))
@@ -368,7 +401,8 @@ def minor_transfer(ctx, suit):
                           and ctx.hand.honor_count('C', ('A', 'K', 'Q')) == 3)
     return (not solid_club_inquiry
             and not direct_minor_game(ctx, suit) and not solid_minor_three_notrump(ctx, suit)
-            and (weak_minor(ctx, suit) or minor_invite(ctx, suit) or shapely_invite(ctx, suit)))
+            and (weak_minor(ctx, suit) or minor_invite(ctx, suit) or shapely_invite(ctx, suit)
+                 or minor_slam_transfer(ctx, suit)))
 
 
 def superaccept(ctx, suit):
@@ -430,7 +464,9 @@ class OneNotrumpInvitations(Gadget):
             answer = self.call('strong_notrump_five_nt_' + contract.lower())
             answer.when = '1NP5NTP'
             answer.bid = contract
-            answer.applies = lambda ctx, high=accepts: ctx.hand is not None and (ctx.hand.hcp >= 17) == high
+            # Quantitative 5NT invites the top half of the 15-17 range, so
+            # 16 HCP accepts (the owner's 50% rule); 15 declines.
+            answer.applies = lambda ctx, high=accepts: ctx.hand is not None and (ctx.hand.hcp >= 16) == high
             answer.meaning.action = 'grand_slam_invitation_' + ('accept' if accepts else 'reject')
             answer.meaning.nature = ['natural']
             answer.meaning.acts = [('accept' if accepts else 'reject'), 'final_placement']
@@ -1107,6 +1143,7 @@ class OneNotrumpInvitations(Gadget):
             ask.bid = transfer
             ask.applies = lambda ctx, s=suit: minor_transfer(ctx, s)
             ask.private_purpose = lambda ctx, s=suit, low=ordinary, high=special: (
+                None if minor_slam_transfer(ctx, s) else
                 {'kind': 'response_plan', 'trump': s,
                  'responses': {low: 'P', high: '3NT' if minor_invite(ctx, s) else '3' + s}}
                 if not shapely_invite(ctx, s) else None)
@@ -1154,6 +1191,255 @@ class OneNotrumpInvitations(Gadget):
                         follow.meaning.target_suit = 'N' if bid == '3NT' else suit
                         follow.meaning.acts = ['signoff', 'final_placement']
                         follow.meaning.purpose_completed = True
+
+                # Slam-interest continuations. After the ordinary completion
+                # the other minor is natural; after a superaccept the same bid
+                # is a control cue. At the three level a cue shows a control
+                # and doubles as a stopper ask; a four-level cue below the
+                # minor game shows extra strength.
+                slam_cues = []
+                other = 'D' if suit == 'C' else 'C'
+                if answer == ordinary:
+                    om_bid = '3D' if suit == 'C' else '4C'
+                    om = self.call('transfer_' + suit.lower() + '_other_minor')
+                    om.when = prefix
+                    om.bid = om_bid
+                    om.applies = (lambda ctx, s=suit, o=other: (minor_slam_transfer(ctx, s)
+                                                               and ctx.hand.length(o) == 4))
+                    om.meaning.action = 'minor_slam_other_minor'
+                    om.meaning.nature = ['natural']
+                    om.meaning.acts = ['game_forcing']
+                    om.meaning.forcing = 'game_forcing'
+                    om.meaning.target_suit = other
+                    om.description = 'Six-four (or longer) both-minor slam interest shows the other minor.'
+
+                    om_prefix = prefix + om_bid + 'P'
+                    for follow_bid, follow_target, follow_action in (
+                        ('3NT', 'N', 'both_minor_notrump'),
+                        ('4' + suit, suit, 'first_minor_agreement'),
+                        ('5' + suit, suit, 'first_minor_game'),
+                        ('4' + other, other, 'second_minor_agreement'),
+                        ('5' + other, other, 'second_minor_game'),
+                    ):
+                        if follow_bid <= om_bid:
+                            continue
+                        follow = self.call('transfer_' + suit.lower() + '_both_minor_'
+                                           + follow_bid.lower())
+                        follow.when = om_prefix
+                        follow.bid = follow_bid
+                        follow.applies = lambda ctx: ctx.hand is not None
+                        follow.meaning.action = follow_action
+                        follow.meaning.nature = ['natural']
+                        follow.meaning.acts = (['descriptive'] if follow_bid == '3NT'
+                                               else ['signoff', 'final_placement'])
+                        follow.meaning.target_suit = follow_target
+                        if follow_target != 'N':
+                            follow.meaning.agreed_suit = follow_target
+                            follow.effect('agreed_suit').suit = follow_target
+                        if follow_bid in ('5' + suit, '5' + other):
+                            follow.meaning.purpose_completed = True
+
+                        if follow_bid == '3NT':
+                            stop = self.call('transfer_' + suit.lower()
+                                             + '_both_minor_notrump_stop')
+                            stop.when = om_prefix + '3NTP'
+                            stop.bid = 'P'
+                            stop.applies = lambda ctx: ctx.hand is not None
+                            stop.meaning.action = 'both_minor_notrump_stop'
+                            stop.meaning.nature = ['natural']
+                            stop.meaning.acts = ['signoff', 'final_placement']
+                            stop.meaning.target_suit = 'N'
+                            stop.meaning.purpose_completed = True
+
+                            # Slaw interest after opener's 3NT: the responder
+                            # may still place either minor or keep driving.
+                            for level in (5, 6):
+                                for target in (suit, other):
+                                    push = self.call('transfer_' + suit.lower()
+                                                     + '_both_minor_push_'
+                                                     + str(level) + target.lower())
+                                    push.when = om_prefix + '3NTP'
+                                    push.bid = str(level) + target
+                                    push.applies = (lambda ctx, s=suit: (
+                                        ctx.hand is not None
+                                        and ctx.hand.length(s) >= 6
+                                        and ctx.hand_quality['kr_points'] >= 15))
+                                    push.meaning.action = 'both_minor_slam_push'
+                                    push.meaning.nature = ['natural']
+                                    push.meaning.acts = ['signoff', 'final_placement']
+                                    push.meaning.target_suit = target
+                                    push.meaning.agreed_suit = target
+                                    if level == 6:
+                                        push.meaning.purpose_completed = True
+
+                                    close = self.call('transfer_' + suit.lower()
+                                                      + '_both_minor_push_close_'
+                                                      + str(level) + target.lower())
+                                    close.when = om_prefix + '3NTP' + str(level) + target + 'P'
+                                    close.bid = 'P'
+                                    close.applies = lambda ctx: ctx.hand is not None
+                                    close.meaning.action = 'both_minor_push_close'
+                                    close.meaning.nature = ['natural']
+                                    close.meaning.acts = ['signoff', 'final_placement']
+                                    close.meaning.target_suit = target
+                                    close.meaning.purpose_completed = True
+                        elif follow_bid in ('4' + suit, '4' + other):
+                            for level in (5, 6):
+                                finish = self.call('transfer_' + suit.lower()
+                                                   + '_both_minor_' + follow_bid.lower()
+                                                   + '_' + str(level) + follow_target.lower())
+                                finish.when = om_prefix + follow_bid + 'P'
+                                finish.bid = str(level) + follow_target
+                                finish.applies = lambda ctx: ctx.hand is not None
+                                finish.meaning.action = 'both_minor_placement'
+                                finish.meaning.nature = ['natural']
+                                finish.meaning.acts = ['signoff', 'final_placement']
+                                finish.meaning.target_suit = follow_target
+                                finish.meaning.agreed_suit = follow_target
+                                finish.meaning.purpose_completed = True
+
+                    serious = self.call('transfer_' + suit.lower() + '_serious_3nt')
+                    serious.when = prefix
+                    serious.bid = '3NT'
+                    serious.applies = (lambda ctx, s=suit: (minor_slam_transfer(ctx, s)
+                                                            and slam_transfer_shape(ctx, s)
+                                                            and not any(minor_control(ctx, c)
+                                                                        for c in ('H', 'S'))))
+                    serious.meaning.action = 'minor_serious_3nt'
+                    serious.meaning.nature = ['artificial']
+                    serious.meaning.acts = ['slam_try']
+                    serious.meaning.target_suit = 'N'
+                    serious.description = 'The low-level serious 3NT: slam interest without a cue.'
+
+                    slam_cues = [('3H', 'H'), ('3S', 'S')]
+                else:
+                    # The other minor (3D for clubs, 4C for diamonds) is a
+                    # control cue after the superaccept, never natural.
+                    if suit == 'C':
+                        slam_cues = [('3D', 'D'), ('3H', 'H'), ('3S', 'S')]
+                    else:
+                        slam_cues = [('3H', 'H'), ('3S', 'S'), ('4C', 'C')]
+
+                for index in range(len(slam_cues)):
+                    cue_bid, control = slam_cues[index]
+                    prior = tuple(item[1] for item in slam_cues[:index])
+                    cue_call = self.call('transfer_' + suit.lower() + '_slam_cue_'
+                                         + cue_bid.lower())
+                    cue_call.when = prefix
+                    cue_call.bid = cue_bid
+                    cue_call.applies = (lambda ctx, s=suit, c=control, p=prior: (
+                        minor_slam_transfer(ctx, s) and slam_transfer_shape(ctx, s)
+                        and minor_control(ctx, c)
+                        and not any(minor_control(ctx, x) for x in p)))
+                    cue_call.meaning.action = 'minor_slam_control_cue'
+                    cue_call.meaning.nature = ['artificial']
+                    cue_call.meaning.acts = ['slam_try', 'control_showing']
+                    cue_call.meaning.control_suit = control
+                    cue_call.meaning.agreed_suit = suit
+                    cue_call.meaning.target_suit = suit
+                    cue_call.effect('agreed_suit').suit = suit
+                    cue_call.description = ('Cue a control with the minor agreed, asking '
+                                            'partner for the remaining stoppers.')
+
+                    after_cue = prefix + cue_bid + 'P'
+                    remaining = [s for s in 'CDHS' if s not in (suit, control)]
+                    if '3NT' > cue_bid:
+                        stopper = self.call('transfer_' + suit.lower() + '_stopper_after_'
+                                            + cue_bid.lower())
+                        stopper.when = after_cue
+                        stopper.bid = '3NT'
+                        stopper.applies = (lambda ctx, r=tuple(remaining): (
+                            ctx.hand is not None and all(minor_stopper(ctx, s) for s in r)
+                            and ctx.hand.hcp <= 16))
+                        stopper.meaning.action = 'minor_slam_stopper_notrump'
+                        stopper.meaning.nature = ['natural']
+                        stopper.meaning.acts = ['signoff', 'final_placement']
+                        stopper.meaning.target_suit = 'N'
+                        stopper.meaning.purpose_completed = True
+                        stopper.description = ('Stoppers in the remaining ask suits and no '
+                                               'slam strength: play 3NT.')
+
+                    minimum = self.call('transfer_' + suit.lower() + '_minimum_after_'
+                                        + cue_bid.lower())
+                    minimum.when = after_cue
+                    minimum.bid = '4' + suit
+                    minimum.applies = (lambda ctx: ctx.hand is not None and ctx.hand.hcp <= 16)
+                    minimum.meaning.action = 'minor_slam_minimum_game'
+                    minimum.meaning.nature = ['natural']
+                    minimum.meaning.acts = ['descriptive']
+                    minimum.meaning.target_suit = suit
+                    minimum.meaning.agreed_suit = suit
+                    minimum.description = ('A minimum declines the slam try at four of the '
+                                           'minor; the partner simulates pass, five, or more cueing.')
+
+                    for stop_bid in ('P', '5' + suit):
+                        stop = self.call('transfer_' + suit.lower() + '_minimum_reply_'
+                                         + stop_bid.lower() + '_after_' + cue_bid.lower())
+                        stop.when = after_cue + '4' + suit + 'P'
+                        stop.bid = stop_bid
+                        stop.applies = lambda ctx: ctx.hand is not None
+                        stop.meaning.action = 'minor_slam_minimum_reply'
+                        stop.meaning.nature = ['natural']
+                        stop.meaning.acts = ['signoff', 'final_placement']
+                        stop.meaning.target_suit = suit
+                        stop.meaning.purpose_completed = True
+                        if stop_bid == '5' + suit:
+                            close = self.call('transfer_' + suit.lower()
+                                              + '_minimum_game_close_after_'
+                                              + cue_bid.lower() + '_' + stop_bid.lower())
+                            close.when = after_cue + '4' + suit + 'P' + stop_bid + 'P'
+                            close.bid = 'P'
+                            close.applies = lambda ctx: ctx.hand is not None
+                            close.meaning.action = 'minor_slam_game_close'
+                            close.meaning.nature = ['natural']
+                            close.meaning.acts = ['signoff', 'final_placement']
+                            close.meaning.target_suit = suit
+                            close.meaning.purpose_completed = True
+
+                    for lift in [s for s in 'CDHS' if '4' + s > '4' + suit
+                                 and s not in (suit, control)]:
+                        strong = self.call('transfer_' + suit.lower() + '_strength_cue_'
+                                           + lift.lower() + '_after_' + cue_bid.lower())
+                        strong.when = after_cue
+                        strong.bid = '4' + lift
+                        strong.applies = (lambda ctx, s=suit, c=lift: (
+                            ctx.hand is not None and ctx.hand.hcp >= 17
+                            and minor_control(ctx, c)))
+                        strong.meaning.action = 'minor_slam_strength_cue'
+                        strong.meaning.nature = ['artificial']
+                        strong.meaning.acts = ['slam_try', 'control_showing']
+                        strong.meaning.control_suit = lift
+                        strong.meaning.agreed_suit = suit
+                        strong.meaning.target_suit = suit
+                        strong.effect('agreed_suit').suit = suit
+                        strong.description = ('A four-level cue with the fit still at three '
+                                              'shows extra strength.')
+
+                        for finish_bid in ('5' + suit, '6' + suit):
+                            finish = self.call('transfer_' + suit.lower() + '_strength_reply_'
+                                               + finish_bid.lower() + '_' + lift.lower()
+                                               + '_after_' + cue_bid.lower())
+                            finish.when = after_cue + '4' + lift + 'P'
+                            finish.bid = finish_bid
+                            finish.applies = lambda ctx: ctx.hand is not None
+                            finish.meaning.action = 'minor_slam_strength_reply'
+                            finish.meaning.nature = ['natural']
+                            finish.meaning.acts = ['signoff', 'final_placement']
+                            finish.meaning.target_suit = suit
+                            finish.meaning.purpose_completed = (finish_bid == '6' + suit)
+
+                            close = self.call('transfer_' + suit.lower()
+                                              + '_strength_game_close_'
+                                              + finish_bid.lower() + '_' + lift.lower()
+                                              + '_after_' + cue_bid.lower())
+                            close.when = after_cue + '4' + lift + 'P' + finish_bid + 'P'
+                            close.bid = 'P'
+                            close.applies = lambda ctx: ctx.hand is not None
+                            close.meaning.action = 'minor_slam_game_close'
+                            close.meaning.nature = ['natural']
+                            close.meaning.acts = ['signoff', 'final_placement']
+                            close.meaning.target_suit = suit
+                            close.meaning.purpose_completed = True
 
                 shape = self.call('transfer_' + suit.lower() + '_invite_5m_after_' + answer.lower())
                 shape.when = prefix

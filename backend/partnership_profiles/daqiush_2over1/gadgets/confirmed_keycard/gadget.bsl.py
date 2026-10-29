@@ -83,6 +83,22 @@ class ConfirmedKeycard(Gadget):
             for answer in superaccepts:
                 prefix = '1NP' + transfer + 'P' + answer + 'P4NP'
                 asks.append(('jacoby_' + trump + '_' + answer, prefix, trump))
+        for transfer, accept, trump in (('2D', '2H', 'H'), ('2H', '2S', 'S')):
+            # Six-plus-card slam interest after the ordinary acceptance.
+            asks.append(('jacoby_' + trump + '_ordinary',
+                         '1NP' + transfer + 'P' + accept + 'P4NP', trump))
+            for minor in 'CD':
+                table = '1NP' + transfer + 'P' + accept + 'P3' + minor + 'P3NTP'
+                # Six-four shape: the cue agrees the major, then keycard.
+                for cue in [suit for suit in 'CDHS' if suit not in (trump, minor)]:
+                    asks.append(('jacoby_' + trump + '_' + minor + '_six_four_'
+                                 + cue, table + '4' + cue + 'P4NP', trump))
+                # Two-suiter: opener cues and responder asks in the minor.
+                for cue in [suit for suit in 'CDHS'
+                            if suit != minor and '4' + suit > '4' + minor]:
+                    asks.append(('jacoby_' + trump + '_' + minor + '_two_suiter_'
+                                 + cue, table + '4' + minor + 'P4' + cue + 'P4NP',
+                                 minor))
         for transfer, accept, trump, splinters in (
             ('2D', '2H', 'H', ('3S', '4C', '4D')),
             ('2H', '2S', 'S', ('4C', '4D', '4H')),
