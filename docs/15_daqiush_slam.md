@@ -32,7 +32,7 @@ inventing a keycard or control-bidding route.
 | Serious 3NT / 3S | Major fit plus forcing context (or an identified no-NT context) makes the bid conventional; hearts use 3S and 3NT shows S control | Define serious/inferred continuation obligations and shortage/control exceptions; retain the explicitly supplied minor-transfer exception |
 | Roman keycard | Useful-void responses, Q/K handling, grand-slam invitations, direct third-round-control asks, enemy-suit stopper asks | Base four-step answer mapping, Q ask recognition, useful void eligibility and precedence remain to be confirmed |
 | Interference over 4NT ask | D0P1 with the supplied P/+1 and X/+2 notation; DOPE when too high | Exact mappings and transition threshold required; do not silently substitute a textbook convention |
-| Exclusion keycard | Jump above 4S, void suit; five-step answers and specified Q/K continuations | Define applicable prefixes, useful void/safety tests, and boundary treatment at 5NT; opponents' joint strength changes meaning to invitation |
+| Voidwood（缺门关键张） | Jump above 4S, void suit; five-step answers and specified Q/K continuations | Define applicable prefixes, useful void/safety tests, and boundary treatment at 5NT; opponents' joint strength changes meaning to invitation |
 | Preempt keycard | After 2m/3m preempt, 4om asks; 0/1/1.5/2/2.5 steps; after zero next step asks Q; 4NT quantitative | Clarify half-keycard notation, exact asking applicability and continuations |
 | Quantitative NT | 4NT invites 6NT nonforcing; minimum Pass, waiting/shape and ace-count replies; later 5NT signoff and six-level fit probes | Imported glyphs require confirmation; scope conflicts with previously specified special 4NT branches require explicit precedence |
 | Strong action over preempt | Control-count step responses; major cue responses and natural 4oM exception | Define reference auctions, control counting and exact step maps |
@@ -297,31 +297,46 @@ Implementation core: `backend/engine/cue_slam_policy.py`. Selector wiring and
 问A后邀请大满贯，越过的（更低）花色不要K，未达的（更高）花色未知是否要K所以有K只能反邀。
 ```
 
-## Implementation notes — exclusion keycard and grand-slam acceptance
+## Implementation notes — Voidwood and grand-slam acceptance
 
-Exclusion keycard (`exclusion_keycard` gadget; owner routes):
+Voidwood（缺门关键张） replaces the old prefix-specific exclusion gadget. The
+profile registers `voidwood`; new meanings and state use `voidwood_ask`,
+`voidwood_answer`, and method `voidwood`.
 
+- Eligible only with a confirmed trump, no pending keycard inquiry, a void in
+  the bid suit, a bid suit different from trumps, the one-level jump in that
+  suit at 4S or higher, five remaining answer steps, and a passing safety
+  check.
+- The bid suit's ace is not a keycard. Four effective keycards remain: the
+  three non-void aces and the trump king.
+- Five answers: 0/3; 1/4 without trump Q; 1/4 with trump Q; 2 without Q;
+  2 with Q.
+- Safety: every answer category compatible with the asker's own count is
+  checked. The ask is rejected when a nonzero answer forces six of the trump
+  while the partnership may still be missing two of the four keycards. A zero
+  answer that can stop at five of trumps does not make the ask unsafe.
 - `1NT-2H-2S`: 5C / 5D / 5H show a void in C / D / H, spades trump.
 - `1NT-2D-2H`: 4S / 5C / 5D show a void in S / C / D, hearts trump.
-- Five-step answers: 0/3; 1/4 without trump Q; 1/4 with trump Q; 2
-  without Q; 2 with Q. The void suit's ace is not a keycard.
-- After 0/3, +1 asks the trump Q and +2 (while below 5NT) asks kings;
-  after a 1/4 answer below 5NT, +1 asks kings. The void ace counts as that
-  suit's king; a king answer may not pass six of the trump.
-- An answer of 5NT or higher leaves every continuation by the asker as a
-  grand-slam invitation.
+- Confirmed-trump example: `1NT-2H-2S-3D-3H` agrees diamonds, so `5C` is a
+  club-void Voidwood. The same diamond state is reached by
+  `1NT-2D-2H-3D-3S`.
+- After 0/3, +1 asks the trump Q and +2 (while below 5NT) asks kings; after a
+  1/4 answer below 5NT, +1 asks kings. The void ace counts as that suit's
+  king; a king answer may not pass six of the trump. An answer of 5NT or
+  higher leaves every continuation by the asker as a grand-slam invitation.
 
-Grand-slam acceptance (`engine/grand_slam_policy.py`):
+Grand-slam acceptance (`engine/grand_slam_policy.py`) is unchanged from the
+previous slice:
 
-- A non-quantitative grand invitation (king ask, control invite) is made
-  on the assumption that the acceptor's hand is in the best 15% of its
-  promised range. Accept seven only inside that quantile.
-- Quantitative 5NT is different: it invites the top 50% of the range
-  (analogous to quantitative 4NT for a small slam). This applies to
-  `1NT-5NT`, `1NT-2C-2D-5NT`, `1NT-3C-3D-5NT`, and `1NT-2H-2S-5NT`.
+- A non-quantitative grand invitation (king ask, control invite) assumes the
+  acceptor's hand is in the best 15% of its promised range. Accept seven only
+  inside that quantile.
+- Quantitative 5NT invites the top 50% of the range (analogous to
+  quantitative 4NT for a small slam): `1NT-5NT`, `1NT-2C-2D-5NT`,
+  `1NT-3C-3D-5NT`, and `1NT-2H-2S-5NT`.
 - With sampled deals and a double-dummy solver, the seven-level completion
-  rate must also reach 50%. When the solver is unavailable, the
-  deterministic quantile decides (deterministic before DDS).
-- The exclusion gadget's six-of-trump grand invite accepts with a top-15%
-  1NT hand (17 HCP or K-R 18) holding the trump queen.
+  rate must also reach 50%; without a solver the deterministic quantile
+  decides.
+- The six-of-trump grand invite accepts with a top-15% 1NT hand (17 HCP or
+  K-R 18) holding the trump queen.
 

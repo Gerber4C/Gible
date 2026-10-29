@@ -577,3 +577,40 @@ intentionally; confirmed clarifications override this historical transcription.
 4NT=65低花选局/55低花逼贯，请同伴出更好的低花
 (2C-2D-4NT)/5NT后续使用5C等待和答A（5D~5S=14、03、2）【注记：这本质是邀请满贯/大满贯，低限不接受（对4NT不叫，对5NT叫6NT），只有高限能答A；5C等待表示还不想打NT，考虑有将（具体请模拟）】
 ```
+
+## Implemented 1NT–3C continuations
+
+The `3C` inquiry already accepts both ordinary game-forcing responder hands
+and the 3-1-major, 5-4-minor class. Opener's `3D` denies a five-card major;
+`3H`/`3S` show one.
+
+After `3D`, responder's `3H`/`3S` shows the singleton major. Opener then:
+
+- `3NT` when the stopper is the only structurally eligible route;
+- `4M` (the shown singleton major) with both minors at least four, enough
+  controls, and no wasted major honors; this sets diamonds;
+- `4C`/`4D` for the unique four-card minor; this sets that minor;
+- `4oM` for the known 4-3 fit in the other major;
+- `4NT` with exactly 3-3 minors.
+
+After `4oM`, responder either passes the game or names the five-card minor.
+The sampled choice compares the current `5m`, the cheapest legal `5oM`, `6m`,
+and `6oM`; the deterministic fallback compares known combined length, then
+control points, and never promotes itself to slam. After the 3-3-minor `4NT`,
+responder chooses `5m` or `6m`.
+
+After opener's `3H`/`3S` (five-card major `M`):
+
+- with three-card support, responder raises to `4M` without slam interest or
+  bids the lowest legal `oM` as an artificial strength show;
+- singleton in `M`, responder bids `3NT` without slam interest or its
+  five-card minor at the four level with interest.
+
+After responder's `4C` (5C4D) opener may bid `4D` (diamonds), `4H`/`4S`
+(clubs), or `5C`; after `4D` (5D4C), `4H` (clubs) or `4S` (diamonds). These
+calls select trumps and do not promise control.
+
+At every new choice point selection is: sampled DDS result, then the
+deterministic fallback, then TD. An unauthored or illegal sampled result falls
+through to the fallback. The trace records
+`simulation_decision.source` as `dds`, `deterministic`, or `inconclusive`.
