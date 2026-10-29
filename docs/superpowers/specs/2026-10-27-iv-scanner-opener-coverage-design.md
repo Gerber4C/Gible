@@ -343,3 +343,56 @@ Tests must demonstrate:
 - Changing responder coverage quotas.
 - Using DDS or concealed opponent cards to choose bids.
 - Treating IV Scanner counts as population-frequency estimates.
+
+## Owner bug report — 1NT responder routes (2026-10-27, pending)
+
+1. **7-card major transfers.** Jacoby weak transfers allow 6 and 7 cards;
+   Texas likewise, with a seventh card converting to strength (worth one
+   HCP, thresholds shift by one). IMPLEMENTED (commit 92f7d2e).
+2. **Strong 7-card minor.** A very strong 7C hand settles in 5C and misses
+   slam. Owner route: bid 2S (transfer to 3C), then 3M cue — the 3M cue
+   initiates the trump agreement while cue-bidding (different from
+   post-agreement cueing). General minor-fit stop-asking principle: with
+   opponents silent and our side holding two or more unbid suits, bidding a
+   suit asks for a stopper there; if partner holds the stoppers for the
+   other ask-suits and lacks slam strength, 3NT. Otherwise: minimum 4m
+   (non-forcing inside the game-forcing process; partner simulates pass,
+   5m, or continued cueing); non-minimum cues.
+3. **6-4 minors with slam interest block.** Transfer to one minor first,
+   then bid the other minor.
+4. **1NT-2H-2S-3C-3NT continuation.** Responder then: if no slam interest,
+   a six-card major bids 4S (signoff); without a six-card major but with a
+   six-card minor, 5C (opener simulates). With slam interest: 5-4 suits
+   bid 4NT / 6NT / 5NT (quantitative / small-slam signoff / grand-slam
+   invite forcing; answer tables per docs/15_daqiush_slam.md); 6-4 suits
+   cue a new suit (agreeing spades); 5-5 / 5-6 suits bid 4C — partner
+   bids any four-level suit (including spades) as a cue (clubs agreed),
+   4NT shows no fit, and responder then simulates.
+
+   Mirror symmetric: spades↔hearts, clubs↔diamonds.
+
+### 3C minor-ask route with 3-1 majors and 5-4 minors (game-forcing+)
+
+Responder with a 3-1 major split and 5-4 minors bids **3C** uniformly.
+Opener 3D asks for the major short-suit position. Responder then shows the
+singleton/void suit. Opener next:
+
+- rolls forward; if the 3NT expected value is high, 3NT;
+- else: four-card minor at the four level (that suit agreed); prefers the
+  4-3 major fit by bidding the lowest other major; if opener still has
+  slam interest responder bids the lowest five-card minor, then opener
+  simulates — all signoffs;
+- 4-4+ minors, good controls, no wasted major honors (no KQJ, or AK):
+  4M (diamonds agreed);
+- 3-3 minors but a poor 3NT simulation: 4NT (opener simulates; all
+  signoffs).
+
+Opener 3M (supporting the three-card major):
+
+- responder's five-card minor matches opener's three: no slam interest
+  raises 4M; otherwise the lowest other major is cue-shown as strong.
+- responder's five-card minor matches opener's one: no slam interest 3NT;
+  otherwise the five-card minor at the four level. Opener then: clubs
+  (5C4D) — 4D agrees diamonds, 4H/S cue agrees clubs, or raises 5C;
+  diamonds (5D4C) — 4H/S agree clubs/diamonds respectively, none
+  promising controls.
