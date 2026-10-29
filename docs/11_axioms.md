@@ -138,6 +138,28 @@ K–R 使用 Richard Pavlicek 发布的 [26 步算法](https://rpbridge.net/8j19
 
 K–R 不直接使用同伴套/敌方套信息。实现保留三个可选上下文修正，默认权重为 0，单独记录且不改变纯 K–R 数值：同伴套大牌数、敌方套大牌数、有明确将牌配合时的边花短门单位。不会默认叠加第二套牌型分。
 
+### Zar Points（独立、保守版评估）
+
+`engine/zar.py` 提供独立的 Zar 评估服务。基础公式为
+`HCP + controls + (a+b) + (a-d)`，其中 `a ≥ b ≥ c ≥ d` 是四门花色的长度排序，
+`controls` 按 A=2、K=1 计算。
+
+项目将这一实现版本标记为 `conservative`；配合调整表取自
+[Zar Points 的“Trump fit re-evaluation”一节](https://en.wikipedia.org/wiki/Zar_Points)：
+
+- 主将牌配合：联手超过 8 张将牌的每一张，若本手边花有缺门则 +2，
+  有单张则 +1，否则 +0。
+- 第二套配合：只有双方在该花色都至少持有 3 张时才调整；
+  联手合计 8/9/10+ 张时分别 +0/+1/+2，排除 1–8 这类单方长套。
+
+返回值保留结构化分量：`hcp`、`controls`、`shape_points`、
+`base_points`、`primary_fit_points`、`secondary_fit_points` 和
+`total_points`。[Petkov 原始说明](https://www.bridgewebs.com/ocala/ZarPoints.pdf)
+中更激进的“联手配合超过 8 张后，每多一张 +3”规则
+与 M4 修正是有意不采用，以避免
+与这一保守实现的口径混用。该服务未注册到 BSL、Profile、公理、扫描器
+或叫牌选择流程；当前没有任何公理消费它的评估结果。
+
 ## Profile 配置
 
 ```python

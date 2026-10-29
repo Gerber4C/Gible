@@ -126,6 +126,14 @@ The selector applies the same constraints to fallback candidates. An empty
 compliant pool produces a blocked decision with no call; the simulator keeps
 the preceding history and returns the structured failure. See `11_axioms.md`.
 
+`backend/engine/zar.py`
+
+- Independent base Zar evaluator and conservative fit-adjustment service, kept
+  next to the hand-quality implementation for reuse without coupling it to the
+  bidding runtime.
+- It is not registered with BSL, profiles, axioms, scanners, or bidding
+  selection, and no existing decision path consumes its result.
+
 `backend/engine/decision.py`
 
 - Resolves same-call meaning ambiguity.
