@@ -1,5 +1,4 @@
 import unittest
-from pathlib import Path
 
 from engine.cards import Hand
 
@@ -32,14 +31,6 @@ class HandQualityTests(unittest.TestCase):
         self.assertTrue(minor_slam_interest(Hand.parse('SAK5H2DKQJ54C8765')))
         self.assertFalse(minor_slam_interest(Hand.parse('SKQ5H2D8765CAJ954')))
         self.assertTrue(minor_slam_interest(Hand.parse('SAK5H2D8765CKQJ54')))
-
-    def test_daqiush_minor_slam_route_uses_shared_predicate(self):
-        gadget = (Path(__file__).resolve().parents[1]
-                  / 'partnership_profiles' / 'daqiush_2over1' / 'gadgets'
-                  / 'one_notrump_invitations' / 'gadget.bsl.py')
-        source = gadget.read_text(encoding='utf-8')
-        self.assertNotIn('MINOR_SLAM_KR =', source)
-        self.assertIn('minor_slam_interest(ctx.hand)', source)
 
     def test_equal_hcp_controls_and_long_honors_outperform_scattered_queens_jacks(self):
         strong_hand = "SAKxxx HKxx Dxx Cxxx"

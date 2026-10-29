@@ -1,8 +1,10 @@
 import unittest
+from unittest.mock import patch
 
 from engine.auction import Auction
 from engine.cards import Hand
-from engine.hand_quality import minor_game_control_points
+from engine.hand_quality import (assess_quality, minor_game_control_points,
+                                 minor_slam_interest)
 from engine.loader import load_profile
 from engine.selector import choose_bid
 from engine.simulator import simulate_auction
@@ -31,6 +33,22 @@ class DaqiushMinorInvitationTests(unittest.TestCase):
                 hand = Hand.from_dict({'spades': holding})
                 self.assertEqual(minor_game_control_points(hand, 'C'), points)
         self.assertEqual(minor_game_control_points(Hand.from_dict({'clubs': 'AQJ'}), 'C'), 7)
+
+    def test_minor_slam_transfer_changes_route_at_shared_kr_threshold(self):
+        below = Hand.parse('S4QHA8D47JQ3T8C6A')
+        boundary = Hand.parse('S24H69DQ975JA4CK6')
+        self.assertEqual(assess_quality(below)['kr_points'], 13.95)
+        self.assertEqual(assess_quality(boundary)['kr_points'], 14.0)
+        self.assertFalse(minor_slam_interest(below))
+        self.assertTrue(minor_slam_interest(boundary))
+        self.assertEqual(choose_bid(self.profile, Auction.parse('1NP'), below).call,
+                         '5D')
+        self.assertEqual(choose_bid(self.profile, Auction.parse('1NP'), boundary).call,
+                         '2N')
+        with patch('engine.hand_quality.MINOR_SLAM_KR', 13.95):
+            profile = load_profile('daqiush_2over1')
+            self.assertEqual(choose_bid(profile, Auction.parse('1NP'), below).call,
+                             '2N')
 
     def test_reviewed_control_table_can_reject_a_raw_sixteen_count(self):
         cards = 'SAQ963HT86DAQJCK2'

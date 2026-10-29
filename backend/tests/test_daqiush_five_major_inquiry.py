@@ -2,6 +2,7 @@ import unittest
 
 from engine.cards import Hand
 from engine.five_major_inquiry_policy import deterministic_after_singleton
+from engine.hand_quality import minor_game_control_points
 
 
 class DaqiushFiveMajorInquiryPolicyTests(unittest.TestCase):
@@ -20,6 +21,38 @@ class DaqiushFiveMajorInquiryPolicyTests(unittest.TestCase):
                 self.assertEqual(decision.call, '4' + singleton_major)
                 self.assertEqual(decision.agreed_suit, 'D')
                 self.assertEqual(decision.source, 'deterministic')
+
+    def test_five_four_minor_orientations_accept_exact_control_boundary(self):
+        examples = (
+            ('SAQH28D8AQ3KC2374', 'H', 5, 4),
+            ('S6THAQDA5J83C643A', 'S', 5, 4),
+            ('SAQH46DJK95CT87AJ', 'H', 4, 5),
+            ('S84HQAD453JCKA9J2', 'S', 4, 5),
+        )
+        for cards, singleton_major, diamonds, clubs in examples:
+            with self.subTest(singleton_major=singleton_major,
+                              minors=(diamonds, clubs)):
+                hand = Hand.parse(cards)
+                self.assertEqual((hand.length('D'), hand.length('C')),
+                                 (diamonds, clubs))
+                self.assertFalse(any(rank in hand.holding(singleton_major)
+                                     for rank in 'KQJ'))
+                self.assertEqual(minor_game_control_points(
+                    hand, 'D', partner_long_suits=('C',)), 14.5)
+                decision = deterministic_after_singleton(
+                    hand, singleton_major=singleton_major)
+                self.assertEqual((decision.call, decision.agreed_suit),
+                                 ('4' + singleton_major, 'D'))
+
+    def test_five_four_minor_route_rejects_just_below_control_boundary(self):
+        hand = Hand.parse('SQJH78DAKJ25CQJK7')
+        self.assertEqual((hand.length('D'), hand.length('C')), (5, 4))
+        self.assertFalse(any(rank in hand.holding('H') for rank in 'KQJ'))
+        self.assertAlmostEqual(minor_game_control_points(
+            hand, 'D', partner_long_suits=('C',)), 14.4)
+        decision = deterministic_after_singleton(hand, singleton_major='H')
+        self.assertIsNone(decision.call)
+        self.assertEqual(decision.source, 'inconclusive')
 
     def test_both_minor_route_allows_ace_king_in_reported_major(self):
         decision = self.decide('S432HAKDKQ76CAJ84', 'H')

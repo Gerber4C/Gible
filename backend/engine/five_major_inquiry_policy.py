@@ -5,8 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .cards import Hand, normalize_suit_name
-from .hand_quality import (inquiry_stopper, minor_game_control_points,
-                           minor_slam_interest)
+from .hand_quality import inquiry_stopper, minor_game_control_points
 
 
 @dataclass(frozen=True)
