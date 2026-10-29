@@ -37,11 +37,12 @@ def starts_jacoby(ctx, trump):
     other = 'S' if trump == 'H' else 'H'
     if ctx.hand.length(trump) == 5:
         return ctx.hand.length(other) <= 3
-    if ctx.hand.length(trump) != 6 or ctx.hand.length(other) >= 4:
+    if ctx.hand.length(trump) not in (6, 7) or ctx.hand.length(other) >= 4:
         return False
     shaped_points = shapely_second_minor_strength(ctx, trump)
-    if shaped_points is not None and 4 <= shaped_points <= 6:
-        return False  # A weak 6M–5m–1–1 describes only the major game via Texas.
+    weak_window = 4 + (1 if ctx.hand.length(trump) == 7 else 0)
+    if shaped_points is not None and weak_window <= shaped_points <= 6:
+        return False  # A weak 6M-5m-1-1 describes only the major game via Texas.
     if named_evaluator(ctx, 'texas_slam_keycard_' + trump):
         return False
     if named_evaluator(ctx, 'six_card_slam_interest_' + trump):
@@ -366,6 +367,28 @@ class JacobyMajorTransfers(Gadget):
                 nt_stop.meaning.acts = ['signoff', 'final_placement']
                 nt_stop.meaning.target_suit = 'N'
                 nt_stop.meaning.purpose_completed = True
+
+            ordinary_ask = self.call('jacoby_' + trump.lower()
+                                     + '_ordinary_acceptance_slam_keycard')
+            ordinary_ask.when = ordinary_prefix
+            ordinary_ask.bid = '4NT'
+            ordinary_ask.applies = lambda ctx, t=trump: (
+                ctx.hand is not None
+                and named_evaluator(ctx, 'six_card_slam_interest_' + t))
+            ordinary_ask.meaning.action = 'rkcb_1430'
+            ordinary_ask.meaning.nature = ['artificial']
+            ordinary_ask.meaning.acts = ['inquiry', 'keycard_asking']
+            ordinary_ask.meaning.target_suit = trump
+            ordinary_ask.meaning.agreed_suit = trump
+            ask_effect = ordinary_ask.effect('agreed_suit')
+            ask_effect.suit = trump
+            keycards = ordinary_ask.effect('keycard_context')
+            keycards.trump_suit = trump
+            keycards.ask_call = '4N'
+            keycards.method = 'rkcb_1430'
+            keycards.status = 'pending'
+            ordinary_ask.description = ('Confirmed slam-interest hands ask keycards '
+                                        'over the ordinary acceptance too.')
 
             for minor in 'CD':
                 new_suit = self.call('jacoby_' + trump.lower() + '_second_' + minor.lower())

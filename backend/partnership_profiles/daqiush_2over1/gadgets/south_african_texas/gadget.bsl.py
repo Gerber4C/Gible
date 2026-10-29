@@ -20,40 +20,56 @@ def has_texas_game(ctx, suit):
             or shaped_points is not None and 4 <= shaped_points <= 6)
 
 
+def _length_strength_bonus(ctx, suit):
+    """Owner rule: a seventh card converts to strength (worth one HCP)."""
+    return max(0, ctx.hand.length(suit) - 6)
+
+
+def _side_class(ctx, suit):
+    """Classify the three side suits around the long major.
+
+    ``no_shortage``: every side suit holds two or more cards.
+    ``small_singleton``: exactly one side suit is a low singleton.
+    Anything else (voids, high singletons) is its own route.
+    """
+
+    side_lengths = sorted(ctx.hand.length(other) for other in 'SHDC'
+                          if other != suit)
+    if side_lengths and side_lengths[0] >= 2:
+        return 'no_shortage', None
+    if side_lengths.count(1) == 1 and side_lengths[0] == 1:
+        singleton = [other for other in 'SHDC' if other != suit
+                     and ctx.hand.length(other) == 1][0]
+        if ctx.hand.holding(singleton) in 'T98765432':
+            return 'small_singleton', singleton
+    return 'other', None
+
+
 def six_card_slam_interest(ctx, suit):
-    if ctx.hand is None or ctx.hand.length(suit) != 6:
+    length = None if ctx.hand is None else ctx.hand.length(suit)
+    if length not in (6, 7):
         return False
-    side_lengths = [ctx.hand.length(other) for other in 'SHDC' if other != suit]
-    if max(side_lengths) != 3:
-        return False  # A second suit or a different long-suit shape needs its own route.
-    if sorted(side_lengths) == [2, 2, 3]:
+    side_class, _ = _side_class(ctx, suit)
+    if side_class == 'no_shortage':
         threshold = SLAM_INTEREST['no_shortage']
-    elif sorted(side_lengths) == [1, 3, 3]:
-        singleton = [other for other in 'SHDC' if other != suit and ctx.hand.length(other) == 1][0]
-        if ctx.hand.holding(singleton) not in 'T98765432':
-            return False
+    elif side_class == 'small_singleton':
         threshold = SLAM_INTEREST['small_singleton']
     else:
         return False
-    # Raw HCP sets the minimum for slam exploration. K-R minus raw HCP then
-    # compares honor quality against the usual bonus of this six-card shape.
-    hcp = ctx.hand.hcp
+    # Raw HCP sets the minimum for slam exploration, with a seventh card
+    # converting to strength. K-R minus raw HCP then compares honor quality
+    # against the usual bonus of this long shape.
+    hcp = ctx.hand.hcp - _length_strength_bonus(ctx, suit)
     return hcp >= threshold['hcp'] and ctx.hand_quality['kr_delta'] >= threshold['kr_delta']
 
 
 def game_only_texas(ctx, suit):
-    if not has_texas_game(ctx, suit) or ctx.hand.length(suit) != 6:
+    if not has_texas_game(ctx, suit) or ctx.hand.length(suit) not in (6, 7):
         return False
     if sorted((ctx.hand.length('H'), ctx.hand.length('S'))) == [4, 6]:
         return True
-    side_lengths = sorted(ctx.hand.length(other) for other in 'SHDC' if other != suit)
-    if side_lengths == [2, 2, 3]:
-        supported = True
-    elif side_lengths == [1, 3, 3]:
-        singleton = [other for other in 'SHDC' if other != suit and ctx.hand.length(other) == 1][0]
-        supported = ctx.hand.holding(singleton) in 'T98765432'
-    else:
-        supported = False
+    side_class, _ = _side_class(ctx, suit)
+    supported = side_class in ('no_shortage', 'small_singleton')
     return supported and not six_card_slam_interest(ctx, suit) and not slam_keycard_texas(ctx, suit)
 
 
