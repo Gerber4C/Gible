@@ -5,7 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .cards import Hand, normalize_suit_name
-from .hand_quality import minor_game_control_points, minor_slam_interest
+from .hand_quality import (inquiry_stopper, minor_game_control_points,
+                           minor_slam_interest)
 
 
 @dataclass(frozen=True)
@@ -47,7 +48,7 @@ def deterministic_after_singleton(
     elif minor_lengths == {'C': 3, 'D': 3}:
         candidates.append(('4NT', None, 'Exact three-three minors'))
 
-    has_stopper = opener.honor_count(reported, ('A', 'K', 'Q')) >= 1
+    has_stopper = inquiry_stopper(opener, reported)
     if has_stopper and not candidates and not ambiguous_minors:
         return InquiryDecision(
             call='3NT', source='deterministic',

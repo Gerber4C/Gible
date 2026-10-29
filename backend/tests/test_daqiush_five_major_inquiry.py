@@ -73,6 +73,19 @@ class DaqiushFiveMajorInquiryPolicyTests(unittest.TestCase):
         self.assertEqual(decision.call, '3NT')
         self.assertTrue(decision.final)
 
+    def test_bare_queen_is_not_an_inquiry_stopper_in_either_major(self):
+        for cards, singleton_major in (
+                ('S876HQ9865D84C963', 'H'),
+                ('SQ9865H876D84C963', 'S')):
+            with self.subTest(singleton_major=singleton_major):
+                decision = self.decide(cards, singleton_major)
+                self.assertIsNone(decision.call)
+                self.assertEqual(decision.source, 'inconclusive')
+
+    def test_bare_king_does_not_conflict_with_unique_minor_route(self):
+        decision = self.decide('S98765HKD842CAQ76', 'H')
+        self.assertEqual((decision.call, decision.agreed_suit), ('4C', 'C'))
+
     def test_stopper_and_structural_suit_candidate_requires_simulation(self):
         decision = self.decide('SAK4HA32DQ876C842', 'H')
         self.assertIsNone(decision.call)

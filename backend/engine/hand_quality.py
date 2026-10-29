@@ -43,6 +43,13 @@ def minor_slam_interest(hand: Hand) -> bool:
     return assess_quality(hand)['kr_points'] >= MINOR_SLAM_KR
 
 
+def inquiry_stopper(hand: Hand, suit: str) -> bool:
+    """Return the established five-card-major-inquiry stopper predicate."""
+    holding = hand.holding(suit)
+    return ('A' in holding or ('K' in holding and len(holding) >= 2)
+            or ('Q' in holding and ('J' in holding or 'T' in holding)))
+
+
 def shapely_control_points(hand: Hand, known_long_suits) -> float:
     """Keep raw HCP in each publicly known 4+ partner suit; adjust the rest.
 

@@ -43,12 +43,6 @@ def singleton_major(ctx):
     return 'H' if ctx.hand.length('H') == 1 else 'S'
 
 
-def stopper(ctx, suit):
-    holding = ctx.hand.holding(suit)
-    return ('A' in holding or ('K' in holding and len(holding) >= 2)
-            or ('Q' in holding and ('J' in holding or 'T' in holding)))
-
-
 class FiveCardMajorInquiry(Gadget):
     id = 'five_card_major_inquiry'
     namespace = 'daqiush_2over1'
@@ -140,7 +134,8 @@ class FiveCardMajorInquiry(Gadget):
             finish = self.call('stopper_after_singleton_' + shortage.lower())
             finish.when = '1NP3CP3DP3' + shortage + 'P'
             finish.bid = '3NT'
-            finish.applies = lambda ctx, s=shortage: ctx.hand is not None and stopper(ctx, s)
+            finish.applies = (lambda ctx, s=shortage: ctx.hand is not None
+                              and inquiry_stopper(ctx.hand, s))
             finish.meaning.action = 'singleton_major_three_notrump'
             finish.meaning.nature = ['natural']
             finish.meaning.acts = ['signoff', 'final_placement']
