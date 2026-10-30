@@ -67,6 +67,48 @@ class DaqiushJacobyTests(unittest.TestCase):
                 self.assertEqual(
                     self.bid(auction, 'SA62HAQJT72DJ7CJ4'), '4N')
 
+    def test_three_level_support_cues_do_not_require_control(self):
+        # A sole cue is available without control.
+        self.assertEqual(
+            self.bid('1NP2DP2HP3DP', 'SQJ2HAKDQJ54CQJ32'), '3S')
+        # With two cues, neither controlled: cue the lowest.
+        self.assertEqual(
+            self.bid('1NP2DP2HP3CP', 'SQJ2HQJDQJ54CAQ32'), '3D')
+        # With one controlled, show that one.
+        self.assertEqual(
+            self.bid('1NP2DP2HP3CP', 'SAK2HQJDQJ54CQJ32'), '3S')
+        self.assertEqual(
+            self.bid('1NP2DP2HP3CP', 'SQJ2HQJDAK54CQJ32'), '3D')
+
+    def test_diamond_fit_support_cue_offers_four_heart_and_denial_choices(self):
+        north = 'SAK9HQ9DK754CA973'
+        south = 'S4HAKJT53DQJT8CQ5'
+        self.assertEqual(self.bid('1NP2DP2HP3DP', north), '3S')
+        self.assertEqual(self.bid('1NP2DP2HP3DP3SP', south), '4H')
+        self.assertEqual(self.bid('1NP2DP2HP3DP3SP4HP', north), '4N')
+        self.assertEqual(
+            self.bid('1NP2DP2HP3DP3SP4HP4NP', south), '5C')
+
+        # The other offered calls are available for the appropriate hands.
+        self.assertEqual(
+            self.bid('1NP2DP2HP3DP3SP', 'S4HAKJT5DQJT8CA54'), '4C')
+        self.assertEqual(
+            self.bid('1NP2DP2HP3DP3SP', 'S4HAKJT5DQJT8CQ54'), '4S')
+        self.assertEqual(
+            self.bid('1NP2DP2HP3DP3SP', 'S43HAKJT5DQJT8CQ5'), '4D')
+
+    def test_strong_nine_five_five_major_minor_forces_second_minor(self):
+        spades = 'SQJ865HJ5D6CKQ754'
+        hearts = 'S2HKQJ76DQJ854C32'
+        self.assertEqual(self.bid('1NP2HP2SP', spades), '3C')
+        self.assertEqual(self.bid('1NP2HP2SP', 'SQJ865HJD6CKQ7543'), '3C')
+        self.assertEqual(self.bid('1NP2DP2HP', hearts), '3D')
+        self.assertEqual(
+            self.bid('1NP2HP2SP3CP', 'SA97HK4DK984CAJT3'), '3S')
+        self.assertEqual(self.bid('1NP2HP2SP3CP3SP', spades), '4S')
+        # A weaker nine in the same shape remains an invitation.
+        self.assertEqual(self.bid('1NP2HP2SP', 'SQJ865HQJD6CQJT54'), '2N')
+
     def test_five_four_after_second_minor_three_notrump_invites(self):
         self.assertEqual(
             self.bid('1NP2HP2SP3DP3NTP', 'SAK982H9DQJT3CK64'), '4N')

@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from engine.auction import Auction
 from engine.cards import Hand
 from engine.loader import load_profile
+from engine.replay import replay_auction
 from engine.selector import choose_bid
 from engine.simulator import simulate_auction
 from engine.simulation_decision import decide_six_four_major_after_three_notrump
@@ -34,6 +35,50 @@ class DaqiushStaymanTests(unittest.TestCase):
         self.assertEqual(self.bid('1NP2CP2SP', south), '4S')
         self.assertEqual(self.bid('1NP2CP2HP3NP', 'SAJ65HK762DAQ3CK3'), '4S')
         self.assertEqual(self.bid('1NP2CP2HP3NP', 'SAQ7HKJ83DA762CQ5'), 'P')
+
+    def test_three_level_high_suit_meanings_after_stayman(self):
+        # 2D denied a major: 3S is a cue with spade control; without it,
+        # 3H remains the minor-support cue.
+        for auction in ('1NP2CP2DP3CP', '1NP2CP2DP3DP'):
+            with self.subTest(auction=auction):
+                self.assertEqual(
+                    self.bid(auction, 'SAK2HQJDQJ54CQJ32'), '3S')
+        self.assertEqual(
+            self.bid('1NP2CP2DP3CP', 'SQJ2HQJDQJ54CAQ32'), '3H')
+
+        # 2S showed four spades: 3S is natural and shows the fifth spade.
+        for auction in ('1NP2CP2SP3CP', '1NP2CP2SP3DP'):
+            with self.subTest(auction=auction):
+                self.assertEqual(
+                    self.bid(auction, 'SAKQ76HQJDQ5CQ432'), '3S')
+        natural = replay_auction(
+            self.profile, Auction.parse('1NP2CP2SP3CP3S'))
+        self.assertEqual(natural.trump_state('ns').status, 'unset')
+        self.assertEqual(
+            self.bid('1NP2CP2SP3CP', 'SAKQ2HQJ2DQJ5CQ32'), '3D')
+        self.assertEqual(
+            self.bid('1NP2CP2SP3DP', 'SAKQ2HQJ2DQJ5CQ32'), '3H')
+
+        # 2H also makes 3S natural; 3H is natural only with five hearts
+        # and a 3D cue available, otherwise 3H is the sole cue.
+        self.assertEqual(
+            self.bid('1NP2CP2HP3DP', 'SAKQ2HKQ32DQJ5CQ3'), '3S')
+        self.assertEqual(
+            self.bid('1NP2CP2HP3CP', 'SQJ2HKQT83DAKCQ32'), '3H')
+        self.assertEqual(
+            self.bid('1NP2CP2HP3DP', 'SQJ2HKQ32DAK5CQ32'), '3H')
+
+    def test_natural_minor_probe_shows_fifth_heart_and_passes_three_notrump(self):
+        south = 'SJ963HA64D-CAJT852'
+        north = 'SA87HKQT83DQJ75CK'
+        self.assertEqual(self.bid('1NP2CP2HP3CP', north), '3H')
+        self.assertEqual(self.bid('1NP2CP2HP3CP3NP', south), 'P')
+        self.assertEqual(self.bid('1NP2CP2HP3CP3HP', south), '3N')
+        self.assertEqual(self.bid('1NP2CP2HP3CP3HP3NP', north), 'P')
+
+        # With four spades, 3S has priority over showing the fifth heart.
+        self.assertEqual(
+            self.bid('1NP2CP2HP3CP', 'SAK87HKQT83DQJ7C5'), '3S')
 
     def test_natural_two_notrump_invite_accept_shows_five_card_major(self):
         # After 1NT-2C-2H-2NT, a maximum with five hearts accepts via 3H,

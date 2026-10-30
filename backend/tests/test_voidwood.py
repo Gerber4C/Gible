@@ -3,6 +3,8 @@ from types import SimpleNamespace
 
 from engine.auction import Auction
 from engine.cards import Hand
+from engine.loader import load_profile
+from engine.selector import choose_bid
 from engine.voidwood import (
     answer_bids, context_validation, effective_keycards,
     is_safe_voidwood_ask, voidwood_jump,
@@ -125,6 +127,31 @@ class VoidwoodProfileTests(unittest.TestCase):
             self.bid(spade_route + '5CP', 'S987HKJ4D9876CQJ2'), '5D')
         self.assertEqual(
             self.bid(heart_route + '5CP', 'S987H432DQ876CQJ2'), '5D')
+
+    def test_generic_voidwood_has_no_asker_trump_length_limit(self):
+        auction = Auction.parse('1NP2HP2SP3DP3HP')
+        for cards in ('SAKQ76H9876DKQ54C-',
+                      'SAKQ76H987DAKQ54C-'):
+            with self.subTest(cards=cards):
+                decision = choose_bid(
+                    self.profile, auction, Hand.parse(cards))
+                self.assertTrue(any(
+                    candidate.call == '5C'
+                    and candidate.public_meaning.get('action_type')
+                    == 'voidwood_ask'
+                    for candidate in decision.candidate_pool.candidates))
+
+    def test_undefined_jump_derives_voidwood_with_inferred_trump(self):
+        decision = choose_bid(
+            self.profile, Auction.parse('1NP2CP2HP3CP'),
+            Hand.parse('S-HKQ32DAKQ54CA432'))
+        asks = [
+            candidate for candidate in decision.candidate_pool.candidates
+            if candidate.public_meaning.get('action_type') == 'voidwood_ask']
+        self.assertEqual(len(asks), 1)
+        self.assertEqual(asks[0].call, '4S')
+        self.assertEqual(asks[0].public_meaning.get('agreed_suit'), 'C')
+        self.assertEqual(asks[0].public_meaning.get('void_suit'), 'S')
 
     def test_transfer_regression_still_works(self):
         self.assertEqual(

@@ -4,13 +4,32 @@
 
 **Goal:** Make Voidwood and ordinary RKCB retain a replayable keycard state, so effective trump-queen rules, king inquiries, and final placements cannot create false grand-slam routes or TD.
 
-**Architecture:** An effective Voidwood trump Q is derived from route-specific public length facts, not a universal Voidwood length. The responder treats Q as effective when the asker's guaranteed trump length plus the responder's actual length reaches nine; if the auction had already shown a nine-card fit before the ask, the threshold is ten. Direct unilateral trump agreement after a 1NT transfer must therefore publicly promise six trumps. Voidwood answers advance a *latest-frame* public state from `pending` to `answered` and retain answer facts, so earlier records cannot remain eligible. King inquiries and final placements read that same state in live bidding and replay. Ordinary RKCB's ten-trump convention is deliberately excluded from this repair unless its own public fit predicate and tests are implemented in a later slice.
+**Architecture:** An effective Voidwood trump Q is derived from route-specific public length facts, not a universal Voidwood length. The responder treats Q as effective when the asker's guaranteed trump length plus the responder's actual length reaches nine; if the auction had already shown a nine-card fit before the ask, the threshold is ten. Direct unilateral trump agreement after a 1NT transfer must therefore publicly promise six trumps. Voidwood itself is a global mechanism: once a trump is agreed, every legal one-level jump to the five level or higher (with hearts, the 4S jump) is Voidwood, regardless of the asker's trump length. If no trump is agreed, a jump may agree trumps on the spot: the default is partner's last natural suit, or the actor's own last natural suit when partner's last non-pass call was notrumps, provided the actor's length plus partner's public likely minimum reaches eight. Only the latest reference trump (agreed or provisional) may select an ask; historical agreement records must not create competing Voidwood calls. Voidwood answers advance a *latest-frame* public state from `pending` to `answered` and retain answer facts, so earlier records cannot remain eligible. King inquiries and final placements read that same state in live bidding and replay. Ordinary RKCB's ten-trump convention is deliberately excluded from this repair unless its own public fit predicate and tests are implemented in a later slice.
 
 **Tech Stack:** Python 3, unittest, Gible BSL gadget DSL, public auction replay state.
 
 ---
 
-## Chunk 1: Voidwood answer facts and king-inquiry gate
+## Chunk 1: Global Voidwood recognition and answer facts
+
+### Task 0: Global ask, no asker-length limit, on-the-spot trump inference
+
+**Files:**
+- Modify: `backend/partnership_profiles/daqiush_2over1/gadgets/voidwood/gadget.bsl.py`
+- Modify: `backend/engine/voidwood.py`
+- Modify: `backend/engine/bsl.py`
+- Modify: `backend/tests/test_voidwood.py`
+
+- [x] Remove the five-trump asker gate from `state_voidwood_ask`: an agreed-trump four-card minor asker may bid 5C Voidwood.
+- [x] Read only the latest reference trump (agreed or provisional); a stale historical `agreed_suit` must not allow a second trump to compete.
+- [x] When no reference trump exists, infer partner's last natural suit; if partner's last non-pass call was notrumps, use the actor's last natural suit.
+- [x] Require the inferred trump fit to reach eight combined likely cards: actor length plus partner's public guaranteed/likely minimum.
+- [x] Let the Voidwood ask itself convert a provisional or inferred trump into agreed trump, so undefined jumps derive Voidwood without a process-specific authoring.
+- [x] Keep the five-card fixture and add a four-card fixture, both producing 5C.
+- [x] Add an inferred-trump fixture where an otherwise undefined 4S jump becomes C-trump Voidwood.
+- [x] Suppress the new 4C/4S cue candidates on exclusion-strength void hands so the legal 5C Voidwood ask is not displaced by a generic cue.
+- [x] Run `tests.test_voidwood tests.test_daqiush_owner_routes`; confirm PASS.
+- [ ] Commit as `fix: make Voidwood global with inferred trumps`.
 
 ### Task 1: Effective-Q answer
 

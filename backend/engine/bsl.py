@@ -11,7 +11,8 @@ from .hand_quality import (inquiry_stopper, minor_game_control_points,
                            minor_slam_interest,
                            shapely_effective_points,
                            shapely_combined_effective_points, shapely_description_proxy)
-from .voidwood import (answer_bids, effective_keycards,
+from .voidwood import (answer_bids, current_voidwood_trump,
+                       effective_keycards, inferred_voidwood_trump,
                        is_safe_voidwood_ask, voidwood_jump)
 from .rkcb_continuation import (
     five_spade_role, five_trump_available, high_answer_invitations,
@@ -1198,7 +1199,9 @@ def _base_namespace(collector: _Collector) -> dict[str, Any]:
         "minor_game_control_points": minor_game_control_points,
         "minor_slam_interest": minor_slam_interest,
         "answer_bids": answer_bids,
+        "current_voidwood_trump": current_voidwood_trump,
         "effective_keycards": effective_keycards,
+        "inferred_voidwood_trump": inferred_voidwood_trump,
         "is_safe_voidwood_ask": is_safe_voidwood_ask,
         "voidwood_jump": voidwood_jump,
         "ordinary_rkcb_pending": _ordinary_rkcb_pending,

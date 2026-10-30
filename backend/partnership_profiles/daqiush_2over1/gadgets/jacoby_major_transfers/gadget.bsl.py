@@ -165,8 +165,14 @@ def second_minor_game_force(ctx, trump, minor):
     shaped_points = shapely_second_minor_strength(ctx, trump)
     if shaped_points is not None:
         return shaped_points >= 9
-    if ctx.hand.length(trump) == 5 and ctx.hand.length(minor) == 5:
-        return shapely_combined_effective_points(ctx.hand) >= 9
+    if ctx.hand.length(trump) == 5 and ctx.hand.length(minor) >= 5:
+        if (ctx.hand.length(minor) == 5
+                and shapely_combined_effective_points(ctx.hand) >= 9):
+            return True
+        # A strong nine with a five-five or five-six was excluded from the
+        # invitation band, but its shape is worth a natural game force.
+        return (ctx.hand.hcp == 9
+                and ctx.hand_quality['kr_delta'] >= 1.0)
     return ctx.hand.hcp >= 10
 
 
@@ -192,6 +198,22 @@ def shapely_second_minor_strength(ctx, trump):
 def second_round_control(ctx, suit):
     holding = ctx.hand.holding(suit)
     return 'A' in holding or 'K' in holding or len(holding) <= 1
+
+
+def minor_support_cue_applies(ctx, trump, minor, cue, suits):
+    """Choose a three-level support cue for the second minor.
+
+    A sole cue is always available and says nothing about control.  With two
+    cues, show the lowest control; if neither cue is controlled, still cue
+    the lowest one.
+    """
+    if (ctx.hand is None or ctx.hand.length(trump) >= 3
+            or ctx.hand.length(minor) < 4):
+        return False
+    controls = [suit for suit in suits if second_round_control(ctx, suit)]
+    if controls:
+        return cue == controls[0]
+    return cue == suits[0]
 
 
 SUPERACCEPTS = {
@@ -469,8 +491,8 @@ class JacobyMajorTransfers(Gadget):
                 new_suit.description = 'Natural four-plus second minor after Jacoby; game forcing.'
 
                 minor_prefix = ordinary_prefix + '3' + minor + 'P'
-                available_cues = [s for s in 'DHS' if s != minor
-                                  and '3' + s != '3' + minor]
+                available_cues = [s for s in 'DHS'
+                                  if s != minor and s != trump]
                 for cue in available_cues:
                     if (minor == 'D' and cue == 'D') or (minor == 'C' and cue == 'C'):
                         continue
@@ -478,19 +500,105 @@ class JacobyMajorTransfers(Gadget):
                                         + '_support_cue_' + cue.lower())
                     cue_call.when = minor_prefix
                     cue_call.bid = '3' + cue
-                    cue_call.applies = (lambda ctx, t=trump, m=minor, s=cue, earlier=tuple(
-                        earlier for earlier in available_cues if earlier < cue):
-                        ctx.hand is not None and ctx.hand.length(t) < 3
-                        and ctx.hand.length(m) >= 4
-                        and second_round_control(ctx, s)
-                        and not any(second_round_control(ctx, x) for x in earlier))
-                    cue_call.meaning.action = 'minor_support_control'
+                    cue_call.applies = (
+                        lambda ctx, t=trump, m=minor, s=cue,
+                        suits=tuple(available_cues):
+                        minor_support_cue_applies(ctx, t, m, s, suits))
+                    cue_call.meaning.action = 'minor_support_cue'
                     cue_call.meaning.nature = ['artificial']
-                    cue_call.meaning.acts = ['control_showing']
-                    cue_call.meaning.agreed_suit = minor
+                    cue_call.meaning.acts = ['slam_try', 'support']
+                    cue_call.meaning.cue_suit = cue
+                    cue_call.meaning.provisional_suit = minor
                     cue_call.meaning.target_suit = minor
-                    cue_call.effect('agreed_suit').suit = minor
-                    cue_call.description = 'Three-level control cue confirms four-card support for the second minor.'
+                    provisional = cue_call.effect('trump_state')
+                    provisional.status = 'provisional'
+                    provisional.suit = minor
+                    cue_call.description = 'Three-level support cue for the second minor; it does not promise control.'
+
+                    if trump == 'H' and minor == 'D' and cue == 'S':
+                        after_cue = minor_prefix + '3S' + 'P'
+
+                        four_hearts = self.call('jacoby_h_d_support_cue_s_four_hearts')
+                        four_hearts.when = after_cue
+                        four_hearts.bid = '4H'
+                        four_hearts.applies = (
+                            lambda ctx: ctx.hand is not None
+                            and ctx.hand.length('H') >= 6)
+                        four_hearts.meaning.action = 'major_signoff_suggestion'
+                        four_hearts.meaning.nature = ['natural']
+                        four_hearts.meaning.acts = ['signoff']
+                        four_hearts.meaning.target_suit = 'H'
+                        four_hearts.meaning.provisional_suit = 'H'
+                        heart_provisional = four_hearts.effect('trump_state')
+                        heart_provisional.status = 'provisional'
+                        heart_provisional.suit = 'H'
+                        four_hearts.description = (
+                            'Natural six-card heart suggestion; partner may '
+                            'pass or ask diamond keycards with a maximum.')
+
+                        four_clubs = self.call('jacoby_h_d_support_cue_s_four_clubs')
+                        four_clubs.when = after_cue
+                        four_clubs.bid = '4C'
+                        four_clubs.applies = (
+                            lambda ctx: ctx.hand is not None
+                            and not exclusion_slam_available(ctx, 'D')
+                            and second_round_control(ctx, 'C'))
+                        four_clubs.meaning.action = 'minor_support_control'
+                        four_clubs.meaning.nature = ['artificial']
+                        four_clubs.meaning.acts = ['control_showing', 'slam_try']
+                        four_clubs.meaning.control_suit = 'C'
+                        four_clubs.meaning.agreed_suit = 'D'
+                        four_clubs.meaning.target_suit = 'D'
+                        four_clubs.effect('agreed_suit').suit = 'D'
+                        four_clubs.description = 'Club control with diamonds agreed.'
+
+                        four_spades = self.call('jacoby_h_d_support_cue_s_four_spades')
+                        four_spades.when = after_cue
+                        four_spades.bid = '4S'
+                        four_spades.applies = (
+                            lambda ctx: ctx.hand is not None
+                            and not exclusion_slam_available(ctx, 'D')
+                            and second_round_control(ctx, 'S'))
+                        four_spades.meaning.action = 'minor_support_control'
+                        four_spades.meaning.nature = ['artificial']
+                        four_spades.meaning.acts = ['control_showing', 'slam_try']
+                        four_spades.meaning.control_suit = 'S'
+                        four_spades.meaning.agreed_suit = 'D'
+                        four_spades.meaning.target_suit = 'D'
+                        four_spades.effect('agreed_suit').suit = 'D'
+                        four_spades.description = 'Spade control with diamonds agreed.'
+
+                        four_diamonds = self.call('jacoby_h_d_support_cue_s_four_diamonds')
+                        four_diamonds.when = after_cue
+                        four_diamonds.bid = '4D'
+                        four_diamonds.applies = (
+                            lambda ctx: ctx.hand is not None
+                            and ctx.hand.length('D') >= 4
+                            and not second_round_control(ctx, 'C'))
+                        four_diamonds.meaning.action = 'natural_diamond_denial'
+                        four_diamonds.meaning.nature = ['natural']
+                        four_diamonds.meaning.acts = ['descriptive', 'slam_try']
+                        four_diamonds.meaning.agreed_suit = 'D'
+                        four_diamonds.meaning.target_suit = 'D'
+                        four_diamonds.effect('agreed_suit').suit = 'D'
+                        four_diamonds.description = (
+                            'Natural diamonds; 4C was unavailable, so this '
+                            'denies a club control.')
+
+                        accept_hearts = self.call('jacoby_h_d_support_cue_s_hearts_pass')
+                        accept_hearts.when = after_cue + '4HP'
+                        accept_hearts.bid = 'P'
+                        accept_hearts.applies = (
+                            lambda ctx: ctx.hand is not None
+                            and ctx.hand.hcp < 16)
+                        accept_hearts.meaning.action = 'major_signoff_accepted'
+                        accept_hearts.meaning.nature = ['natural']
+                        accept_hearts.meaning.acts = ['signoff', 'final_placement']
+                        accept_hearts.meaning.target_suit = 'H'
+                        accept_hearts.meaning.agreed_suit = 'H'
+                        accept_hearts.meaning.purpose_completed = True
+                        accept_hearts.effect('agreed_suit').suit = 'H'
+                        accept_hearts.description = 'Accept the heart signoff.'
 
                 natural_nt = self.call('jacoby_' + trump.lower() + '_' + minor.lower() + '_no_cue')
                 natural_nt.when = minor_prefix

@@ -1037,11 +1037,22 @@ class OneNotrumpInvitations(Gadget):
 
                 probe_prefix = prefix + '3' + minor + 'P'
                 support_bid = '3D' if answer != '2D' and minor == 'C' else '3H'
+                # After 2H-3C, 3S is natural spades, 3H shows the fifth
+                # heart, and 3D is the artificial club support.
                 for bid, applies, action, target in (
                     ('3D', lambda ctx, a=answer, m=minor: a == '2D' and m == 'C'
                      and ctx.hand.length('D') >= 5, 'natural_diamonds', 'D'),
                     ('3S', lambda ctx, a=answer: a == '2H'
                      and ctx.hand.length('S') >= 4, 'natural_spades', 'S'),
+                    ('3S', lambda ctx, a=answer: a == '2S'
+                     and ctx.hand.length('S') >= 5, 'natural_spades', 'S'),
+                    ('3S', lambda ctx, a=answer, m=minor: a == '2D'
+                     and ctx.hand.length(m) >= 3
+                     and minor_control(ctx, 'S'),
+                     'minor_support_control', minor),
+                    ('3H', lambda ctx, a=answer, m=minor: a == '2H' and m == 'C'
+                     and not (a == '2H' and ctx.hand.length('S') >= 4)
+                     and ctx.hand.length('H') >= 5, 'natural_hearts', 'H'),
                     (support_bid, lambda ctx, a=answer, m=minor: ctx.hand.length(m) >= 3
                      and not (a == '2D' and m == 'C' and ctx.hand.length('D') >= 5)
                      and not (a == '2H' and ctx.hand.length('S') >= 4), 'minor_support', minor),
@@ -1049,23 +1060,74 @@ class OneNotrumpInvitations(Gadget):
                      and not (a == '2D' and m == 'C' and ctx.hand.length('D') >= 5)
                      and not (a == '2H' and ctx.hand.length('S') >= 4), 'natural_notrump', 'N'),
                 ):
-                    if bid == '3D' and not (answer == '2D' and minor == 'C'):
-                        continue
-                    if bid == '3S' and answer != '2H':
+                    if (bid == '3D' and action == 'natural_diamonds'
+                            and not (answer == '2D' and minor == 'C')):
                         continue
                     reply = self.call('stayman_' + answer.lower() + '_' + minor.lower()
                                       + '_' + action)
                     reply.when = probe_prefix
                     reply.bid = bid
                     reply.applies = applies
-                    reply.meaning.action = action
-                    reply.meaning.nature = ['artificial' if action == 'minor_support' else 'natural']
-                    reply.meaning.acts = ['descriptive']
-                    reply.meaning.target_suit = target
                     if action == 'minor_support':
+                        reply.meaning.action = 'minor_support_cue'
+                        reply.meaning.nature = ['artificial']
+                        reply.meaning.acts = ['slam_try', 'support']
                         reply.meaning.agreed_suit = minor
                         reply.effect('agreed_suit').suit = minor
-                    reply.description = 'Natural new suit, conventional minor support, or 3NT without support.'
+                    elif action == 'minor_support_control':
+                        reply.meaning.action = 'minor_support_control'
+                        reply.meaning.nature = ['artificial']
+                        reply.meaning.acts = ['control_showing', 'slam_try']
+                        reply.meaning.control_suit = 'S'
+                        reply.meaning.agreed_suit = minor
+                        reply.effect('agreed_suit').suit = minor
+                    else:
+                        reply.meaning.action = action
+                        reply.meaning.nature = ['natural']
+                        reply.meaning.acts = ['descriptive']
+                    reply.meaning.target_suit = target
+                    if action == 'natural_spades':
+                        reply.description = (
+                            'Natural fifth spade; it does not agree spades.'
+                            if answer == '2S' else
+                            'Natural four-card spade suit; it does not agree spades.')
+                    elif action == 'natural_hearts':
+                        reply.description = (
+                            'Natural fifth heart; it does not agree hearts.')
+                    else:
+                        reply.description = ('Natural new suit, conventional '
+                                             'minor support, or 3NT without support.')
+
+                notrump_signoff = self.call('stayman_' + answer.lower() + '_'
+                                            + minor.lower() + '_notrump_signoff')
+                notrump_signoff.when = probe_prefix + '3NTP'
+                notrump_signoff.bid = 'P'
+                notrump_signoff.applies = (
+                    lambda ctx: ctx.hand is not None
+                    and not minor_slam_interest(ctx.hand))
+                notrump_signoff.meaning.action = 'natural_minor_probe_notrump_signoff'
+                notrump_signoff.meaning.nature = ['natural']
+                notrump_signoff.meaning.acts = ['signoff', 'final_placement']
+                notrump_signoff.meaning.target_suit = 'N'
+                notrump_signoff.meaning.purpose_completed = True
+                notrump_signoff.description = (
+                    'Without further slam interest, pass the natural 3NT.')
+
+                if answer == '2H' and minor == 'C':
+                    hearts_notrump = self.call('stayman_2h_c_after_hearts_notrump')
+                    hearts_notrump.when = probe_prefix + '3HP'
+                    hearts_notrump.bid = '3NT'
+                    hearts_notrump.applies = (
+                        lambda ctx: ctx.hand is not None
+                        and not minor_slam_interest(ctx.hand))
+                    hearts_notrump.meaning.action = 'natural_minor_probe_hearts_notrump'
+                    hearts_notrump.meaning.nature = ['natural']
+                    hearts_notrump.meaning.acts = ['signoff', 'final_placement']
+                    hearts_notrump.meaning.target_suit = 'N'
+                    hearts_notrump.meaning.purpose_completed = True
+                    hearts_notrump.description = (
+                        'After opener shows five hearts, choose 3NT without '
+                        'further slam interest.')
 
         for bid, applies, action in (
             ('4S', lambda ctx: ctx.hand is not None and ctx.hand.length('S') >= 4, 'spade_fit'),

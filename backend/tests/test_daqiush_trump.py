@@ -24,14 +24,32 @@ class DaqiushTrumpPrefixes(unittest.TestCase):
         found = replay_auction(self.profile, Auction.parse('1NP2CP2DP4CP4DP4HP4S'))
         self.assertEqual(found.trump_state('ns').suit, 'D')
 
-    def test_diamond_agreement_persists_through_natural_four_hearts_and_keycard_ask(self):
-        agreed = replay_auction(self.profile, Auction.parse('1NP2DP2HP3DP3S'))
-        self.assertEqual(agreed.trump_state('ns').suit, 'D')
-        natural = replay_auction(self.profile, Auction.parse('1NP2DP2HP3DP3SP4H'))
-        self.assertEqual(natural.trump_state('ns').suit, 'D')
-        ask = replay_auction(self.profile, Auction.parse('1NP2DP2HP3DP3SP4HP4N'))
+    def test_provisional_diamond_then_heart_flip_then_keycard_diamond(self):
+        natural_second = replay_auction(
+            self.profile, Auction.parse('1NP2DP2HP3DP'))
+        self.assertEqual(natural_second.trump_state('ns').suit, 'H')
+        self.assertEqual(natural_second.trump_state('ns').status, 'agreed')
+
+        provisional = replay_auction(
+            self.profile, Auction.parse('1NP2DP2HP3DP3S'))
+        self.assertEqual(provisional.trump_state('ns').suit, 'D')
+        self.assertEqual(provisional.trump_state('ns').status, 'provisional')
+
+        flipped = replay_auction(
+            self.profile, Auction.parse('1NP2DP2HP3DP3SP4H'))
+        self.assertEqual(flipped.trump_state('ns').suit, 'H')
+        self.assertEqual(flipped.trump_state('ns').status, 'provisional')
+
+        accepted = replay_auction(
+            self.profile, Auction.parse('1NP2DP2HP3DP3SP4HPP'))
+        self.assertEqual(accepted.trump_state('ns').suit, 'H')
+        self.assertEqual(accepted.trump_state('ns').status, 'agreed')
+
+        ask = replay_auction(
+            self.profile, Auction.parse('1NP2DP2HP3DP3SP4HP4N'))
         self.assertTrue(ask.state_exists({'key': 'keycard_context', 'trump_suit': 'D'}))
         self.assertEqual(ask.trump_state('ns').suit, 'D')
+        self.assertEqual(ask.trump_state('ns').status, 'agreed')
 
 
 if __name__ == '__main__':

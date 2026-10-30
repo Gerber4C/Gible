@@ -13,10 +13,117 @@ from dataclasses import dataclass
 from .call_space import contract_at_rank, contract_rank
 from .cards import Hand
 from .legality import is_call_legal, legal_calls
+from .rkcb_continuation import public_minimum_length
 
 
 TOTAL_EFFECTIVE_KEYCARDS = 4
 SMALL_SLAM_MINIMUM = 3
+PARTNER = {'n': 's', 's': 'n', 'e': 'w', 'w': 'e'}
+
+
+def current_voidwood_trump(trace, actor: str) -> str | None:
+    """Return the latest reference trump, agreed or provisional.
+
+    A provisional support cue may be converted to agreed by the Voidwood ask
+    itself; a historical agreement must never be used.
+    """
+    side = 'ns' if actor in 'ns' else 'ew'
+    state = trace.trump_state(side)
+    if state.status in ('agreed', 'provisional'):
+        return state.suit
+    return None
+
+
+def inferred_voidwood_trump(auction, trace) -> tuple[str, int] | None:
+    """Infer a global Voidwood trump and partner's likely minimum length.
+
+    The default is partner's last natural suit.  If partner's last non-pass
+    call was notrumps, use the acting side's own last natural suit instead.
+    The caller must still combine this with its own length to decide whether
+    the likely fit is playable.
+    """
+    actor = auction.actor_to_call
+    partner = PARTNER.get(actor)
+    if partner is None:
+        return None
+
+    last_partner = _last_non_pass(auction, partner)
+    if last_partner is not None and last_partner[1][1:] == 'N':
+        own = _last_natural_suit(auction, trace, actor)
+        if own is None:
+            return None
+        suit = own[1][1]
+        return suit, _partner_guaranteed_length(trace, partner, suit)
+
+    natural = _last_natural_suit(auction, trace, partner)
+    if natural is None:
+        return None
+    _, call, meaning = natural
+    suit = call[1]
+    return suit, _guaranteed_length(meaning, suit, call)
+
+
+def _last_non_pass(auction, seat: str):
+    for index in range(len(auction.calls) - 1, -1, -1):
+        call = auction.calls[index]
+        if call in ('P', 'X', 'R'):
+            continue
+        if auction.actor_at(index) == seat:
+            return index, call
+    return None
+
+
+def _last_natural_suit(auction, trace, seat: str):
+    for index in range(len(auction.calls) - 1, -1, -1):
+        call = auction.calls[index]
+        if auction.actor_at(index) != seat:
+            continue
+        if (call in ('P', 'X', 'R') or len(call) != 2
+                or call[1] not in 'CDHS'):
+            continue
+        meaning = _meaning_at(trace, index)
+        if 'natural' in meaning.get('nature_labels', ()):
+            return index, call, meaning
+    return None
+
+
+def _meaning_at(trace, index: int) -> dict:
+    for entry in trace.applied_meanings:
+        if entry.get('index') == index:
+            return entry.get('public_meaning', {}) or {}
+    return {}
+
+
+def _guaranteed_length(meaning: dict, suit: str, call: str) -> int:
+    length = public_minimum_length(meaning, suit)
+    if length > 0:
+        return length
+    if meaning.get('target_suit') == suit:
+        for key in ('minimum_length', 'support_length_min'):
+            value = meaning.get(key)
+            if isinstance(value, int) and value > 0:
+                return value
+    if 'natural' in meaning.get('nature_labels', ()) and len(call) == 2:
+        if int(call[0]) >= 3:
+            return 4
+        return 3 if suit in 'HS' else 4
+    return 0
+
+
+def _partner_guaranteed_length(trace, partner: str, suit: str) -> int:
+    best = 0
+    for entry in trace.applied_meanings:
+        if entry.get('seat') != partner:
+            continue
+        meaning = entry.get('public_meaning', {}) or {}
+        if (meaning.get('target_suit') != suit
+                and meaning.get('agreed_suit') != suit
+                and public_minimum_length(meaning, suit) <= 0):
+            continue
+        best = max(best, _guaranteed_length(
+            meaning, suit, entry.get('call', '')))
+    return best
+
 
 
 @dataclass(frozen=True)

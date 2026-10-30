@@ -110,17 +110,32 @@ def public_voidwood_requires(ctx, trump):
 
     A pending ordinary keycard frame means the same bid belongs to the
     ordinary-RKCB answer set; Voidwood must not compete for it in replay.
+    The trump may be already agreed or inferred from the last natural suit
+    when the partnership has not agreed one yet.
     """
-    return (ctx.state.exists('agreed_suit', suit=trump)
-            and not ctx.state.exists('keycard_context', method='rkcb_1430'))
+    if ctx.state.exists('keycard_context', method='rkcb_1430'):
+        return False
+    current = current_voidwood_trump(ctx.trace, ctx.auction.actor_to_call)
+    if current is not None:
+        return current == trump
+    inferred = inferred_voidwood_trump(ctx.auction, ctx.trace)
+    return inferred is not None and inferred[0] == trump
 
 
 def state_voidwood_ask(ctx, trump, void, ask):
-    """The generic confirmed-trump Voidwood gate."""
+    """The generic confirmed- or inferred-trump Voidwood gate."""
     if ctx.hand is None or ctx.hand.length(void) != 0:
         return False
-    if not state_exists(ctx, 'agreed_suit', suit=trump):
-        return False
+    current = current_voidwood_trump(ctx.trace, ctx.auction.actor_to_call)
+    if current is not None:
+        if current != trump:
+            return False
+    else:
+        inferred = inferred_voidwood_trump(ctx.auction, ctx.trace)
+        if inferred is None or inferred[0] != trump:
+            return False
+        if ctx.hand.length(trump) + inferred[1] < 8:
+            return False
     if state_exists(ctx, 'keycard_context', status='pending'):
         return False
     if state_exists(ctx, 'voidwood', status='pending'):
