@@ -22,6 +22,8 @@ CALL_ORDER = ('4C', '4D', '4H', '4S', '4NT', '5C', '5D', '5H', '5S',
               '5NT', '6C', '6D', '6H', '6S', '6NT', '7C', '7D', '7H', '7S', '7NT')
 
 MINIMUM_ASK_KR = 17.0
+MINIMUM_VOIDWOOD_ASKER_LENGTH = 6
+MINIMUM_EFFECTIVE_QUEEN_FIT = 9
 
 # ask bid, trump, void suit, five answer bids (0/3, 1/4 no Q, 1/4 Q, 2 no Q, 2 Q)
 VOIDWOOD_ASKS = (
@@ -63,10 +65,20 @@ def next_non_trump(anchor, trump):
 
 
 def voidwood_ask_eligible(ctx, trump, void):
-    return (ctx.hand is not None and ctx.hand.length(trump) >= 5
+    return (ctx.hand is not None
+            and ctx.hand.length(trump) >= MINIMUM_VOIDWOOD_ASKER_LENGTH
             and ctx.hand.length(void) == 0
             and state_exists(ctx, 'agreed_suit', suit=trump)
             and ctx.hand_quality['kr_points'] >= MINIMUM_ASK_KR)
+
+
+def has_effective_trump_queen(ctx, trump):
+    """An actual queen, or the public nine-card fit announced by Voidwood."""
+    return (ctx.hand.contains_rank(trump, 'Q')
+            or ctx.state.exists(
+                'agreed_suit', suit=trump,
+                asker_min_length=MINIMUM_VOIDWOOD_ASKER_LENGTH,
+                min_total=MINIMUM_EFFECTIVE_QUEEN_FIT))
 
 
 def voidwood_answer(ctx, trump, void, counts, queen):
@@ -81,7 +93,7 @@ def voidwood_answer(ctx, trump, void, counts, queen):
     count = ctx.hand.keycard_count(trump, excluded_suit=void)
     if count not in counts:
         return False
-    return queen is None or ctx.hand.contains_rank(trump, 'Q') == queen
+    return queen is None or has_effective_trump_queen(ctx, trump) == queen
 
 
 def queen_answer(ctx, trump, with_queen):
@@ -89,7 +101,7 @@ def queen_answer(ctx, trump, with_queen):
         return False
     if not ctx.state.exists('keycard_context', trump_suit=trump, status='pending'):
         return False
-    return ctx.hand.contains_rank(trump, 'Q') == with_queen
+    return has_effective_trump_queen(ctx, trump) == with_queen
 
 
 def king_in(ctx, suit, void):
@@ -124,7 +136,9 @@ def public_voidwood_requires(ctx, trump):
 
 def state_voidwood_ask(ctx, trump, void, ask):
     """The generic confirmed- or inferred-trump Voidwood gate."""
-    if ctx.hand is None or ctx.hand.length(void) != 0:
+    if (ctx.hand is None
+            or ctx.hand.length(trump) < MINIMUM_VOIDWOOD_ASKER_LENGTH
+            or ctx.hand.length(void) != 0):
         return False
     current = current_voidwood_trump(ctx.trace, ctx.auction.actor_to_call)
     if current is not None:
@@ -161,7 +175,7 @@ def state_voidwood_answer(ctx, ask, step):
     count = effective_keycards(ctx.hand, trump, void)
     if count not in counts:
         return False
-    return queen is None or ctx.hand.contains_rank(trump, 'Q') == queen
+    return queen is None or has_effective_trump_queen(ctx, trump) == queen
 
 
 def last_non_pass(auction):
@@ -309,7 +323,10 @@ class Voidwood(Gadget):
             call.meaning.target_suit = trump
             call.meaning.agreed_suit = trump
             call.meaning.void_suit = void
-            call.effect('agreed_suit').suit = trump
+            agreement = call.effect('agreed_suit')
+            agreement.suit = trump
+            agreement.asker_min_length = MINIMUM_VOIDWOOD_ASKER_LENGTH
+            agreement.min_total = MINIMUM_EFFECTIVE_QUEEN_FIT
             context = call.effect('keycard_context')
             context.trump_suit = trump
             context.excluded_suit = void
@@ -336,6 +353,7 @@ class Voidwood(Gadget):
                 answer.meaning.keycard_counts = list(counts)
                 if queen is not None:
                     answer.meaning.trump_queen = queen
+                    answer.meaning.trump_queen_basis = 'actual_or_nine_card_fit'
                 answer.description = ('Voidwood answer: ' + answer_map[index]
                                       + ' shows ' + str(counts) + ' keycards outside '
                                       + void + '.')
@@ -667,7 +685,10 @@ class Voidwood(Gadget):
                     call.meaning.target_suit = trump
                     call.meaning.agreed_suit = trump
                     call.meaning.void_suit = void
-                    call.effect('agreed_suit').suit = trump
+                    agreement = call.effect('agreed_suit')
+                    agreement.suit = trump
+                    agreement.asker_min_length = MINIMUM_VOIDWOOD_ASKER_LENGTH
+                    agreement.min_total = MINIMUM_EFFECTIVE_QUEEN_FIT
                     frame = call.effect('voidwood')
                     frame.trump = trump
                     frame.void = void
@@ -700,6 +721,7 @@ class Voidwood(Gadget):
                         answer.meaning.keycard_counts = list(counts)
                         if queen is not None:
                             answer.meaning.trump_queen = queen
+                            answer.meaning.trump_queen_basis = 'actual_or_nine_card_fit'
                         answer.description = ('Voidwood answer ' + answers[step]
                                               + ' for the ' + void + ' void.')
                     q = queen_ask_bid(ask, trump)

@@ -120,9 +120,9 @@ class VoidwoodProfileTests(unittest.TestCase):
         spade_route = '1NP2HP2SP3DP3HP'
         heart_route = '1NP2DP2HP3DP3SP'
         self.assertEqual(
-            self.bid(spade_route, 'SAQJ76HKQ5DAKQJ4C-'), '5C')
+            self.bid(spade_route, 'SAQJ76HKQDAKQJ45C-'), '5C')
         self.assertEqual(
-            self.bid(heart_route, 'SKQ5HAQJ76DAJ954C-'), '5C')
+            self.bid(heart_route, 'SKQHAQJ76DAJ9543C-'), '5C')
         self.assertEqual(
             self.bid(spade_route + '5CP', 'S987HKJ4D9876CQJ2'), '5D')
         self.assertEqual(
@@ -155,9 +155,9 @@ class VoidwoodProfileTests(unittest.TestCase):
 
     def test_transfer_regression_still_works(self):
         self.assertEqual(
-            self.bid('1NP2HP2SP', 'SAQJ76HKQ5DKQ764C-'), '5C')
+            self.bid('1NP2HP2SP', 'SAQJ765HKQDKQ764C-'), '5C')
         self.assertEqual(
-            self.bid('1NP2DP2HP', 'S-HAQJ76DKQ5CKQ765'), '4S')
+            self.bid('1NP2DP2HP', 'S-HAQJ765DKQCKQ765'), '4S')
 
 
 if __name__ == '__main__':

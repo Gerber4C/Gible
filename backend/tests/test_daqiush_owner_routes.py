@@ -156,6 +156,11 @@ class OwnerRouteTests(unittest.TestCase):
         self.assertEqual(
             self.bid('1NP2DP2HP4SP5HP5SP5NP7HP', north), 'P')
 
+    def test_voidwood_uses_nine_card_fit_as_effective_trump_queen(self):
+        north = 'SAKH843DK76542CAJ'
+        self.assertEqual(
+            self.bid('1NP2DP2HP4SP', north), '5D')
+
 
 class ExclusionKeycardTests(unittest.TestCase):
     @classmethod
@@ -167,18 +172,17 @@ class ExclusionKeycardTests(unittest.TestCase):
                           Hand.parse(cards)).call
 
     def test_asks_show_a_void(self):
-        self.assertEqual(self.bid('1NP2HP2SP', 'SAQJ76HKQ5DKQ764C-'), '5C')
-        self.assertEqual(self.bid('1NP2DP2HP', 'S-HAQJ76DKQ5CKQ765'), '4S')
+        self.assertEqual(self.bid('1NP2HP2SP', 'SAQJ765HKQDKQ764C-'), '5C')
+        self.assertEqual(self.bid('1NP2DP2HP', 'S-HAQJ765DKQCKQ765'), '4S')
 
     def test_five_step_answers_and_followups(self):
         opener = 'SAK5HKQ4DKQ765C32'
-        self.assertEqual(self.bid('1NP2HP2SP5CP', opener), '5N')
+        self.assertEqual(self.bid('1NP2HP2SP5CP', opener), '6C')
         zero = 'SQJ5HQJ4DQJ765C32'
         self.assertEqual(self.bid('1NP2HP2SP5CP', zero), '5D')
         self.assertEqual(self.bid('1NP2HP2SP5CP5DP5HP', zero), '5N')
         self.assertEqual(self.bid('1NP2HP2SP5CP5DP5HP',
-                                  'SJ95HQJ4DQJ765C32'), '5S')
-        self.assertEqual(self.bid('1NP2HP2SP5CP5HP5SP', opener), '6D')
+                                  'SJ95HQJ4DQJ765C32'), '5N')
 
 
 class GrandSlamPolicyTests(unittest.TestCase):
