@@ -182,7 +182,8 @@ def five_trump_available(auction, trump: str) -> bool:
 
 
 def lowest_showable_side_king(hand: Hand | None, trump: str, auction,
-                              denied: Iterable[str] = ()) -> str | None:
+                              denied: Iterable[str] = (),
+                              allow_above: bool = False) -> str | None:
     if hand is None:
         return None
     denied = set(denied)
@@ -190,7 +191,8 @@ def lowest_showable_side_king(hand: Hand | None, trump: str, auction,
              if suit != trump and suit not in denied
              and hand.contains_rank(suit, 'K')
              and is_call_legal(auction, f'6{suit}')
-             and bid_rank(f'6{suit}') < bid_rank(f'6{trump}')]
+             and (allow_above
+                  or bid_rank(f'6{suit}') < bid_rank(f'6{trump}'))]
     return min(calls, key=bid_rank) if calls else None
 
 

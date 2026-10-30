@@ -158,6 +158,14 @@ class RelayGeometryTests(unittest.TestCase):
             hand, 'H', auction, denied=('D',)))
         self.assertIsNone(lowest_showable_side_king(hand, 'C', auction))
 
+    def test_lowest_king_can_cross_six_trumps_only_when_allowed(self):
+        auction = Auction.parse('1NP4CP4HP4NP5CP5SP5NP')
+        hand = Hand.parse('SAK2HKQ976D432C42')
+        self.assertIsNone(lowest_showable_side_king(hand, 'H', auction))
+        self.assertEqual(
+            lowest_showable_side_king(hand, 'H', auction, allow_above=True),
+            '6S')
+
 
 class RescueSimulationTests(unittest.TestCase):
     def test_sampling_chooses_the_relay_when_it_is_not_worse(self):

@@ -55,8 +55,11 @@ class DaqiushJacobyTests(unittest.TestCase):
         self.assertEqual(self.bid('1NP2HP2SP3DP', 'SAKQHJT98DAK2C432'), '3S')
         self.assertEqual(self.bid('1NP2HP2SP3DP', 'SAKQHJT98DAK32C42'), '3S')
         self.assertEqual(self.bid('1NP2DP2HP3CP', 'SAKQJHJT9DAK2C432'), '3H')
-        self.assertEqual(self.bid('1NP2HP2SP3DP3SP', 'SAKQJ9H432D9876C2'), '4S')
-        self.assertEqual(self.bid('1NP2DP2HP3CP3HP', 'S2HAKQJ9D432C9876'), '4H')
+        self.assertEqual(self.bid('1NP2HP2SP3DP3SP', 'SAKQJ9H432D9876C2'), '4C')
+        self.assertEqual(self.bid('1NP2HP2SP3DP3SP4CP', 'SAK5HKQ4DQ7654C32'), '4S')
+        self.assertEqual(self.bid('1NP2DP2HP3CP3HP', 'S2HAKQJ9D432C9876'), '3N')
+        self.assertEqual(
+            self.bid('1NP2DP2HP3CP3HP3NTP', 'SAK5HKQ4DQ7654C32'), '4H')
 
     def test_six_card_slam_interest_uses_texas_before_keycard(self):
         self.assertEqual(self.bid('1NP', 'SA62HAQJT72DJ7CJ4'), '4C')
@@ -105,7 +108,7 @@ class DaqiushJacobyTests(unittest.TestCase):
         self.assertEqual(self.bid('1NP2DP2HP', hearts), '3D')
         self.assertEqual(
             self.bid('1NP2HP2SP3CP', 'SA97HK4DK984CAJT3'), '3S')
-        self.assertEqual(self.bid('1NP2HP2SP3CP3SP', spades), '4S')
+        self.assertEqual(self.bid('1NP2HP2SP3CP3SP', spades), '4C')
         # A weaker nine in the same shape remains an invitation.
         self.assertEqual(self.bid('1NP2HP2SP', 'SQJ865HQJD6CQJT54'), '2N')
 

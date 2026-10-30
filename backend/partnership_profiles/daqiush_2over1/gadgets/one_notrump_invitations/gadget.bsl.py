@@ -1563,6 +1563,58 @@ class OneNotrumpInvitations(Gadget):
                     # or someone asks keycards / places the minor game.
                     serious_prefix = prefix + '3NTP'
                     game_minor = '5' + suit
+
+                    # Low-limit four of the minor is forcing.  Its side-suit
+                    # continuations are derived generically, not authored
+                    # call by call.
+                    low_limit = self.call('transfer_' + suit.lower()
+                                          + '_serious_low_limit')
+                    low_limit.when = serious_prefix
+                    low_limit.bid = '4' + suit
+                    low_limit.applies = (lambda ctx: ctx.hand is not None
+                                         and ctx.hand.hcp < 16)
+                    low_limit.meaning.action = 'serious_low_limit_forcing'
+                    low_limit.meaning.nature = ['natural']
+                    low_limit.meaning.acts = ['slam_try', 'game_forcing']
+                    low_limit.meaning.forcing = 'game_forcing'
+                    low_limit.meaning.target_suit = suit
+                    low_limit.meaning.agreed_suit = suit
+                    low_limit.effect('agreed_suit').suit = suit
+                    low_limit.description = (
+                        'Low-limit serious reply at four of the minor; '
+                        'forcing, never the final contract.')
+
+                    low_prefix = serious_prefix + '4' + suit + 'P'
+                    low_keycard = self.call('transfer_' + suit.lower()
+                                            + '_serious_low_limit_keycard')
+                    low_keycard.when = low_prefix
+                    low_keycard.bid = '4NT'
+                    low_keycard.applies = lambda ctx: ctx.hand is not None
+                    low_keycard.meaning.action = 'rkcb_1430'
+                    low_keycard.meaning.nature = ['artificial']
+                    low_keycard.meaning.acts = ['inquiry', 'keycard_asking']
+                    low_keycard.meaning.target_suit = suit
+                    low_keycard.meaning.agreed_suit = suit
+                    low_keycard.effect('agreed_suit').suit = suit
+                    context = low_keycard.effect('keycard_context')
+                    context.trump_suit = suit
+                    context.ask_call = '4N'
+                    context.method = 'rkcb_1430'
+                    context.status = 'pending'
+
+                    low_game = self.call('transfer_' + suit.lower()
+                                         + '_serious_low_limit_game')
+                    low_game.when = low_prefix
+                    low_game.bid = game_minor
+                    low_game.applies = lambda ctx: ctx.hand is not None
+                    low_game.meaning.action = 'serious_low_limit_game'
+                    low_game.meaning.nature = ['natural']
+                    low_game.meaning.acts = ['signoff', 'final_placement']
+                    low_game.meaning.target_suit = suit
+                    low_game.meaning.agreed_suit = suit
+                    low_game.meaning.purpose_completed = True
+                    low_game.effect('agreed_suit').suit = suit
+
                     cue_suits = [side for side in 'CDHS' if side != suit]
                     cue_sequences = [()]
                     for first_index in range(len(cue_suits)):

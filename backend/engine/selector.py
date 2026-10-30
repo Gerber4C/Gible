@@ -10,7 +10,7 @@ from .axioms import evaluate_axioms
 from .cards import Hand
 from .candidate_generation import agreed_trump_fallback, default_candidate, generate_candidates
 from .context import BidDecision, CandidatePool
-from .decision import choose_candidate, _resolve_same_call_meanings
+from .decision import choose_candidate, _ordered_with_selected_first, _resolve_same_call_meanings
 from .dds_adapter import DDSUnavailableError
 from .deal_sampler import SamplingExhausted
 from .hand_quality import assess_quality
@@ -108,7 +108,7 @@ def choose_bid(
                       else (purpose.candidate,))
     elif terminal is not None:
         candidates = (terminal,)
-    elif purpose_controls or generated or not profile.derived_semantics:
+    elif purpose_controls or not profile.derived_semantics:
         candidates = generated
     else:
         from .derived_evidence import collect_evidence
@@ -128,12 +128,14 @@ def choose_bid(
                 for candidate in derived.candidates],
             'conflicts': list(derived.conflicts),
         }
-        derived_candidates = derived.candidates
-        if generated:
-            derived_candidates = tuple(
-                candidate for candidate in derived_candidates
-                if candidate.call != 'P')
+        authored_calls = {candidate.call for candidate in generated}
+        derived_candidates = tuple(
+            replace(candidate, score=candidate.score - 1000)
+            if generated else candidate
+            for candidate in derived.candidates
+            if candidate.call not in authored_calls)
         candidates = tuple(generated) + derived_candidates
+    pool_candidates_full = tuple(candidates)
     nfrkcb = _nfrkcb_response(profile, auction, trace, hand, candidates)
     if nfrkcb == 'error':
         trace.warn('NFRKCB response needs sampled evidence')
@@ -448,10 +450,12 @@ def choose_bid(
             trace.warn(f"Axiom {error['code']}: {error['message']}")
         return BidDecision(call=None, selected_candidate=None, candidate_pool=CandidatePool((),auction),
                            trace=trace, private_memory=actor_memory)
+    pool_candidates = _ordered_with_selected_first(
+        decision.selected, pool_candidates_full)
     return BidDecision(
         call=decision.selected.call,
         selected_candidate=decision.selected,
-        candidate_pool=CandidatePool(decision.ordered, auction),
+        candidate_pool=CandidatePool(pool_candidates, auction),
         trace=trace,
         policy_origin=decision.policy_origin,
         context=decision.context,

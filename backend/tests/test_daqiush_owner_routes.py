@@ -77,8 +77,8 @@ class OwnerRouteTests(unittest.TestCase):
         south = 'SAKH52DKQCAKQT764'
         north = 'SQJT4HAKDAT652CJ9'
         self.assertEqual(self.bid('1NP2SP3CP', south), '3N')
-        self.assertEqual(self.bid('1NP2SP3CP3NTP', north), '4D')
-        self.assertEqual(self.bid('1NP2SP3CP3NTP4DP', south), '4N')
+        self.assertEqual(self.bid('1NP2SP3CP3NTP', north), '4C')
+        self.assertEqual(self.bid('1NP2SP3CP3NTP4CP', south), '4N')
 
     # Bug 3: six-four minors transfer, then show the other minor.
     def test_six_four_minors_transfer_then_show_other_minor(self):
@@ -136,7 +136,7 @@ class OwnerRouteTests(unittest.TestCase):
             self.bid('1NP2SP3CP3NTP', 'SQJHQJ3DQJ4CAKQJ5'), '5C')
         # Cues may cross four of the agreed minor; game remains five.
         self.assertEqual(
-            self.bid('1NP2SP3CP3NTP', 'SAKQHQJ4D765CQJ32'), '4S')
+            self.bid('1NP2SP3CP3NTP', 'SAKQHQJ4DQJ76CQ32'), '4S')
 
         # After the forced cue, an eligible serious hand asks keycards.
         self.assertEqual(

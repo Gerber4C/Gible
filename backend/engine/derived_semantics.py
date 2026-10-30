@@ -51,7 +51,7 @@ def reserved_calls(profile, auction, trace, environment=None) -> frozenset[str]:
 def derive_candidates(profile, auction, trace, evidence: DerivedEvidence,
                       reserved: frozenset[str] = frozenset(), hand=None
                       ) -> DerivationResult:
-    from . import derived_fit_calls, derived_four_notrump
+    from . import derived_cue, derived_fit_calls, derived_four_notrump
     from .derived_terminals import derive_six_notrump, derive_terminal_pass
 
     candidates = []
@@ -59,6 +59,7 @@ def derive_candidates(profile, auction, trace, evidence: DerivedEvidence,
     families = (
         derived_four_notrump.derive,
         derived_fit_calls.derive,
+        derived_cue.derive,
         derive_six_notrump,
         derive_terminal_pass,
     )

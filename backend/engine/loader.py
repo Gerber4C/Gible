@@ -48,6 +48,7 @@ def load_profile(profile_id: str, base_dir: Path | None = None) -> PartnershipPr
         evaluator_specs=profile_evaluators,
         axioms=data.get("axioms", {}),
         missing_call_behavior=data.get('missing_call_behavior', 'fallback'),
+        derived_semantics=data.get('derived_semantics', False),
         description=data.get("description"),
         system_notes=data.get("system_notes"),
     )

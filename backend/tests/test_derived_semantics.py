@@ -165,13 +165,24 @@ class DispatcherIntegrationTests(unittest.TestCase):
         cue = replay_auction(profile, Auction.parse('1HP2HP4CP'))
         entry = next(item for item in cue.applied_meanings
                      if item['call'] == '4C')
-        self.assertEqual(entry['public_meaning']['action_type'],
-                         'derived_major_control_cue')
+        self.assertIn(entry['public_meaning']['action_type'],
+                      ('derived_major_control_cue', 'derived_control_cue'))
         passed = replay_auction(profile, Auction.parse('1HP2HPP'))
         entry = next(item for item in passed.applied_meanings
                      if item['index'] == 4)
         self.assertEqual(entry['public_meaning']['action_type'],
                          'derived_terminal_pass')
+
+    def test_derived_cue_is_added_beside_authored_candidates(self):
+        from engine.selector import choose_bid
+        profile = load_profile('daqiush_2over1')
+        decision = choose_bid(
+            profile, Auction.parse('1NP2SP3CP3NTP4CP'),
+            Hand.parse('SQJHQJDAKQCAQJxxx'))
+        rules = {item['rule']
+                 for item in decision.trace.derivation['candidates']}
+        self.assertIn('derive_control_cue', rules)
+        self.assertEqual(decision.call, '4N')
 
     def test_trace_derivation_contains_no_private_cards(self):
         import json

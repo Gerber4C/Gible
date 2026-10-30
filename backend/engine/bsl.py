@@ -758,7 +758,8 @@ def _class_metadata(cls: type, kind: str) -> dict[str, Any]:
         data["namespace"] = getattr(cls, "namespace", object_id)
     if hasattr(cls, "gadgets"):
         data["gadgets"] = [_gadget_reference(item) for item in getattr(cls, "gadgets")]
-    for key in ("description", "system_notes", "axioms", "missing_call_behavior"):
+    for key in ("description", "system_notes", "axioms", "missing_call_behavior",
+                "derived_semantics"):
         if getattr(cls, key, None) is not None:
             data[key] = getattr(cls, key)
     return data
