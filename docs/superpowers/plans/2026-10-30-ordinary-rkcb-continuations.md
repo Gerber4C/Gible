@@ -674,4 +674,3 @@ git commit -m "docs: describe ordinary rkcb continuations"
 - [ ] **Step 9: Request code review**
 
 Use `superpowers:requesting-code-review` with the approved specification, this plan, the commit range, and the exact test evidence. Address findings through `superpowers:receiving-code-review`, rerun the focused and full suites, then use `superpowers:verification-before-completion` before claiming completion.
-

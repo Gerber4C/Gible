@@ -189,4 +189,3 @@
 - [ ] Run `git diff --check` and `git status --short`; require no whitespace errors and preserve unrelated dirty files.
 - [ ] Stage exact integration files with `git add backend/engine/selector.py backend/engine/replay.py backend/engine/derived_replay.py backend/engine/trace.py backend/tests/test_derived_semantics.py backend/tests/test_derived_four_notrump.py backend/tests/test_derived_fit_calls.py backend/tests/test_nfrkcb_policy.py docs/15_daqiush_slam.md docs/19_derived_semantics.md`; commit with `git commit -m "docs: explain derived bidding semantics"`.
 - [ ] Use `superpowers:requesting-code-review`, address findings with `superpowers:receiving-code-review`, rerun focused/full suites, and use `superpowers:verification-before-completion` before reporting success.
-
