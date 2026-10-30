@@ -85,19 +85,15 @@ def six_card_slam_interest(ctx, suit):
 
 
 def game_only_texas(ctx, suit):
+    """Game-only Texas: 6+ trumps and game strength, independent of shape."""
     length = ctx.hand.length(suit)
     if not has_texas_game(ctx, suit) or length < 6:
         return False
-    if sorted((ctx.hand.length('H'), ctx.hand.length('S'))) == [4, 6]:
-        return True
     if length >= 7:
-        supported = long_major_band(ctx, suit) == 'game'
-    else:
-        if max(ctx.hand.length(s) for s in 'CD') == 4:
-            return False  # A second four-card minor needs its Jacoby continuations.
-        side_class, _ = _side_class(ctx, suit)
-        supported = side_class in ('no_shortage', 'small_singleton')
-    return (supported and not six_card_slam_interest(ctx, suit)
+        return (long_major_band(ctx, suit) == 'game'
+                and not six_card_slam_interest(ctx, suit)
+                and not slam_keycard_texas(ctx, suit))
+    return (not six_card_slam_interest(ctx, suit)
             and not slam_keycard_texas(ctx, suit))
 
 

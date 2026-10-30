@@ -2,15 +2,18 @@
 
 
 def exact_minor_two_suit_game(ctx):
+    """5-5 minors at game-forcing strength or stronger; 6-5+ uses 4NT."""
     return (ctx.hand is not None and ctx.hand.length('C') == 5
             and ctx.hand.length('D') == 5
-            and (10 <= ctx.hand.hcp <= 12
-                 or (ctx.hand.hcp == 9 and ctx.hand_quality['kr_delta'] >= 1.0)))
+            and (ctx.hand.hcp >= 10
+                 or (ctx.hand.hcp == 9
+                     and ctx.hand_quality['kr_delta'] >= 1.0)))
 
 
 def six_five_minor_choice(ctx):
-    return (ctx.hand is not None
-            and sorted(ctx.hand.length(s) for s in 'CD') == [5, 6]
+    lengths = None if ctx.hand is None else sorted(
+        ctx.hand.length(s) for s in 'CD')
+    return (lengths is not None and lengths[0] >= 5 and lengths[1] >= 6
             and shapely_combined_effective_points(ctx.hand) >= 7)
 
 
@@ -101,7 +104,7 @@ class MinorTwoSuitGame(Gadget):
         ask.meaning.nature = ['artificial']
         ask.meaning.acts = ['game_forcing']
         ask.meaning.forcing = 'game_forcing'
-        ask.description = 'Five-five minors, game force; this executable slice is game only.'
+        ask.description = 'Five-five minors at game-forcing strength or stronger; 6-5+ minors use the 4NT choice first.'
 
         for answer, applies, stopper_suit in (
             ('3NT', lambda ctx: major_stopper(ctx, 'H') and major_stopper(ctx, 'S'), None),

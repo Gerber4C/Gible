@@ -188,34 +188,34 @@ class DaqiushResampleFollowupTests(unittest.TestCase):
         self.assertEqual(result.status, 'complete')
         self.assertEqual(result.calls[-4:], ('4H', 'P', 'P', 'P'))
 
-    def test_six_five_major_minor_values_second_suit(self):
+    def test_six_five_major_minor_uses_game_only_texas(self):
         cards = 'S2HKQJT98DQJ954C2'
-        self.assertEqual(self.bid('1NP', cards), '2D')
+        self.assertEqual(self.bid('1NP', cards), '4C')
         self.assertEqual(self.bid('1NP2DP2HP', cards), '3D')
         result = simulate_auction(self.profile, {
             'n': 'SJ853HA75DAK3CKT8',
             's': cards,
         })
         self.assertEqual(result.status, 'complete')
-        self.assertEqual(result.calls[-6:], ('3H', 'P', '4H', 'P', 'P', 'P'))
+        self.assertEqual(result.calls[-6:], ('4D', 'P', '4H', 'P', 'P', 'P'))
 
-    def test_six_five_spade_minor_also_values_second_suit(self):
+    def test_six_five_spade_minor_uses_game_only_texas(self):
         cards = 'SKQJT98H2DQJ954C2'
-        self.assertEqual(self.bid('1NP', cards), '2H')
+        self.assertEqual(self.bid('1NP', cards), '4D')
         self.assertEqual(self.bid('1NP2HP2SP', cards), '3D')
         result = simulate_auction(self.profile, {
             'n': 'SJ853HA75DAK3CKT8',
             's': cards,
         })
         self.assertEqual(result.status, 'complete')
-        self.assertEqual(result.calls[-6:], ('3S', 'P', '4S', 'P', 'P', 'P'))
+        self.assertEqual(result.calls[-6:], ('4H', 'P', '4S', 'P', 'P', 'P'))
 
-    def test_seven_retained_points_six_five_major_minor_invites_in_major(self):
+    def test_seven_retained_points_six_five_major_minor_uses_texas(self):
         heart_cards = 'S2HKQJT98DJ9543C2'
         spade_cards = 'SKQJT98H2DJ9543C2'
-        self.assertEqual(self.bid('1NP', heart_cards), '2D')
+        self.assertEqual(self.bid('1NP', heart_cards), '4C')
         self.assertEqual(self.bid('1NP2DP2HP', heart_cards), '3H')
-        self.assertEqual(self.bid('1NP', spade_cards), '2H')
+        self.assertEqual(self.bid('1NP', spade_cards), '4D')
         self.assertEqual(self.bid('1NP2HP2SP', spade_cards), '3S')
 
     def test_six_four_major_invite_and_game_only_texas_are_distinct(self):
@@ -287,6 +287,20 @@ class DaqiushResampleFollowupTests(unittest.TestCase):
         self.assertEqual(sample.call_args.args[:2], ('s', responder))
         self.assertEqual(sample.call_args.kwargs['public_constraints']['n']['min_lengths']['S'], 4)
         self.assertEqual(sample.call_args.kwargs['public_constraints']['n']['max_lengths']['H'], 3)
+
+    def test_five_five_minors_above_the_old_cap_use_three_diamonds(self):
+        self.assertEqual(self.bid('1NP', 'S52HADK9764CAK743'), '3D')
+
+    def test_six_major_honor_singleton_uses_game_only_texas(self):
+        self.assertEqual(self.bid('1NP', 'SKHQT8632DK74CA87'), '4C')
+
+    def test_six_five_minors_keep_their_four_notrump_choice(self):
+        cards = 'S2H2DQJT98CAKQJT9'
+        decision = choose_bid(
+            self.profile, Auction.parse('1NP'), Hand.parse(cards))
+        self.assertIn('4N', [candidate.call
+                             for candidate in decision.candidate_pool.candidates])
+        self.assertNotEqual(decision.call, '3D')
 
 
 if __name__ == '__main__':
