@@ -279,5 +279,28 @@ class HighAnswerGeometryTests(unittest.TestCase):
         self.assertEqual(lowest_counterinvite_king(hand, frame, auction), '6D')
 
 
+class MethodIsolationTests(unittest.TestCase):
+    def test_other_keycard_methods_are_never_ordinary(self):
+        for method in ('voidwood', 'nfrkcb_offer', 'nfrkcb_answered'):
+            with self.subTest(method=method):
+                trace = AuctionTrace()
+                add_context(trace, method=method, status='answered',
+                            trump_suit='H')
+                self.assertIsNone(ordinary_rkcb_frame(trace))
+
+    def test_completed_and_disrupted_frames_are_inactive(self):
+        for status in ('completed', 'disrupted'):
+            with self.subTest(status=status):
+                trace = AuctionTrace()
+                add_context(trace, method='rkcb_1430', status=status,
+                            trump_suit='H')
+                frame = ordinary_rkcb_frame(trace)
+                self.assertIsNotNone(frame)
+                self.assertFalse(frame.active)
+
+    def test_no_keycard_frame_means_no_ordinary_continuation(self):
+        self.assertIsNone(ordinary_rkcb_frame(AuctionTrace()))
+
+
 if __name__ == '__main__':
     unittest.main()

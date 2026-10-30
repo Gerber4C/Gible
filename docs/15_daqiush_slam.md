@@ -340,3 +340,39 @@ previous slice:
 - The six-of-trump grand invite accepts with a top-15% 1NT hand (17 HCP or
   K-R 18) holding the trump queen.
 
+
+## Implementation notes — ordinary RKCB continuations
+
+The ordinary (`method='rkcb_1430'`) engine reads the latest public
+`keycard_context` record and never reuses Voidwood or NFRKCB state.
+
+- Answers remain 5C=1/4, 5D=0/3, 5H=2 without trump Q, 5S=2 with trump Q.
+- A void is useful when it is not trumps and not a suit partner naturally
+  showed at four or more cards. With a useful void, 5NT shows 0/2/4 and an
+  unspecified void; six of a lower void shows 1/3 and that exact void; six of
+  trumps shows 1/3 and a higher void. Only the exact-void answer publishes its
+  suit.
+- When the answer category leaves more than one keycard count possible, the
+  engine prunes mathematically impossible counts. If one count remains it
+  decides deterministically; otherwise it samples category-consistent partner
+  hands and compares the exposed continuations. Without sampling or DDS it
+  returns a structured TD instead of guessing.
+- The lowest legal step above a 5C/5D answer, excluding five of trumps, is the
+  queen ask. It takes precedence over any 5S relay. The queen-ask answer table
+  is not authored yet, so the asker's next turn reports
+  `QUEEN_ASK_CONTINUATION_UNAUTHORED`.
+- 5S is a relay only when it is legal and is not the queen ask. A responder
+  forced to 5NT uses the only authored completion; the asker then Passes a
+  rescue relay or shows its lowest legal side king. With no showable king it
+  returns to six of trumps, otherwise TD.
+- After a direct high answer (5NT or a six-level void/trump answer), Pass
+  places the current contract. A legal lower six-level side-suit bid is a grand
+  invitation, never a specific king ask. Seven of trumps is final. Skipped
+  six-level side suits between the answer and invitation enter
+  `not_required_kings`; higher suits stay unknown.
+- The responder accepts with seven of trumps when the grand policy qualifies,
+  counter-invites once with the lowest still-unknown higher king, or rejects
+  with six of trumps. The original asker then chooses six or seven from
+  sampled evidence. No second counter-invitation is allowed.
+- Voidwood, quantitative 4NT, and NFRKCB are separate methods. Completed or
+  disrupted frames expose no generic ordinary continuation.

@@ -195,7 +195,8 @@ def evaluate_axioms(auction, hand, trace, candidates, raw_config=None):
                                           or (m.get('shape_invitation') and candidate_tags & INVITES
                                               and hand.length(m.get('target_suit')) >= 7
                                               and quality['kr_delta'] >= 2)
-                                          or candidate_tags & {'slam_try','inquiry','control_showing'}):
+                                          or (candidate_tags & {'slam_try','inquiry','control_showing'}
+                                              and str(m.get('action_type','')).startswith('rkcb_1430'))):
             reject('SIGNOFF_REQUIRED','Even partner maximum is insufficient; choose invite_minus or signoff')
         elif action in ('accept','reject') and action not in candidate_tags:
             reject('INVITATION_RESPONSE_REQUIRED',f'Choose a call explicitly marked {action}')
