@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Callable, Mapping
 
 from .auction import Auction
-from .cards import Hand
+from .cards import Hand, SUITS
 from .coverage_scan import (
     DECK,
     _contract,
@@ -1385,6 +1385,7 @@ def match_process_partners(
                 status = _attach_case_result(
                     case, simulation, ew_samples, rng, solve_table)
                 _append_case(updated, case, status)
+                members.append(case)
                 partners.setdefault(north_key, set()).add(mutated_key)
                 partners.setdefault(mutated_key, set()).add(north_key)
                 if mutated_key not in souths:
@@ -1448,6 +1449,7 @@ def match_process_partners(
                 status = _attach_case_result(
                     case, simulation, ew_samples, rng, solve_table)
                 _append_case(updated, case, status)
+                members.append(case)
                 partners.setdefault(south_key, set()).add(north_key)
                 partners.setdefault(north_key, set()).add(south_key)
                 if north_key not in norths:
@@ -1487,11 +1489,11 @@ def _sample_disjoint_north(rng, south: Hand, representative: Mapping, profile):
     shape = representative.get('north_shape')
     if not isinstance(shape, (list, tuple)) or len(shape) != 4:
         return None
-    used = {(suit, rank) for suit in 'SHDC'
+    used = {(suit, rank) for suit in SUITS
             for rank in south.holding(suit)}
     remaining = tuple(card for card in DECK if card not in used)
     eligible = _opener_eligible(profile)
-    for _ in range(2000):
+    for _ in range(200):
         hcp = rng.choice((14, 15, 16, 17, 18))
         cards = _sample_hand(rng, remaining, tuple(shape), hcp)
         if cards is None:
@@ -1512,10 +1514,10 @@ def _sample_disjoint_south(rng, north: Hand, representative: Mapping):
         return None
     if not isinstance(hcp, int) or isinstance(hcp, bool):
         return None
-    used = {(suit, rank) for suit in 'SHDC'
+    used = {(suit, rank) for suit in SUITS
             for rank in north.holding(suit)}
     remaining = tuple(card for card in DECK if card not in used)
-    for _ in range(2000):
+    for _ in range(200):
         cards = _sample_hand(rng, remaining, tuple(shape), hcp)
         if cards is None:
             continue

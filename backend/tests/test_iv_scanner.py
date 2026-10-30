@@ -3,7 +3,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from engine.coverage_extend import _repair_partner_low_cards
+from engine.coverage_extend import (
+    _repair_partner_low_cards, _sample_disjoint_south,
+)
 from engine.cards import Hand
 from engine.iv_scanner import (
     copy_report, delete_report, list_reports, project_report, read_report,
@@ -551,6 +553,19 @@ class IVScannerTests(unittest.TestCase):
             row for row in group['primary_hands']['n']
             if row['hand'] == north_hand)
         self.assertEqual(primary['overflow'], 3)
+
+    def test_disjoint_partner_sampling_uses_the_full_deck(self):
+        import random
+        north = Hand.parse('SAKQJHT98D765C432')
+        south = _sample_disjoint_south(
+            random.Random(2), north,
+            {'south_shape': [4, 3, 3, 3], 'south_hcp': 10,
+             'south_kr': 10.0})
+        self.assertIsNotNone(south)
+        for suit in 'SHDC':
+            self.assertFalse(set(north.holding(suit))
+                             & set(south.holding(suit)))
+        self.assertEqual([south.length(s) for s in 'SHDC'], [4, 3, 3, 3])
 
 
 if __name__ == '__main__':
