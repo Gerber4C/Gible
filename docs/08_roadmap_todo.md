@@ -346,6 +346,13 @@ by Axioms require an explicit design, not an implicit override by a DDS score.
 8. Add central legal-call constraints to reusable Gadgets.
 9. Add custom evaluator libraries for suit quality, losing trick count, controls, rebid ease, playing strength, and vulnerability style.
 10. Add deterministic random-source support for randomized policies.
+11. Redesign quantitative 4NT continuations as a reusable method rather than
+    auction-by-auction enumerations. Cover Pass, the ambiguous extra-shape 5C
+    ace ask, direct ace-showing steps, strain-aware five-level stops, natural
+    six-level descriptions (including 6H from a five-card heart suit),
+    interference, simulation/fallback, and strict separation from RKCB,
+    NFRKCB, Voidwood, and natural 4NT. The bounded Daqiush 1NT routes remain
+    explicitly authored until this redesign has its own approved specification.
 
 ## Meow 2/1 Benchmark Roadmap
 
