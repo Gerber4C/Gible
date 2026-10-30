@@ -79,7 +79,7 @@ def choose_bid(
             f"Illegal prior call {illegal_call.call} at auction position {illegal_call.index + 1}: {illegal_call.reason}"
         )
     active_environment = active_environment_for(profile, environment, auction)
-    purpose = resolve_purpose(auction, trace, actor_memory)
+    purpose = resolve_purpose(auction, trace, actor_memory, hand)
     actor_memory = purpose.memory
     if purpose.error:
         trace.warn('Purpose axiom: ' + purpose.error)
@@ -358,7 +358,8 @@ def choose_bid(
         actor_memory,
     )
     updated_memory = actor_memory.remember_candidate(decision.selected)
-    updated_memory = complete_purpose(updated_memory, purpose.purpose)
+    if purpose.completes:
+        updated_memory = complete_purpose(updated_memory, purpose.purpose)
     updated_memory = remember_selected_purpose(updated_memory, auction, hand, decision.selected)
     checked, final_report = evaluate_axioms(auction, hand, trace, (decision.selected,), profile.axioms)
     if not checked:

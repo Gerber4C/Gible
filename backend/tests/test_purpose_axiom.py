@@ -3,7 +3,10 @@ import unittest
 from engine.auction import Auction
 from engine.cards import Hand
 from engine.loader import load_profile
+from engine.memory import Purpose, SeatMemory
+from engine.purpose_axiom import resolve_purpose
 from engine.selector import choose_bid
+from engine.trace import AuctionTrace, StateRecord
 
 
 class PurposeAxiomTests(unittest.TestCase):
@@ -119,6 +122,94 @@ class PurposeAxiomTests(unittest.TestCase):
                  for other in ('S987H543D9876CK87', 'S987H543D9876CA87')]
         self.assertEqual(calls, ['6H', '6H'])
 
+    def test_new_rkcb_purpose_fields_round_trip_with_legacy_defaults(self):
+        purpose = Purpose(
+            kind='keycard_slam', owner='s', source_index=6,
+            source_call='4N', trump='H', own_keycards=3,
+            owns_trump_queen=True,
+            rkcb_stage='await_relay_completion',
+            relay_intent='show_lowest_king',
+            answer_category='0/2/4/void',
+            not_required_kings=('C', 'D'))
+        self.assertEqual(Purpose.from_dict(purpose.to_dict()), purpose)
+        legacy = Purpose.from_dict({
+            'kind': 'keycard_slam', 'owner': 's', 'source_index': 6,
+            'source_call': '4N', 'trump': 'H', 'own_keycards': 3,
+            'owns_trump_queen': True})
+        self.assertIsNone(legacy.rkcb_stage)
+        self.assertIsNone(legacy.relay_intent)
+        self.assertEqual(legacy.not_required_kings, ())
+
+    def test_terminal_keycard_placement_replaces_the_purpose_once(self):
+        hand = Hand.parse('SAKJHKQ8DA762C954')
+        decision = choose_bid(self.profile, Auction.parse('1NP2DP2HP4CP'), hand)
+        self.assertEqual(decision.call, '4N')
+        continuation = choose_bid(
+            self.profile, Auction.parse('1NP2DP2HP4CP4NP5CP'), hand,
+            private_memory=decision.private_memory.to_dict())
+        self.assertEqual(continuation.call, '6H')
+        self.assertEqual(len(continuation.private_memory.purposes), 1)
+        saved = continuation.private_memory.purposes[0]
+        self.assertEqual((saved.status, saved.rkcb_stage),
+                         ('completed', 'choose_continuation'))
+
+    def test_queen_ask_gap_keeps_the_purpose_active_for_the_next_turn(self):
+        purpose = {'kind': 'keycard_slam', 'owner': 's', 'source_index': 6,
+                   'source_call': '4N', 'trump': 'H', 'own_keycards': 3,
+                   'owns_trump_queen': False, 'status': 'active'}
+        decision = self.choose('1NP4CP4HP4NP5CP', 'SA2HAJ9876DA32CK2', purpose)
+        self.assertIsNone(decision.call)
+        self.assertEqual(len(decision.private_memory.purposes), 1)
+        saved = decision.private_memory.purposes[0]
+        self.assertEqual((saved.status, saved.rkcb_stage),
+                         ('active', 'choose_continuation'))
+
+    def _relay_trace(self, status='relay_completed'):
+        trace = AuctionTrace()
+        trace.add_state(StateRecord('keycard_context', {
+            'method': 'rkcb_1430', 'status': status,
+            'trump_suit': 'H', 'answer_category': '0/2/4/void',
+            'keycard_counts': [0, 2, 4]}, {}))
+        return trace
+
+    def _relay_purpose(self, intent):
+        return Purpose(kind='keycard_slam', owner='s', source_index=6,
+                       source_call='4N', trump='H', own_keycards=3,
+                       owns_trump_queen=True, status='active',
+                       rkcb_stage='await_relay_completion',
+                       relay_intent=intent)
+
+    def test_rescue_relay_passes_after_the_forced_five_notrump(self):
+        auction = Auction.parse('1NP4CP4HP4NP5CP5SP5NP')
+        purpose = self._relay_purpose('rescue')
+        result = resolve_purpose(auction, self._relay_trace(),
+                                 SeatMemory(purposes=(purpose,)),
+                                 Hand.parse('SA2HKQ976D432CK42'))
+        self.assertIsNone(result.error)
+        self.assertEqual(result.candidate.call, 'P')
+        self.assertEqual(result.purpose.status, 'completed')
+        self.assertEqual(result.purpose.rkcb_stage, 'place_after_5nt')
+        self.assertEqual(len(result.memory.purposes), 1)
+
+    def test_grand_relay_shows_the_lowest_legal_side_king(self):
+        auction = Auction.parse('1NP4CP4HP4NP5CP5SP5NP')
+        purpose = self._relay_purpose('show_lowest_king')
+        result = resolve_purpose(auction, self._relay_trace(),
+                                 SeatMemory(purposes=(purpose,)),
+                                 Hand.parse('SA2HKQ976D432CK42'))
+        self.assertIsNone(result.error)
+        self.assertEqual(result.candidate.call, '6C')
+        self.assertEqual(result.purpose.status, 'completed')
+
+    def test_relay_completion_is_required_after_the_relay(self):
+        auction = Auction.parse('1NP4CP4HP4NP5CP5SP5NP')
+        purpose = self._relay_purpose('rescue')
+        result = resolve_purpose(auction, self._relay_trace('relay_pending'),
+                                 SeatMemory(purposes=(purpose,)),
+                                 Hand.parse('SA2HKQ976D432CK42'))
+        self.assertIsNone(result.candidate)
+        self.assertIn('not completed', result.error)
+        self.assertEqual(result.purpose.status, 'active')
     def test_keycard_plan_does_not_override_enemy_interference(self):
         purpose = {'kind': 'keycard_slam', 'owner': 's', 'source_index': 6,
                    'source_call': '4N', 'trump': 'H', 'own_keycards': 4,

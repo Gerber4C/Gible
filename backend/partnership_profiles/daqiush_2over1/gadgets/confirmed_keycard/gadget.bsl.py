@@ -145,6 +145,9 @@ class ConfirmedKeycard(Gadget):
                 answer.meaning.target_suit = trump
                 answer.meaning.agreed_suit = trump
                 answer.meaning.keycard_counts = list(counts)
+                if bid == '5D':
+                    # Partnership-reviewed ordinary default for the 0/3 answer.
+                    answer.meaning.preferred_keycard_count = 3
                 if queen is not None:
                     answer.meaning.trump_queen = queen
                 if bid == '5N':

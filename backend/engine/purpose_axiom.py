@@ -7,6 +7,7 @@ from .calls import normalize_call
 from .context import CallCandidate
 from .legality import SIDE_BY_SEAT, is_call_legal, last_contract_state
 from .memory import Purpose, SeatMemory
+from .rkcb_continuation import bid_rank, ordinary_rkcb_frame
 from .slam_intent import (
     PARTNER_1NT_MIN, PARTNER_DEFAULT_MIN, detect_slam_intent,
 )
@@ -18,6 +19,8 @@ class PurposeResolution:
     candidate: CallCandidate | None = None
     purpose: Purpose | None = None
     error: str | None = None
+    filtered_candidates: tuple[CallCandidate, ...] | None = None
+    completes: bool = True
 
 
 def terminal_pass_candidate(auction, trace) -> CallCandidate | None:
@@ -47,30 +50,48 @@ def terminal_pass_candidate(auction, trace) -> CallCandidate | None:
         metadata={'source_index': index, 'purpose_kind': 'terminal_pass'})
 
 
-def resolve_purpose(auction, trace, memory: SeatMemory) -> PurposeResolution:
+def resolve_purpose(auction, trace, memory: SeatMemory, hand=None) -> PurposeResolution:
     for purpose in reversed(memory.purposes):
         if purpose.status != 'active' or purpose.owner != auction.actor_to_call:
             continue
         if not _valid_source(auction, purpose):
             return PurposeResolution(memory, error='Saved purpose does not match this auction')
         if _opponent_interfered(auction, purpose):
-            return PurposeResolution(memory.replace_purpose(purpose, replace(purpose, status='disrupted')))
+            return PurposeResolution(memory.replace_purpose(
+                purpose, replace(purpose, status='disrupted')))
+        if purpose.kind == 'response_plan':
+            if len(auction.calls) < purpose.source_index + 4:
+                return PurposeResolution(memory)
+            if len(auction.calls) != purpose.source_index + 4:
+                return PurposeResolution(memory.replace_purpose(
+                    purpose, replace(purpose, status='disrupted')))
+            call, error = _response_plan(auction, purpose)
+            if error:
+                return PurposeResolution(memory, purpose=purpose, error=error)
+            if not is_call_legal(auction, call):
+                return PurposeResolution(memory, purpose=purpose,
+                                         error=f'Planned call {call} is illegal in this auction')
+            return PurposeResolution(memory, _candidate(call, purpose), purpose)
+        if purpose.kind != 'keycard_slam':
+            return PurposeResolution(memory, purpose=purpose,
+                                     error=f'Unknown saved purpose: {purpose.kind}')
         if len(auction.calls) < purpose.source_index + 4:
             return PurposeResolution(memory)
-        if len(auction.calls) != purpose.source_index + 4:
-            return PurposeResolution(memory.replace_purpose(purpose, replace(purpose, status='disrupted')))
-        if purpose.kind == 'response_plan':
-            call, error = _response_plan(auction, purpose)
-        elif purpose.kind == 'keycard_slam':
-            call, error = _keycard_slam(auction, trace, purpose)
-        else:
-            call, error = None, f'Unknown saved purpose: {purpose.kind}'
-        if error:
-            return PurposeResolution(memory, purpose=purpose, error=error)
-        if not is_call_legal(auction, call):
-            return PurposeResolution(memory, purpose=purpose,
-                                     error=f'Planned call {call} is illegal in this auction')
-        return PurposeResolution(memory, _candidate(call, purpose), purpose)
+        result = _keycard_slam(auction, trace, purpose, hand)
+        if result.purpose is not None and result.purpose != purpose:
+            memory = memory.replace_purpose(purpose, result.purpose)
+        resolved = result.purpose or purpose
+        if result.error:
+            return PurposeResolution(memory, purpose=resolved,
+                                     error=result.error)
+        if result.call is None:
+            return PurposeResolution(memory, purpose=resolved,
+                                     completes=False)
+        if not is_call_legal(auction, result.call):
+            return PurposeResolution(memory, purpose=resolved,
+                                     error=f'Planned call {result.call} is illegal in this auction')
+        return PurposeResolution(memory, _candidate(result.call, resolved),
+                                 resolved, completes=result.completes)
     return PurposeResolution(memory)
 
 
@@ -111,7 +132,8 @@ def remember_selected_purpose(memory: SeatMemory, auction, hand, candidate) -> S
         source_index=len(auction.calls), source_call=candidate.call, trump=trump,
         own_keycards=hand.keycard_count(trump),
         owns_trump_queen=hand.contains_rank(trump, 'Q'),
-        grand_candidate=intent.grand, combined_min=intent.combined_min))
+        grand_candidate=intent.grand, combined_min=intent.combined_min,
+        rkcb_stage='await_keycard_answer'))
 
 
 def _partner_minimum(auction, owner: str) -> int:
@@ -150,14 +172,40 @@ def _response_plan(auction, purpose):
     return normalize_call(purpose.responses[response]), None
 
 
-def _keycard_slam(auction, trace, purpose):
+@dataclass(frozen=True)
+class _StageResult:
+    call: str | None = None
+    error: str | None = None
+    purpose: Purpose | None = None
+    completes: bool = False
+
+
+def _keycard_slam(auction, trace, purpose, hand=None) -> _StageResult:
     if purpose.own_keycards is None or purpose.owns_trump_queen is None:
-        return None, 'Keycard purpose lacks the asker\'s saved private count'
-    answer_index = purpose.source_index + 2
-    meaning = next((entry['public_meaning'] for entry in trace.applied_meanings
-                    if entry['index'] == answer_index and entry['seat'] != purpose.owner), None)
+        return _StageResult(error='Keycard purpose lacks the asker\'s saved private count')
+    stage = purpose.rkcb_stage or 'await_keycard_answer'
+    frame = ordinary_rkcb_frame(trace)
+    if stage == 'await_keycard_answer':
+        return _choose_after_answer(auction, trace, purpose, hand, frame)
+    if stage == 'choose_continuation':
+        return _choose_continuation(auction, trace, purpose, hand, frame)
+    if stage == 'await_relay_completion':
+        return _observe_relay_completion(auction, purpose, hand, frame)
+    if stage == 'place_after_5nt':
+        return _choose_king_or_small_slam(auction, purpose, hand, frame)
+    return _StageResult(error=f'Unknown RKCB continuation stage: {stage}')
+
+
+def _choose_after_answer(auction, trace, purpose, hand, frame):
+    meaning = _answer_meaning(trace, purpose)
     if not meaning or 'keycard_counts' not in meaning:
-        return None, 'Partner keycard answer has no unambiguous public meaning'
+        return _StageResult(
+            error='Partner keycard answer has no unambiguous public meaning',
+            purpose=replace(purpose, rkcb_stage='choose_continuation'))
+    category = ((frame.answer_category if frame is not None else None)
+                or meaning.get('answer_category'))
+    with_stage = replace(purpose, rkcb_stage='choose_continuation',
+                         answer_category=category)
     possible_counts = [count for count in meaning['keycard_counts']
                        if 0 <= 5 - purpose.own_keycards - count <= 5]
     # The partnership may state a preferred interpretation of an ambiguous
@@ -169,24 +217,115 @@ def _keycard_slam(auction, trace, purpose):
     missing = {5 - purpose.own_keycards - count for count in possible_counts
                if 0 <= 5 - purpose.own_keycards - count <= 5}
     if len(missing) != 1:
-        return None, 'Partner keycard answer leaves the number of missing keycards ambiguous'
+        return _StageResult(
+            error='Partner keycard answer leaves the number of missing keycards ambiguous',
+            purpose=with_stage)
     missing_count = missing.pop()
     game, slam = f'5{purpose.trump}', f'6{purpose.trump}'
     if missing_count >= 2:
-        return game, None
+        return _StageResult(game, purpose=_completed(with_stage))
     queen_known = (purpose.owns_trump_queen is True
                    or meaning.get('trump_queen') is True)
     if missing_count == 0 and queen_known and purpose.grand_candidate:
-        return f'7{purpose.trump}', None
+        return _StageResult(f'7{purpose.trump}', purpose=_completed(with_stage))
     if missing_count == 0 or queen_known:
-        return slam, None
+        return _StageResult(slam, purpose=_completed(with_stage))
     if meaning.get('trump_queen') is False:
-        return game, None
+        return _StageResult(game, purpose=_completed(with_stage))
     # An unknown queen must be asked when a legal non-trump step remains below
     # the five-level trump signoff. Its exact call/answers belong to the profile.
     if _queen_ask_space(auction, game):
-        return None, 'Trump queen ask has space but no authored continuation'
-    return slam, None
+        return _StageResult(
+            error='Trump queen ask has space but no authored continuation',
+            purpose=with_stage)
+    return _StageResult(slam, purpose=_completed(with_stage))
+
+
+def _choose_continuation(auction, trace, purpose, hand, frame):
+    if frame is None:
+        return _StageResult(error='Ordinary keycard frame is unavailable')
+    if frame.trump != purpose.trump:
+        return _StageResult(error='Ordinary keycard frame changed the agreed trump')
+    if frame.status == 'disrupted':
+        return _StageResult(
+            purpose=replace(purpose, status='disrupted',
+                            answer_category=frame.answer_category))
+    if frame.status == 'completed':
+        return _StageResult(
+            purpose=replace(purpose, status='completed',
+                            answer_category=frame.answer_category))
+    if frame.status == 'relay_completed':
+        return _observe_relay_completion(auction, purpose, hand, frame)
+    if frame.status == 'relay_pending':
+        return _StageResult(
+            error='Relay is awaiting partner\'s forced five notrump',
+            purpose=purpose)
+    if frame.continuation_stage == 'counterinvited':
+        return _StageResult(
+            error='Keycard counter-invitation continuation is not authored',
+            purpose=purpose)
+    return _StageResult(
+        error='No authored continuation matches this keycard frame',
+        purpose=purpose)
+
+
+def _observe_relay_completion(auction, purpose, hand, frame):
+    if frame is None:
+        return _StageResult(error='Ordinary keycard frame is unavailable')
+    if frame.status == 'relay_pending':
+        return _StageResult(
+            error='Partner has not completed the forced five notrump relay',
+            purpose=purpose)
+    if frame.status != 'relay_completed':
+        return _StageResult(
+            error='The five spade relay is not awaiting completion',
+            purpose=purpose)
+    advanced = replace(purpose, rkcb_stage='place_after_5nt')
+    return _choose_king_or_small_slam(auction, advanced, hand, frame)
+
+
+def _choose_king_or_small_slam(auction, purpose, hand, frame):
+    if frame is None or frame.status != 'relay_completed':
+        return _StageResult(
+            error='The five notrump relay has not been completed',
+            purpose=purpose)
+    if purpose.relay_intent == 'rescue':
+        return _StageResult('P', purpose=_completed(purpose))
+    if purpose.relay_intent != 'show_lowest_king':
+        return _StageResult(error='Saved keycard relay intent is missing',
+                            purpose=purpose)
+    king = _lowest_showable_side_king(
+        hand, purpose.trump, auction, denied=purpose.not_required_kings)
+    if king is not None:
+        return _StageResult(king, purpose=_completed(purpose))
+    small_slam = f'6{purpose.trump}'
+    if is_call_legal(auction, small_slam):
+        return _StageResult(small_slam, purpose=_completed(purpose))
+    return _StageResult(
+        error='No legal king or small-slam return is available after the relay',
+        purpose=purpose)
+
+
+def _lowest_showable_side_king(hand, trump, auction, denied=()):
+    if hand is None:
+        return None
+    calls = [f'6{suit}' for suit in 'CDHS'
+             if suit != trump and suit not in denied
+             and hand.contains_rank(suit, 'K')
+             and is_call_legal(auction, f'6{suit}')
+             and bid_rank(f'6{suit}') < bid_rank(f'6{trump}')]
+    return min(calls, key=bid_rank) if calls else None
+
+
+def _completed(purpose):
+    return replace(purpose, status='completed')
+
+
+def _answer_meaning(trace, purpose):
+    answer_index = purpose.source_index + 2
+    return next((entry['public_meaning'] for entry in trace.applied_meanings
+                 if entry['index'] == answer_index
+                 and entry['seat'] != purpose.owner), None)
 
 
 def _queen_ask_space(auction, game):

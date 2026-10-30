@@ -19,19 +19,28 @@ class Purpose:
     grand_candidate: bool | None = None
     combined_min: int | None = None
     responses: dict[str, str] = field(default_factory=dict)
+    rkcb_stage: str | None = None
+    relay_intent: str | None = None
+    answer_category: str | None = None
+    not_required_kings: tuple[str, ...] = ()
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Purpose":
-        return cls(**{key: data.get(key) for key in (
+        values = {key: data.get(key) for key in (
             'kind', 'owner', 'source_index', 'source_call', 'trump',
             'status', 'own_keycards', 'owns_trump_queen', 'grand_candidate',
-            'combined_min', 'responses') if key in data})
+            'combined_min', 'responses', 'rkcb_stage', 'relay_intent',
+            'answer_category', 'not_required_kings') if key in data}
+        if values.get('not_required_kings') is not None:
+            values['not_required_kings'] = tuple(values['not_required_kings'])
+        return cls(**values)
 
     def to_dict(self) -> dict[str, Any]:
         return {key: getattr(self, key) for key in (
             'kind', 'owner', 'source_index', 'source_call', 'trump',
             'status', 'own_keycards', 'owns_trump_queen', 'grand_candidate',
-            'combined_min', 'responses')}
+            'combined_min', 'responses', 'rkcb_stage', 'relay_intent',
+            'answer_category', 'not_required_kings')}
 
 
 @dataclass(frozen=True)
