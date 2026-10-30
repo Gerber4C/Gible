@@ -80,6 +80,16 @@ class OwnerRouteTests(unittest.TestCase):
         self.assertIn('4C', result.calls)
         self.assertEqual(result.calls[-1], 'P')
 
+    def test_voidwood_two_keycard_answer_offers_king_ask_and_placement(self):
+        south = 'S-HKQJT864DK85CAK8'
+        north = 'SA754HA752DACQJ43'
+        self.assertEqual(
+            self.bid('1NP2DP2HP4SP5HP', south), '5N')
+        self.assertEqual(
+            self.bid('1NP2DP2HP4SP5HP5NP', north), '6H')
+        self.assertEqual(
+            self.bid('1NP2DP2HP4SP5HP5NP6HP', south), 'P')
+
 
 class ExclusionKeycardTests(unittest.TestCase):
     @classmethod

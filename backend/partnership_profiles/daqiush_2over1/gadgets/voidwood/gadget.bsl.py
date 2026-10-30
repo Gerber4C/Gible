@@ -386,6 +386,53 @@ class Voidwood(Gadget):
                             kcall.description = ('Ask kings after 1/4 keycards; the void '
                                                  'suit ace counts as its king.')
 
+                if index in (3, 4) and below_five_notrump(answer_map[index]):
+                    # With two keycards already known, 5NT asks kings while
+                    # the asker is still deciding between six and seven.
+                    kcall = self.call('voidwood_' + trump.lower() + '_void_'
+                                      + void.lower() + '_king_ask_5nt_after_'
+                                      + answer_map[index].lower())
+                    kcall.when = answer_prefix + answer_map[index] + 'P'
+                    kcall.bid = '5NT'
+                    kcall.applies = (lambda ctx, t=trump, v=void,
+                                     qa=STEPS[index][1]: (
+                        ctx.hand is not None
+                        and ctx.hand.keycard_count(t, excluded_suit=v) + 2 == 4
+                        and (ctx.hand.contains_rank(t, 'Q') or qa is True)))
+                    kcall.priority = 1
+                    kcall.meaning.action = 'voidwood_king_ask'
+                    kcall.meaning.nature = ['artificial']
+                    kcall.meaning.acts = ['inquiry']
+                    kcall.meaning.target_suit = trump
+                    kcall.description = ('Ask kings after the two-keycard answer; '
+                                         'five notrump is the hesitation between '
+                                         'six and seven.')
+                    for final_bid, grand in (('6' + trump, False),
+                                             ('7' + trump, True)):
+                        final = self.call('voidwood_' + trump.lower() + '_void_'
+                                          + void.lower() + '_direct_'
+                                          + final_bid.lower() + '_after_'
+                                          + answer_map[index].lower())
+                        final.when = answer_prefix + answer_map[index] + 'P'
+                        final.bid = final_bid
+                        final.applies = (lambda ctx, t=trump, v=void,
+                                         g=grand, qa=STEPS[index][1]: (
+                            ctx.hand is not None
+                            and ((ctx.hand.keycard_count(t, excluded_suit=v) + 2 == 3)
+                                 if not g else
+                                 (ctx.hand.keycard_count(t, excluded_suit=v) + 2 == 4
+                                  and (ctx.hand.contains_rank(t, 'Q') or qa is True)))))
+                        final.priority = 2 if grand else 1
+                        final.meaning.action = ('voidwood_grand_acceptance'
+                                                if grand else 'voidwood_slam')
+                        final.meaning.nature = ['natural']
+                        final.meaning.acts = ['signoff', 'final_placement']
+                        final.meaning.target_suit = trump
+                        final.meaning.purpose_completed = True
+                        final.description = ('No king ask needed: place the '
+                                             + ('grand' if grand else 'small')
+                                             + ' slam directly.')
+
                 if not below_five_notrump(answer_map[index]):
                     # Any continuation beyond a 5NT-or-higher answer is a
                     # grand-slam invitation; six of the trump declines.
@@ -442,11 +489,16 @@ class Voidwood(Gadget):
             # six of the trump; six of the trump when nothing is showable.
             for index in range(len(STEPS)):
                 counts, _ = STEPS[index]
-                if counts not in ((0, 3), (1, 4)):
+                if index in (3, 4):
+                    king_ask = '5NT'
+                elif counts in ((0, 3), (1, 4)):
+                    offset = 2 if counts == (0, 3) else 1
+                    king_ask = step_bid(answer_map[index], offset)
+                else:
                     continue
-                offset = 2 if counts == (0, 3) else 1
-                king_ask = step_bid(answer_map[index], offset)
-                if king_ask is None or not below_five_notrump(king_ask):
+                if (king_ask is None
+                        or (king_ask != '5NT'
+                            and not below_five_notrump(king_ask))):
                     continue
                 after_king = answer_prefix + answer_map[index] + 'P' + king_ask + 'P'
                 shown = []
