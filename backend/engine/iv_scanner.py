@@ -197,7 +197,8 @@ def project_by_process(report: dict, *, analyses=None,
                        north_cap: int = NORTH_CAP,
                        south_cap: int = SOUTH_CAP,
                        process_overflow=None,
-                       hand_overflow=None) -> list[dict]:
+                       hand_overflow=None,
+                       ew_samples: int = 10) -> list[dict]:
     """Group cases by bidding process with North/South primary pools.
 
     One process is one group across all sampling cells.  Each side keeps a
@@ -306,7 +307,7 @@ def project_by_process(report: dict, *, analyses=None,
                                      'matched_north_hands', south_cap)
                              for group in south_groups.values()],
             'primary_hands': _primary_hand_groups(
-                members, process, hand_overflow or {}),
+                members, process, hand_overflow or {}, ew_samples),
             'overflow': (process_overflow or {}).get(process, 0),
         })
     result.sort(key=lambda item: (-item['cases'], item.get('auction') or ''))
@@ -314,7 +315,7 @@ def project_by_process(report: dict, *, analyses=None,
 
 
 
-def _primary_hand_groups(members, process, hand_overflow):
+def _primary_hand_groups(members, process, hand_overflow, ew_samples):
     """Aggregate weighted metrics per Process x Primary Hand."""
     groups = {'n': {}, 's': {}}
     for case in members:
@@ -352,10 +353,13 @@ def _primary_hand_groups(members, process, hand_overflow):
                 'hand': hand,
                 'shape': item['shape'],
                 'hcp': item['hcp'], 'kr': item['kr'],
-                'boards': metric['boards'],
                 'partner_count': len(partners),
                 'partners': partners,
                 'overflow': hand_overflow.get((process, side, hand), 0),
+                'overflow_boards': (hand_overflow.get(
+                    (process, side, hand), 0) * ew_samples),
+                'boards': metric['boards'] + (hand_overflow.get(
+                    (process, side, hand), 0) * ew_samples),
                 'metrics': metric,
             })
         rows.sort(key=lambda row: (-(row['hcp'] or 0), row['hand']))
@@ -447,7 +451,7 @@ def _overflow_by_hand(report):
             continue
         process = tuple(item.get('process') or ())
         side = item.get('side')
-        hand = item.get('hand')
+        hand = item.get('merged_into') or item.get('hand')
         if side in ('n', 's') and isinstance(hand, str):
             key = (process, side, hand)
             result[key] = result.get(key, 0) + int(item.get('count') or 0)
@@ -613,7 +617,9 @@ def project_report(report: dict, report_id: str, *,
             report, analyses=analyses, overflow_cases=report.get('overflow_cases'),
             north_cap=north_cap, south_cap=south_cap,
             process_overflow=_overflow_by_process(report),
-            hand_overflow=_overflow_by_hand(report)) if include_pairs else []),
+            hand_overflow=_overflow_by_hand(report),
+            ew_samples=(report.get('budget') or {}).get('ew_samples', 10))
+            if include_pairs else []),
         'method_note': report.get('method_note'),
     })
 

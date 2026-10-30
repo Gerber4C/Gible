@@ -1298,6 +1298,7 @@ def match_process_partners(
     next_id = max((case.get('id') for case in cases
                    if isinstance(case.get('id'), int)), default=0) + 1
     overflow = {}
+    overflow_entries = []
     for item in report.get('partner_overflow') or ():
         if isinstance(item, Mapping) and item.get('side') in ('n', 's'):
             key = (tuple(item.get('process') or ()), item['side'],
@@ -1322,6 +1323,17 @@ def match_process_partners(
             partners.setdefault(south_key, set()).add(north_key)
         norths = norths[:north_cap]
         souths = souths[:south_cap]
+        hand_meta = {}
+        for case in members:
+            hands = case.get('hands') or {}
+            if hands.get('n'):
+                hand_meta[('n', hands['n'])] = (
+                    tuple(case.get('north_shape') or ()),
+                    case.get('north_hcp'), case.get('north_kr'))
+            if hands.get('s'):
+                hand_meta[('s', hands['s'])] = (
+                    tuple(case.get('south_shape') or ()),
+                    case.get('south_hcp'), case.get('south_kr'))
         attempt_cap = max(attempts + max_attempts_per_hand * max(1, len(norths)),
                           attempts + 200)
         for north_key in norths:
@@ -1332,13 +1344,17 @@ def match_process_partners(
                 if south_key in partners.get(north_key, set()):
                     continue
                 if len(partners.get(north_key, set())) >= south_cap:
-                    overflow[(process, 'n', north_key)] = (
-                        overflow.get((process, 'n', north_key), 0) + 1)
-                    continue
+                    merged = _merge_overflow_hand(
+                        rng, process, 'n', north_key, norths,
+                        hand_meta, overflow_entries, overflow)
+                    if merged is not None:
+                        continue
                 if len(partners.get(south_key, set())) >= north_cap:
-                    overflow[(process, 's', south_key)] = (
-                        overflow.get((process, 's', south_key), 0) + 1)
-                    continue
+                    merged = _merge_overflow_hand(
+                        rng, process, 's', south_key, souths,
+                        hand_meta, overflow_entries, overflow)
+                    if merged is not None:
+                        continue
                 if attempts >= attempt_cap:
                     break
                 attempts += 1
@@ -1473,11 +1489,9 @@ def match_process_partners(
         'attempted_pairs': attempts, 'north_cap': north_cap,
         'south_cap': south_cap,
     }
-    updated['partner_overflow'] = [
-        {'process': list(process), 'side': side, 'hand': hand, 'count': count}
-        for (process, side, hand), count in sorted(overflow.items(),
-                                                   key=lambda item: item[0])
-    ]
+    for entry in overflow_entries:
+        entry['process'] = list(entry['process'])
+    updated['partner_overflow'] = overflow_entries
     if snapshot is not None:
         snapshot(updated)
     return updated
@@ -1527,6 +1541,38 @@ def _sample_disjoint_south(rng, north: Hand, representative: Mapping):
             continue
         return hand
     return None
+
+
+def _merge_overflow_hand(rng, process, side, hand_key, pool, hand_meta,
+                         entries, overflow):
+    shape, hcp, kr = hand_meta.get((side, hand_key), ((), None, None))
+    if not shape or not isinstance(hcp, int):
+        return None
+    candidates = []
+    for candidate in pool:
+        if candidate == hand_key:
+            continue
+        other_shape, other_hcp, other_kr = hand_meta.get(
+            (side, candidate), ((), None, None))
+        if other_shape != shape or not isinstance(other_hcp, int):
+            continue
+        if abs(other_hcp - hcp) > 1:
+            continue
+        if (isinstance(kr, (int, float))
+                and isinstance(other_kr, (int, float))
+                and abs(other_kr - kr) > 1):
+            continue
+        candidates.append(candidate)
+    if not candidates:
+        return None
+    target = rng.choice(candidates)
+    entries.append({
+        'process': process, 'side': side, 'hand': hand_key,
+        'merged_into': target, 'count': 1,
+    })
+    overflow[(process, side, target)] = (
+        overflow.get((process, side, target), 0) + 1)
+    return target
 
 def _repair_partner_low_cards(north: Hand, south_key: str):
     """Return South with only its 2-7 conflicts against North replaced."""

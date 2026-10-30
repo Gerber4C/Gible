@@ -4,7 +4,8 @@ import unittest
 from pathlib import Path
 
 from engine.coverage_extend import (
-    _repair_partner_low_cards, _sample_disjoint_south,
+    _merge_overflow_hand, _repair_partner_low_cards,
+    _sample_disjoint_south,
 )
 from engine.cards import Hand
 from engine.iv_scanner import (
@@ -566,6 +567,22 @@ class IVScannerTests(unittest.TestCase):
             self.assertFalse(set(north.holding(suit))
                              & set(south.holding(suit)))
         self.assertEqual([south.length(s) for s in 'SHDC'], [4, 3, 3, 3])
+
+    def test_overflow_merges_into_compatible_same_shape_hand(self):
+        import random
+        process = ('1N', 'P', '3N', 'P', 'P', 'P')
+        pool = ['SAKQ2HK32DQJ2C432', 'SAKQ2HK32DQJ2C543']
+        meta = {
+            ('n', pool[0]): ((4, 3, 3, 3), 16, 16.0),
+            ('n', pool[1]): ((4, 3, 3, 3), 17, 16.5),
+        }
+        entries, overflow = [], {}
+        target = _merge_overflow_hand(
+            random.Random(1), process, 'n', pool[0], pool, meta,
+            entries, overflow)
+        self.assertEqual(target, pool[1])
+        self.assertEqual(entries[0]['merged_into'], pool[1])
+        self.assertEqual(overflow[(process, 'n', pool[1])], 1)
 
 
 if __name__ == '__main__':
