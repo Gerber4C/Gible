@@ -384,6 +384,15 @@ class IVScannerTests(unittest.TestCase):
             self.assertTrue(path.exists())
             self.assertEqual(json.loads(path.read_text())['summary']['pairs'], 1)
 
+    def test_process_projection_keeps_blocked_cases_visible(self):
+        projected = project_report(self.sample_report(), 'sample.json')
+        blocked = next(
+            process for process in projected['process_groups']
+            if process['auction'] == '1NP2HP2SP3DP')
+        groups = blocked['north_groups'] + blocked['south_groups']
+        self.assertTrue(any(group['categories'].get('block')
+                            for group in groups))
+
 
 if __name__ == '__main__':
     unittest.main()

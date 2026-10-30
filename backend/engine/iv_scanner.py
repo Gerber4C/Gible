@@ -224,9 +224,12 @@ def project_by_process(report: dict, *, analyses=None,
         south_groups = {}
         for case in members:
             analysis = analyses.get(case.get('id')) or case.get('analysis') or {}
-            categories = {FLAG_CATEGORY[flag]
-                          for flag in analysis.get('flags') or ()
-                          if flag in FLAG_CATEGORY}
+            categories = set()
+            if case.get('blocked') or case.get('status') == 'blocked':
+                categories.add('block')
+            categories.update({FLAG_CATEGORY[flag]
+                               for flag in analysis.get('flags') or ()
+                               if flag in FLAG_CATEGORY})
             contract = case.get('contract')
             declarer = case.get('declarer')
             if contract and declarer in ('n', 's'):
