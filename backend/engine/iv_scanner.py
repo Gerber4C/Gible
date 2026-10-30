@@ -819,6 +819,13 @@ class ScannerJobs:
                 seed=options['seed'],
                 max_attempts_per_bucket=options['max_attempts_per_bucket'],
                 progress=progress, snapshot=snapshot)
+            report = match_process_partners(
+                report, profile,
+                north_cap=options['north_cap'],
+                south_cap=options['south_cap'],
+                ew_samples=options['ew_samples'],
+                seed=options['seed'],
+                progress=progress, snapshot=snapshot)
             snapshot(report)
             path.with_suffix('.html').write_text(
                 render_html(report), encoding='utf-8')
