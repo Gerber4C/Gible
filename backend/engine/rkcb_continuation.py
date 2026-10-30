@@ -1,0 +1,144 @@
+"""Pure ordinary-RKCB frame reading, useful-void classification, and answers.
+
+The module never reads private cards except for the acting hand's own void and
+keycard count. Public facts come from replayed meanings and state only.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Iterable
+
+from .cards import Hand
+
+
+ORDINARY_METHOD = 'rkcb_1430'
+STATUSES = ('pending_answer', 'answered', 'relay_pending', 'relay_completed',
+            'completed', 'disrupted')
+ACTIVE_STATUSES = ('pending_answer', 'answered', 'relay_pending', 'relay_completed')
+CALL_ORDER = ('4C', '4D', '4H', '4S', '4NT', '5C', '5D', '5H', '5S', '5NT',
+              '6C', '6D', '6H', '6S', '6NT', '7C', '7D', '7H', '7S', '7NT')
+
+
+@dataclass(frozen=True)
+class OrdinaryRKCBFrame:
+    trump: str
+    status: str
+    answer_category: str | None = None
+    keycard_counts: tuple[int, ...] = ()
+    trump_queen: bool | None = None
+    useful_void: str | None = None
+    useful_void_category: str | None = None
+    not_required_kings: tuple[str, ...] = ()
+    disrupted_reason: str | None = None
+    continuation_stage: str | None = None
+    invitation_call: str | None = None
+    counterinvite_count: int = 0
+
+    @property
+    def active(self) -> bool:
+        return self.status in ACTIVE_STATUSES
+
+
+@dataclass(frozen=True)
+class RKCBResponse:
+    call: str
+    keycard_counts: tuple[int, ...]
+    trump_queen: bool | None = None
+    void_suit: str | None = None
+    void_category: str | None = None
+
+
+def bid_rank(call: str) -> int:
+    return int(call[0]) * 5 + 'CDHSN'.index(call[1])
+
+
+def partner_of(seat: str) -> str:
+    return {'n': 's', 's': 'n', 'e': 'w', 'w': 'e'}[seat]
+
+
+def ordinary_rkcb_frame(trace) -> OrdinaryRKCBFrame | None:
+    """The latest public ``rkcb_1430`` frame, or None for other methods."""
+    records = [record for record in trace.current_state_records
+               if record.key == 'keycard_context']
+    if not records:
+        return None
+    record = records[-1]
+    if record.attribute('method') != ORDINARY_METHOD:
+        return None
+    status = record.attribute('status') or 'pending_answer'
+    if status == 'pending':
+        status = 'pending_answer'
+    if status not in STATUSES:
+        return None
+    trump = record.attribute('trump_suit')
+    if trump not in 'CDHS':
+        return None
+    counts = record.attribute('keycard_counts') or ()
+    return OrdinaryRKCBFrame(
+        trump=trump,
+        status=status,
+        answer_category=record.attribute('answer_category'),
+        keycard_counts=tuple(int(value) for value in counts),
+        trump_queen=record.attribute('trump_queen'),
+        useful_void=record.attribute('useful_void'),
+        useful_void_category=record.attribute('useful_void_category'),
+        not_required_kings=tuple(record.attribute('not_required_kings') or ()),
+        disrupted_reason=record.attribute('disrupted_reason'),
+        continuation_stage=record.attribute('continuation_stage'),
+        invitation_call=record.attribute('invitation_call'),
+        counterinvite_count=int(record.attribute('counterinvite_count') or 0),
+    )
+
+
+def public_minimum_length(meaning: dict[str, Any], suit: str) -> int:
+    lengths = meaning.get('suit_length_minimums', {}) or {}
+    if suit in lengths:
+        return int(lengths[suit])
+    if meaning.get('target_suit') == suit:
+        return int(meaning.get('minimum_length', 0) or 0)
+    return 0
+
+
+def naturally_shown_long_suits(trace, partner: str) -> frozenset[str]:
+    result = set()
+    for entry in trace.applied_meanings:
+        meaning = entry.get('public_meaning', {})
+        call = entry.get('call', '')
+        if (entry.get('seat') == partner and len(call) == 2
+                and call[0] in '1234567' and call[1] in 'CDHS'
+                and 'natural' in meaning.get('nature_labels', ())
+                and public_minimum_length(meaning, call[1]) >= 4):
+            result.add(call[1])
+    return frozenset(result)
+
+
+def useful_voids(trace, responder: str, hand: Hand,
+                 trump: str) -> tuple[str, ...]:
+    excluded = naturally_shown_long_suits(trace, partner_of(responder))
+    return tuple(suit for suit in 'CDHS'
+                 if suit != trump and hand.length(suit) == 0
+                 and suit not in excluded)
+
+
+def ordinary_response(hand: Hand, trump: str,
+                      voids: Iterable[str] = ()) -> RKCBResponse:
+    count = hand.keycard_count(trump)
+    queen = hand.contains_rank(trump, 'Q')
+    voids = tuple(voids)
+    if voids:
+        void = voids[0]
+        if count in (0, 2, 4):
+            return RKCBResponse('5N', (0, 2, 4),
+                                void_category='unspecified')
+        if bid_rank('6' + void) < bid_rank('6' + trump):
+            return RKCBResponse('6' + void, (1, 3), void_suit=void)
+        return RKCBResponse('6' + trump, (1, 3),
+                            void_category='higher_than_trump')
+    if count in (1, 4):
+        return RKCBResponse('5C', (1, 4))
+    if count in (0, 3):
+        return RKCBResponse('5D', (0, 3))
+    if not queen:
+        return RKCBResponse('5H', (2,), trump_queen=False)
+    return RKCBResponse('5S', (2,), trump_queen=True)
