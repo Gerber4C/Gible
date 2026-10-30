@@ -38,11 +38,47 @@ class OwnerRouteTests(unittest.TestCase):
         self.assertEqual(self.bid('1NP2HP2SP', 'SAQJ76HAKJD43CQ76'), '6C')
         self.assertEqual(self.bid('1NP2HP2SP', 'SAQJ76HAKJDQ43C76'), '6D')
 
+    def test_two_major_force_uses_zar_for_heart_cue(self):
+        """A high-Zar three-heart fit cues instead of forcibly ending at 4H."""
+        north = 'S94HK943DAKQ84CK5'
+        decision = choose_bid(
+            self.profile, Auction.parse('1NP2HP2SP3HP'), Hand.parse(north))
+        self.assertEqual(decision.call, '4C')
+        self.assertEqual(decision.selected_candidate.public_meaning['agreed_suit'], 'H')
+
+    def test_two_major_force_heart_game_is_suggested_not_forced(self):
+        north = 'S94HQ943DJ7654C32'
+        decision = choose_bid(
+            self.profile, Auction.parse('1NP2HP2SP3HP'), Hand.parse(north))
+        self.assertEqual(decision.call, '4H')
+        self.assertIn('signoff', decision.selected_candidate.public_meaning['call_act_types'])
+        self.assertNotIn('purpose_completed', decision.selected_candidate.public_meaning)
+
+    def test_two_major_force_spade_game_is_a_signoff(self):
+        north = 'SQJ4HK2DAK7652CQ3'
+        decision = choose_bid(
+            self.profile, Auction.parse('1NP2HP2SP3HP'), Hand.parse(north))
+        self.assertEqual(decision.call, '4S')
+        self.assertIn('signoff', decision.selected_candidate.public_meaning['call_act_types'])
+        self.assertNotIn('purpose_completed', decision.selected_candidate.public_meaning)
+
     # Bug 2: strong seven-card minor transfers before cueing.
-    def test_strong_seven_club_transfers_and_cues(self):
+    def test_overstrength_seven_club_transfer_uses_serious_notrump(self):
         hand = 'SA4H2DAK2CAKQJT72'
         self.assertEqual(self.bid('1NP', hand), '2S')
+        self.assertEqual(self.bid('1NP2SP3CP', hand), '3N')
+
+    def test_ordinary_minor_slam_hand_keeps_its_first_control_cue(self):
+        hand = 'SA43H2DK2CAKJ9876'
         self.assertEqual(self.bid('1NP2SP3CP', hand), '3H')
+
+    def test_overstrength_minor_transfer_uses_serious_notrump_before_a_cue(self):
+        """An extreme club hand starts the serious ladder, not an early cue."""
+        south = 'SAKH52DKQCAKQT764'
+        north = 'SQJT4HAKDAT652CJ9'
+        self.assertEqual(self.bid('1NP2SP3CP', south), '3N')
+        self.assertEqual(self.bid('1NP2SP3CP3NTP', north), '4D')
+        self.assertEqual(self.bid('1NP2SP3CP3NTP4DP', south), '4N')
 
     # Bug 3: six-four minors transfer, then show the other minor.
     def test_six_four_minors_transfer_then_show_other_minor(self):

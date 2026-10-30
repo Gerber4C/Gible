@@ -337,7 +337,12 @@ def _primary_hand_groups(members, process, hand_overflow, ew_samples):
             item['cases'].append(case)
             if isinstance(partner, str) and partner:
                 instance = item['partners'].setdefault(partner, {
-                    'hand': partner, 'status': None, 'td': None})
+                    'hand': partner, 'status': None, 'td': None,
+                    'hcp': case.get('north_hcp' if partner_side == 'n' else 'south_hcp'),
+                    'kr': case.get('north_kr' if partner_side == 'n' else 'south_kr'),
+                    'shape': list(case.get('north_shape' if partner_side == 'n'
+                                           else 'south_shape') or ()),
+                })
                 status = 'blocked' if case.get('blocked') else (
                     'limit' if case.get('status') == 'limit' else 'complete')
                 if instance['status'] != 'blocked' and status == 'blocked':

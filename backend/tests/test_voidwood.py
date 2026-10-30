@@ -140,7 +140,7 @@ class VoidwoodProfileTests(unittest.TestCase):
     def test_undefined_jump_derives_voidwood_with_inferred_trump(self):
         decision = choose_bid(
             self.profile, Auction.parse('1NP2CP2HP3CP'),
-            Hand.parse('S-HKQ32DAKQ5CA432'))
+            Hand.parse('S-HKQ32DAKQ5CA5432'))
         asks = [
             candidate for candidate in decision.candidate_pool.candidates
             if candidate.public_meaning.get('action_type') == 'voidwood_ask']

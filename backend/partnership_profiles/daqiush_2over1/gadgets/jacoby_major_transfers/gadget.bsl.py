@@ -141,6 +141,15 @@ def major_two_suit_force(ctx):
             and shapely_combined_effective_points(ctx.hand) >= 9)
 
 
+def two_major_force_heart_cue(ctx, suit):
+    """A high-Zar hand with a heart fit may cue instead of suggesting 4H."""
+    return (ctx.hand is not None
+            and ctx.hand.length('S') < 3
+            and ctx.hand.length('H') >= 3
+            and second_round_control(ctx, suit)
+            and zar_total(ctx.hand, 'H', 5 + ctx.hand.length('H')) >= 31)
+
+
 def game_five_major(ctx, trump):
     return (ctx.hand is not None and ctx.hand.length(trump) == 5
             and max(ctx.hand.length(suit) for suit in 'CD') <= 3
@@ -425,6 +434,22 @@ class JacobyMajorTransfers(Gadget):
                 two_major.description = 'After the spade transfer, 3H shows game-forcing 5-5 majors.'
 
                 force_prefix = ordinary_prefix + '3HP'
+                for cue in ('C', 'D', 'S'):
+                    show = self.call('two_major_force_heart_cue_' + cue.lower())
+                    show.when = force_prefix
+                    show.bid = '4' + cue
+                    show.applies = (lambda ctx, s=cue:
+                                    two_major_force_heart_cue(ctx, s))
+                    show.meaning.action = 'two_major_force_heart_cue'
+                    show.meaning.nature = ['artificial']
+                    show.meaning.acts = ['slam_try', 'control_showing']
+                    show.meaning.control_suit = cue
+                    show.meaning.agreed_suit = 'H'
+                    show.meaning.target_suit = 'H'
+                    show.effect('agreed_suit').suit = 'H'
+                    show.description = ('A Zar-qualified control cue agrees '
+                                        'hearts after the 5-5-major force.')
+
                 for bid, applies, target in (
                     ('3S', lambda ctx: ctx.hand.length('S') >= 3 and ctx.hand.hcp >= 16, 'S'),
                     ('4S', lambda ctx: ctx.hand.length('S') >= 3 and ctx.hand.hcp < 16, 'S'),
@@ -437,7 +462,14 @@ class JacobyMajorTransfers(Gadget):
                     reply.applies = lambda ctx, fn=applies: ctx.hand is not None and fn(ctx)
                     reply.meaning.action = 'two_major_game_force_reply'
                     reply.meaning.nature = ['natural']
-                    reply.meaning.acts = ['descriptive']
+                    # Three spades keeps a spade fit below game available for
+                    # a later slam decision.  Four of either major is instead
+                    # a suggested game signoff; it deliberately does not set
+                    # purpose_completed, so a specifically authored override
+                    # remains possible.
+                    reply.meaning.acts = (['signoff', 'final_placement']
+                                           if bid in ('4S', '4H')
+                                           else ['descriptive'])
                     reply.meaning.target_suit = target
                     if target in 'HS':
                         reply.meaning.agreed_suit = target
@@ -453,8 +485,7 @@ class JacobyMajorTransfers(Gadget):
                     placement.meaning.nature = ['natural']
                     placement.meaning.acts = ['signoff', 'final_placement']
                     placement.meaning.target_suit = agreed_major
-                    placement.meaning.purpose_completed = True
-                    placement.description = 'With a known major fit, play the major game until a slam route is justified.'
+                    placement.description = 'Suggested major-game signoff after the 5-5-major force.'
 
                 slam = self.call('two_major_force_spade_keycard')
                 slam.when = force_prefix + '3SP'

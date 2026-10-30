@@ -136,13 +136,16 @@ function handStats(hand = "") {
   return { shape, hcp };
 }
 
-function miniHand(hand, title, tone = "") {
+function miniHand(hand, title, tone = "", metadata = {}) {
   const holdings = compactSuits(hand);
   const stats = handStats(hand);
+  const hcp = metadata.hcp ?? stats.hcp;
+  const kr = metadata.kr;
+  const shape = metadata.shape?.length ? metadata.shape : stats.shape;
   return e("section", { className: `iv-hand iv-mini-hand ${tone}` },
     e("div", { className: "iv-hand-heading" },
       e("strong", null, title),
-      e("span", null, `${stats.hcp} HCP · ${stats.shape.join("–")}`)),
+      e("span", null, `${hcp} HCP${kr != null ? ` · ${kr} K–R` : ""} · ${shape.join("–")}`)),
     SUITS.map(([suit, symbol], index) => e("div", {
       className: `iv-suit iv-suit-${suit.toLowerCase()}`, key: suit,
     }, e("span", null, symbol), e("b", null, holdings[index]))),
@@ -654,10 +657,10 @@ function ProcessView({ processes, thresholds, selectedKey, onSelect, search, onS
                     Math.min(partners.length - 1, activePartnerIndex + 1)),
                 }, "▶"))),
             e("div", { className: "iv-hand-pair" },
-              miniHand(primary.hand, `${primaryLabel} · Primary`, "is-primary"),
+              miniHand(primary.hand, `${primaryLabel} · Primary`, "is-primary", primary),
               partner
                 ? miniHand(partner.hand,
-                  `${partnerLabel} · Partner #${activePartnerIndex + 1}`)
+                  `${partnerLabel} · Partner #${activePartnerIndex + 1}`, "", partner)
                 : e("p", { className: "iv-empty-list" },
                   `No matched ${partnerLabel} hand.`)),
             partner?.status === "blocked" && e("div", {

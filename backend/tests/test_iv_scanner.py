@@ -522,6 +522,7 @@ class IVScannerTests(unittest.TestCase):
         self.assertIsNone(primary['metrics']['best_other'])
         self.assertEqual(primary['partners'][0]['status'], 'blocked')
         self.assertEqual(primary['partners'][0]['td']['seat'], 's')
+        self.assertIsInstance(primary['partners'][0]['kr'], (int, float))
 
     def test_partner_repair_only_rewrites_conflicting_low_cards(self):
         north = Hand.parse('SAKQJHT98D765C432')

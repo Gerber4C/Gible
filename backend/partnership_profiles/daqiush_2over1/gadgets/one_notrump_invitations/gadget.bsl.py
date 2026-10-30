@@ -392,6 +392,21 @@ def minor_slam_transfer(ctx, suit):
             and max(ctx.hand.length(s) for s in 'HS') <= 3)
 
 
+MINOR_SERIOUS_OVERSTRENGTH_HCP = 18
+
+
+def minor_serious_overstrength(ctx, suit):
+    """Strength that reserves the cheapest space for the serious 3NT ladder.
+
+    A responder with 18+ HCP opposite a 15--17 notrump has already exceeded
+    the ordinary game range.  Even with a readily available side-suit
+    control, serious 3NT comes first; opener's forced cue then lets responder
+    ask keycards without spending that space on an advance cue.
+    """
+    return (minor_slam_transfer(ctx, suit)
+            and ctx.hand.hcp >= MINOR_SERIOUS_OVERSTRENGTH_HCP)
+
+
 def minor_control(ctx, suit):
     return shortage_has_control(ctx, suit)
 
@@ -1529,13 +1544,16 @@ class OneNotrumpInvitations(Gadget):
                     serious.bid = '3NT'
                     serious.applies = (lambda ctx, s=suit: (minor_slam_transfer(ctx, s)
                                                             and slam_transfer_shape(ctx, s)
-                                                            and not any(minor_control(ctx, c)
-                                                                        for c in ('H', 'S'))))
+                                                            and (minor_serious_overstrength(ctx, s)
+                                                                 or not any(minor_control(ctx, c)
+                                                                            for c in ('H', 'S')))))
                     serious.meaning.action = 'minor_serious_3nt'
                     serious.meaning.nature = ['artificial']
                     serious.meaning.acts = ['slam_try']
                     serious.meaning.target_suit = 'N'
-                    serious.description = 'The low-level serious 3NT: slam interest without a cue.'
+                    serious.description = ('The low-level serious 3NT: slam interest '
+                                           'without a cue, or with overstrength that '
+                                           'takes priority over an advance cue.')
 
                     # Control ladder after serious 3NT.  Partner's first
                     # cue is forced and says nothing about extra strength.
@@ -1690,6 +1708,7 @@ class OneNotrumpInvitations(Gadget):
                     cue_call.bid = cue_bid
                     cue_call.applies = (lambda ctx, s=suit, c=control, p=prior: (
                         minor_slam_transfer(ctx, s) and slam_transfer_shape(ctx, s)
+                        and not minor_serious_overstrength(ctx, s)
                         and minor_control(ctx, c)
                         and not any(minor_control(ctx, x) for x in p)))
                     cue_call.meaning.action = 'minor_slam_control_cue'
