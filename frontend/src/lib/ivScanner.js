@@ -151,3 +151,99 @@ export function paginateGroups(groups = [], page = 1, pageSize = 100) {
     end: Math.min(startIndex + pageSize, total),
   };
 }
+
+function reachedContractGame(contract) {
+  return reachedGame(contract);
+}
+
+function processContractFlags(item = {}, thresholds = DEFAULT_THRESHOLDS) {
+  const contract = item.contract || "";
+  const level = Number(contract[0]);
+  const rates = item.rates || {};
+  const flags = [];
+  const failure = probability(rates.contract_failure);
+  if (failure != null && failure > thresholds.set) flags.push("contract_failure");
+  const wrong = probability(rates.wrong_game);
+  if (wrong != null && wrong < thresholds.wrong) flags.push("wrong_game");
+  if (!reachedContractGame(contract)) {
+    const missedGame = probability(rates.missed_game);
+    if (missedGame != null && missedGame > thresholds.missed) {
+      flags.push("missed_game");
+    }
+  }
+  if (level < 6) {
+    const missedSmall = probability(rates.missed_small_slam);
+    if (missedSmall != null && missedSmall > thresholds.missed) {
+      flags.push("missed_small_slam");
+    }
+  }
+  if (level < 7) {
+    const missedGrand = probability(rates.missed_grand_slam);
+    if (missedGrand != null && missedGrand > thresholds.missed) {
+      flags.push("missed_grand_slam");
+    }
+  }
+  return flags;
+}
+
+export function processFlags(process = {}, thresholds = DEFAULT_THRESHOLDS) {
+  const flags = new Set();
+  (process.contracts || []).forEach((item) => {
+    processContractFlags(item, thresholds).forEach((flag) => flags.add(flag));
+  });
+  return [...flags];
+}
+
+export function processCategories(process = {}, thresholds = DEFAULT_THRESHOLDS) {
+  const flags = new Set(processFlags(process, thresholds));
+  (process.north_groups || []).forEach((group) => {
+    Object.entries(group.categories || {}).forEach(([key, count]) => {
+      if (count > 0) flags.add(key === "block" ? "block" : key);
+    });
+  });
+  (process.south_groups || []).forEach((group) => {
+    Object.entries(group.categories || {}).forEach(([key, count]) => {
+      if (count > 0) flags.add(key === "block" ? "block" : key);
+    });
+  });
+  return ["block", "missed", "down", "wrong"].filter((category) => (
+    category === "down" ? flags.has("contract_failure")
+      : category === "wrong" ? flags.has("wrong_game")
+        : category === "missed"
+          ? MISSED_FLAGS.some((flag) => flags.has(flag))
+          : flags.has(category)
+  ));
+}
+
+export function processMatches(process = {}, category = "all", search = "",
+                               thresholds = DEFAULT_THRESHOLDS) {
+  if (category !== "all" && !processCategories(process, thresholds).includes(category)) {
+    return false;
+  }
+  const query = String(search).trim().toLowerCase();
+  if (!query) return true;
+  const evidence = [
+    process.auction,
+    (process.process || []).join(" "),
+    ...(process.contracts || []).map((item) => item.contract),
+    ...(process.north_groups || []).map((group) => (group.north_shape || []).join("-")),
+    ...(process.south_groups || []).map((group) => (group.south_shape || []).join("-")),
+  ];
+  return evidence.some((value) => String(value ?? "").toLowerCase().includes(query));
+}
+
+export function filterProcessGroups(processes = [], category = "all", search = "",
+                                    thresholds = DEFAULT_THRESHOLDS) {
+  return processes.filter((process) => processMatches(process, category, search, thresholds));
+}
+
+export function processBoardCount(process = {}) {
+  return (process.contracts || []).reduce((sum, item) => sum + (item.boards || 0), 0);
+}
+
+export function processWorstFailure(process = {}) {
+  return (process.contracts || []).reduce((worst, item) => {
+    const value = probability(item.rates?.contract_failure);
+    return value == null ? worst : Math.max(worst, value);
+  }, 0);
+}

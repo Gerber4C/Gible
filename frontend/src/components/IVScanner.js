@@ -3,8 +3,10 @@ import {
   listScannerReports, readScannerReport, scannerRunStatus, startScannerRun,
 } from "../api/gibleApi.js";
 import {
-  DEFAULT_THRESHOLDS, filterScannerGroups, groupCategories,
-  pairFlags, pairMatches, paginateGroups, selectPairForGroup, wrongGameScores,
+  DEFAULT_THRESHOLDS, filterProcessGroups, filterScannerGroups,
+  groupCategories, pairFlags, pairMatches, paginateGroups,
+  processBoardCount, processCategories, processFlags,
+  processWorstFailure, selectPairForGroup, wrongGameScores,
 } from "../lib/ivScanner.js";
 
 const CATEGORY = {
@@ -250,54 +252,198 @@ function pairDetail(pair, group, thresholds) {
   );
 }
 
-function ProcessView({ report }) {
-  const processes = report?.process_groups || [];
-  if (!processes.length) {
-    return e("p", { className: "iv-empty-list" },
-      "No process groups yet. Run a scan to populate them.");
-  }
-  const rate = (value) => (value == null ? "—" : Number(value).toFixed(2));
-  const flags = (counts) => Object.entries(counts || {})
-    .map(([key, value]) => `${key} ${value}`).join(", ") || "—";
-  const table = (headers, rows) => e("table", { className: "iv-process-table" },
-    e("thead", null, e("tr", null, headers.map((h) => e("th", { key: h }, h)))),
-    e("tbody", null, rows.map((cells, index) => e("tr", { key: index },
-      cells.map((cell, position) => e("td", { key: position }, cell))))));
-  return e("div", { className: "iv-process-view" },
-    processes.map((process) => e("details", {
-      key: (process.process || []).join(" ") || process.auction || process.cases,
-      className: "iv-process",
-    },
-      e("summary", null,
-        e("b", null, process.auction || (process.process || []).join(" ")),
-        e("span", null, ` · ${process.cases} N/S pairs`)),
-      e("div", { className: "iv-process-body" },
-        e("h4", null, "Contracts (all sampled deals)"),
-        table(["Contract", "By", "Boards", "Fail", "Wrong", "Missed"],
-          (process.contracts || []).map((item) => [
-            item.contract, String(item.declarer || "").toUpperCase(),
-            item.boards, rate(item.rates?.contract_failure),
-            rate(item.rates?.wrong_game), rate(item.rates?.missed_game),
-          ])),
-        e("div", { className: "iv-process-columns" },
-          e("div", null,
-            e("h4", null, "North primary"),
-            table(["Shape", "Mode", "HCP", "KR", "Hands", "Dropped", "Flags"],
-              (process.north_groups || []).map((group) => [
-                (group.north_shape || []).join("-"), group.opener_mode,
-                group.hcp_band, group.kr_band,
-                `${group.stored}/${group.cases}`, group.dropped,
-                flags(group.categories),
-              ]))),
-          e("div", null,
-            e("h4", null, "South primary"),
-            table(["Shape", "HCP", "Hands", "Dropped", "Flags"],
-              (process.south_groups || []).map((group) => [
-                (group.south_shape || []).join("-"), group.south_hcp,
-                `${group.stored}/${group.cases}`, group.dropped,
-                flags(group.categories),
-              ])))))))
+function processKey(process) {
+  return (process.process || []).join(" ") || process.auction
+    || `${process.cases} cases`;
+}
+
+function processRate(value, threshold, inverse = false) {
+  if (value == null) return { text: "—", bad: false, width: 0 };
+  const bad = inverse ? value < threshold : value > threshold;
+  return {
+    text: inverse ? Number(value).toFixed(2) : pct(value),
+    bad,
+    width: Math.max(0, Math.min(1, Number(value))) * 100,
+  };
+}
+
+function rateMeter(label, value, threshold, inverse = false) {
+  const rate = processRate(value, threshold, inverse);
+  return e("div", { className: `iv-rate ${rate.bad ? "bad" : "ok"}` },
+    e("span", { className: "iv-rate-label" }, label),
+    e("span", { className: "iv-rate-track" },
+      e("i", { style: { width: `${rate.width}%` } })),
+    e("b", null, rate.text),
   );
+}
+
+function processFlagTags(process, thresholds) {
+  const categories = processCategories(process, thresholds);
+  const flags = processFlags(process, thresholds);
+  return e("span", { className: "iv-case-tags" },
+    categories.map((key) => e("b", {
+      key, className: `iv-tag iv-tag-${key}`,
+    }, CATEGORY[key]?.title || key)),
+    categories.length === 0 && e("b", { className: "iv-tag iv-tag-clean" },
+      "CLEAN"),
+    flags.includes("wrong_game") && e("b", {
+      className: "iv-tag iv-tag-wrong", title: "chosen / best-other ratio",
+    }, "RATIO"),
+  );
+}
+
+function contractCard(item, thresholds) {
+  const rates = item.rates || {};
+  const missed = Math.max(
+    rates.missed_game ?? 0, rates.missed_small_slam ?? 0,
+    rates.missed_grand_slam ?? 0);
+  const flags = processCategories({ contracts: [item] }, thresholds);
+  return e("article", { className: "iv-contract-card", key: `${item.contract}-${item.declarer}` },
+    e("header", null,
+      e("strong", null, item.contract || "—"),
+      e("span", null, `${String(item.declarer || "").toUpperCase()} declares`),
+      e("em", null, `${item.boards ?? 0} boards`)),
+    e("div", { className: "iv-contract-rates" },
+      rateMeter("SET", rates.contract_failure, thresholds.set),
+      rateMeter("LOSE", missed, thresholds.missed),
+      rateMeter("WRONG", rates.wrong_game, thresholds.wrong, true)),
+    flags.length > 0 && e("div", { className: "iv-contract-flags" },
+      flags.map((key) => e("b", {
+        key, className: `iv-tag iv-tag-${key}`,
+      }, CATEGORY[key]?.title || key))),
+  );
+}
+
+function poolTable(title, groups, kind, thresholds) {
+  if (!groups?.length) {
+    return e("div", { className: "iv-pool-block" },
+      e("h4", null, title),
+      e("p", { className: "iv-empty-list" }, "No hands in this pool."));
+  }
+  return e("div", { className: "iv-pool-block" },
+    e("div", { className: "iv-pool-heading" },
+      e("h4", null, title),
+      e("span", null, `${groups.length} shape·band pools`)),
+    e("div", { className: "iv-pool-scroll" },
+      e("table", { className: "iv-pool-table" },
+        e("thead", null, e("tr", null,
+          ["Shape", kind === "north" ? "Mode" : "HCP",
+            ...(kind === "north" ? ["HCP", "K–R"] : []),
+            "Hands", "Dropped", "Flags"].map((label) => e("th", {
+              key: label, scope: "col",
+            }, label)))),
+        e("tbody", null, groups.map((group, index) => {
+          const categories = Object.entries(group.categories || {})
+            .filter(([, count]) => count > 0).map(([key]) => key);
+          return e("tr", { key: `${group.north_shape || group.south_shape}-${index}` },
+            e("td", null,
+              e("span", { className: "iv-shape-chip" },
+                (group.north_shape || group.south_shape || []).join("–") || "?")),
+            e("td", null, kind === "north" ? group.opener_mode : group.south_hcp),
+            ...(kind === "north" ? [
+              e("td", null, group.hcp_band),
+              e("td", null, group.kr_band),
+            ] : []),
+            e("td", null, `${group.stored ?? 0}/${group.cases ?? 0}`),
+            e("td", null, group.dropped ?? 0),
+            e("td", null, categories.length
+              ? e("span", { className: "iv-pool-flags" },
+                categories.map((key) => e("b", {
+                  key, className: `iv-tag iv-tag-${key}`,
+                }, CATEGORY[key]?.title || key)))
+              : e("span", { className: "iv-pool-clean" }, "—")),
+          );
+        })))));
+}
+
+function processCard(process, selected, thresholds, onSelect) {
+  const categories = processCategories(process, thresholds);
+  return e("button", {
+    key: processKey(process), type: "button",
+    className: `iv-case iv-process-card ${selected ? "selected" : ""}`,
+    onClick: () => onSelect(processKey(process)),
+    "aria-pressed": selected,
+  },
+    e("span", { className: "iv-case-top" },
+      e("strong", null, `${process.cases ?? 0} N/S pairs`),
+      e("span", null, `${processBoardCount(process)} DDS boards`)),
+    processFlagTags(process, thresholds),
+    e("span", { className: "iv-case-auction" }, process.auction || "—"),
+    e("span", { className: "iv-process-contracts" },
+      (process.contracts || []).slice(0, 4).map((item) => e("em", {
+        key: `${item.contract}-${item.declarer}`,
+      }, `${item.contract} ${String(item.declarer || "").toUpperCase()}`)),
+      (process.contracts || []).length > 4 && e("em", null, "+ more")),
+    categories.length > 0 && e("span", { className: "iv-process-worst" },
+      `worst SET ${pct(processWorstFailure(process))}`),
+  );
+}
+
+function ProcessView({ processes, thresholds, selectedKey, onSelect, search, onSearch }) {
+  if (!processes.length) {
+    return e("div", { className: "iv-inspection" },
+      e("div", { className: "iv-list" },
+        e("p", { className: "iv-empty-list" },
+          "No process groups match the current filters and thresholds. "
+          + "Run a scan or switch to Process Overview.")));
+  }
+  const selected = processes.find((process) => processKey(process) === selectedKey)
+    || processes[0];
+  const categories = processCategories(selected, thresholds);
+  return e("div", { className: "iv-inspection iv-process-inspection" },
+    e("div", { className: "iv-list" },
+      e("div", { className: "iv-list-tools" },
+        e("span", null, `${processes.length} process·groups`),
+        e("span", { className: "iv-process-list-note" },
+          "one row = one public auction process"),
+        e("input", {
+          type: "search", placeholder: "Find auction, contract, shape",
+          value: search,
+          "aria-label": "Search process groups",
+          onChange: (event) => onSearch(event.target.value),
+        })),
+      e("div", { className: "iv-list-scroll" },
+        processes.map((process) => processCard(
+          process, processKey(selected) === processKey(process),
+          thresholds, onSelect)))),
+    e("div", { className: "iv-pair-workspace" },
+      e("div", { className: "iv-pair-detail iv-process-detail" },
+        e("div", { className: "iv-detail-heading" },
+          e("span", { className: "iv-eyebrow" }, "PROCESS"),
+          e("h3", null, selected.auction || "Unrecorded auction"),
+          e("p", null, (selected.process || []).join(" · ")
+            || "No canonical call path recorded")),
+        e("div", { className: "iv-process-metrics" },
+          e("div", null, e("span", null, "N/S pairs"),
+            e("strong", null, selected.cases ?? 0)),
+          e("div", null, e("span", null, "DDS boards"),
+            e("strong", null, processBoardCount(selected))),
+          e("div", null, e("span", null, "Contracts"),
+            e("strong", null, (selected.contracts || []).length)),
+          e("div", null, e("span", null, "Worst SET"),
+            e("strong", null, pct(processWorstFailure(selected))))),
+        categories.length > 0 && e("div", { className: "iv-process-alerts" },
+          e("span", { className: "iv-eyebrow" }, "FLAGS"),
+          processFlagTags(selected, thresholds)),
+        e("section", { className: "iv-detail-section" },
+          e("h4", null, "Contract outcomes"),
+          e("p", { className: "iv-section-note" },
+            "Rates pool every sampled deal in this process. SET is the chosen-contract failure rate; "
+            + "LOSE is the best missed game/slam availability; WRONG is chosen/best-other."),
+          e("div", { className: "iv-contract-grid" },
+            (selected.contracts || []).length
+              ? selected.contracts.map((item) => contractCard(item, thresholds))
+              : e("p", { className: "iv-empty-list" },
+                "No complete contract pool was recorded for this process."))),
+        e("section", { className: "iv-detail-section" },
+          e("h4", null, "Primary hand pools"),
+          e("p", { className: "iv-section-note" },
+            "North and South are bucketed the same way as Cell views, but pooled across every "
+            + "cell that reached this process. Hands are deduplicated; dropped hands still count "
+            + "in the contract rates above."),
+          e("div", { className: "iv-process-pools" },
+            poolTable("North primary", selected.north_groups, "north", thresholds),
+            poolTable("South primary", selected.south_groups, "south", thresholds))))));
 }
 
 export function IVScanner({ profileId }) {
@@ -308,10 +454,11 @@ export function IVScanner({ profileId }) {
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState("");
   const [category, setCategory] = React.useState("all");
-  const [view, setView] = React.useState("findings");
+  const [view, setView] = React.useState("process-findings");
   const [page, setPage] = React.useState(1);
   const [selectedGroupId, setSelectedGroupId] = React.useState(null);
   const [selectedPairId, setSelectedPairId] = React.useState(null);
+  const [selectedProcessKey, setSelectedProcessKey] = React.useState(null);
   const [search, setSearch] = React.useState("");
   const [thresholds, setThresholds] = React.useState(DEFAULT_THRESHOLDS);
   const [hcpMin, setHcpMin] = React.useState(0);
@@ -411,10 +558,20 @@ export function IVScanner({ profileId }) {
     }
   }
 
+  const isProcessView = view.startsWith("process");
   const counts = React.useMemo(() => {
     const result = { block: 0, missed: 0, down: 0, wrong: 0 };
     (report?.groups || []).forEach((group) => {
       groupCategories(group, thresholds).forEach((key) => { result[key] += 1; });
+    });
+    return result;
+  }, [report, thresholds]);
+  const processCounts = React.useMemo(() => {
+    const result = { block: 0, missed: 0, down: 0, wrong: 0 };
+    (report?.process_groups || []).forEach((process) => {
+      processCategories(process, thresholds).forEach((key) => {
+        result[key] += 1;
+      });
     });
     return result;
   }, [report, thresholds]);
@@ -425,8 +582,24 @@ export function IVScanner({ profileId }) {
   const findingsGroups = React.useMemo(
     () => filterScannerGroups(flaggedGroups, category, search, thresholds),
     [flaggedGroups, category, search, thresholds]);
+  const processSource = React.useMemo(() => {
+    if (!isProcessView) return [];
+    let items = filterProcessGroups(
+      report?.process_groups || [], category, search, thresholds);
+    if (view === "process-findings") {
+      items = items.filter(
+        (process) => processCategories(process, thresholds).length > 0);
+    }
+    return [...items].sort((left, right) => (
+      (view === "process-findings"
+        ? processCategories(right, thresholds).length
+          - processCategories(left, thresholds).length
+        : 0)
+      || (right.cases || 0) - (left.cases || 0)
+      || String(left.auction || "").localeCompare(String(right.auction || ""))));
+  }, [report, view, category, search, thresholds, isProcessView]);
   const overviewSource = React.useMemo(() => {
-    if (view !== "overview") return [];
+    if (view !== "cell-overview") return [];
     const groups = filterScannerGroups(
       report?.groups || [], "all", search, thresholds);
     return [...groups].sort((left, right) => (
@@ -437,18 +610,21 @@ export function IVScanner({ profileId }) {
   const pagination = React.useMemo(
     () => paginateGroups(overviewSource, page, OVERVIEW_PAGE_SIZE),
     [overviewSource, page]);
-  const visibleGroups = view === "overview" ? pagination.items : findingsGroups;
+  const visibleGroups = view === "cell-overview"
+    ? pagination.items
+    : (view === "cell-findings" ? findingsGroups : []);
   const matchingPairs = React.useMemo(
     () => findingsGroups.reduce((sum, group) => sum + (group.pairs || []).filter(
       (pair) => pairMatches(pair, category, search, thresholds)).length, 0),
     [findingsGroups, category, search, thresholds]);
   const selectedGroup = visibleGroups.find((group) => group.id === selectedGroupId)
     || visibleGroups[0] || null;
-  const selectionCategory = view === "overview" ? "all" : category;
+  const selectionCategory = view === "cell-overview" ? "all" : category;
   const selectedPair = selectedGroup
     ? (selectedGroup.pairs || []).find((pair) => pair.id === selectedPairId)
       || selectPairForGroup(selectedGroup, selectionCategory, search, thresholds)
     : null;
+  const displayCounts = isProcessView ? processCounts : counts;
 
   React.useEffect(() => {
     setPage(1);
@@ -461,6 +637,12 @@ export function IVScanner({ profileId }) {
       group, selectionCategory, search, thresholds)?.id ?? null);
     if (group && group.id !== selectedGroupId) setSelectedGroupId(group.id);
   }, [visibleGroups, selectedGroupId, selectionCategory, search, thresholds]);
+
+  React.useEffect(() => {
+    const keys = processSource.map(processKey);
+    if (keys.includes(selectedProcessKey)) return;
+    setSelectedProcessKey(keys[0] || null);
+  }, [processSource, selectedProcessKey]);
 
   const running = run?.status === "running" || run?.status === "queued";
   const planned = (Number(hcpMax) - Number(hcpMin) + 1) * FULL_SCAN_SHAPES * Number(pairs);
@@ -541,51 +723,65 @@ export function IVScanner({ profileId }) {
             }))),
         ),
         report && e("div", { className: "iv-view-switch", role: "group",
-          "aria-label": "Findings view" },
+          "aria-label": "Scanner view" },
           e("button", {
-            type: "button", className: view === "findings" ? "active" : "",
-            "aria-pressed": view === "findings",
-            onClick: () => setView("findings"),
-          }, "Findings"),
+            type: "button",
+            className: view === "process-findings" ? "active" : "",
+            "aria-pressed": view === "process-findings",
+            onClick: () => { setView("process-findings"); setCategory("all"); },
+          }, "Process · Findings"),
           e("button", {
-            type: "button", className: view === "overview" ? "active" : "",
-            "aria-pressed": view === "overview",
-            onClick: () => { setView("overview"); setCategory("all"); },
-          }, "Overview · 总览"),
+            type: "button",
+            className: view === "process-overview" ? "active" : "",
+            "aria-pressed": view === "process-overview",
+            onClick: () => { setView("process-overview"); setCategory("all"); },
+          }, "Process · Overview 总览"),
           e("button", {
-            type: "button", className: view === "process" ? "active" : "",
-            "aria-pressed": view === "process",
-            onClick: () => { setView("process"); setCategory("all"); },
-          }, "Process · 进程"),
+            type: "button",
+            className: view === "cell-findings" ? "active" : "",
+            "aria-pressed": view === "cell-findings",
+            onClick: () => { setView("cell-findings"); setCategory("all"); },
+          }, "Cell · Findings"),
+          e("button", {
+            type: "button",
+            className: view === "cell-overview" ? "active" : "",
+            "aria-pressed": view === "cell-overview",
+            onClick: () => { setView("cell-overview"); setCategory("all"); },
+          }, "Cell · Overview 总览"),
         ),
         e("div", { className: "iv-categories" },
           Object.entries(CATEGORY).map(([key, item], index) => e("button", {
             key, className: `iv-category iv-category-${key} ${category === key ? "selected" : ""}`,
             onClick: () => {
-              setView("findings");
+              setView(isProcessView ? "process-findings" : "cell-findings");
               setCategory(category === key ? "all" : key);
             },
             "aria-pressed": category === key,
           }, e("span", null, `0${index + 1} / ${item.title}`),
-          e("strong", null, counts[key]),
+          e("strong", null, displayCounts[key]),
           e("small", null, item.detail))),
         ),
-        view === "process"
-          ? e(ProcessView, { report })
+        isProcessView
+          ? e(ProcessView, {
+            processes: processSource, thresholds,
+            selectedKey: selectedProcessKey,
+            onSelect: setSelectedProcessKey,
+            search, onSearch: setSearch,
+          })
           : e("div", { className: "iv-inspection" },
           e("div", { className: "iv-list" },
             e("div", { className: "iv-list-tools" },
               e("span", null, busy ? "Loading…" : (
-                view === "overview"
+                view === "cell-overview"
                   ? `all ${pagination.total} cell·process groups · page ${pagination.page}/${pagination.pages}`
                   : `${findingsGroups.length} findings · ${matchingPairs} N/S pairs`)),
               e("input", { type: "search", placeholder: "Find deal #, auction, hand", value: search,
                 "aria-label": "Search scanner findings", onChange: (event) => setSearch(event.target.value) }),
-              category !== "all" && view === "findings" && e("button", {
+              category !== "all" && view === "cell-findings" && e("button", {
                 onClick: () => setCategory("all"),
               }, "Show all"),
             ),
-            view === "overview" && e("div", { className: "iv-pager" },
+            view === "cell-overview" && e("div", { className: "iv-pager" },
               e("button", {
                 type: "button", "aria-label": "Previous overview page",
                 disabled: pagination.page <= 1,
@@ -604,7 +800,7 @@ export function IVScanner({ profileId }) {
             e("div", { className: "iv-list-scroll" },
               visibleGroups.length === 0 && e("p", { className: "iv-empty-list" },
                 report
-                  ? (view === "overview"
+                  ? (view === "cell-overview"
                     ? "No cell·process groups match this search."
                     : "No findings match the current filters and thresholds.")
                   : "Choose or run a scan to see findings."),
@@ -621,7 +817,7 @@ export function IVScanner({ profileId }) {
                     e("span", null, `${report?.budget?.ew_samples ?? "—"} EW samples`)),
                   e("span", { className: "iv-case-tags" },
                     categories.map((key) => e("b", { key, className: `iv-tag iv-tag-${key}` }, CATEGORY[key]?.title || key)),
-                    categories.length === 0 && view === "overview" && e("b", {
+                    categories.length === 0 && view === "cell-overview" && e("b", {
                       className: "iv-tag iv-tag-clean",
                     }, "CLEAN"),
                     group.incomplete && e("b", { className: "iv-tag iv-tag-block" },

@@ -1856,3 +1856,158 @@ textarea {
   .iv-results-top label { width: 100%; }
   .iv-hands { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Process inspection mirrors the Cell workspace: list, selected process, detail. */
+.iv-process-inspection .iv-pair-workspace { grid-template-columns: minmax(0, 1fr); }
+.iv-process-list-note {
+  width: auto !important;
+  color: #7a8b7f !important;
+  font-weight: 600 !important;
+}
+.iv-process-card { gap: 6px; }
+.iv-process-contracts { display: flex; flex-wrap: wrap; gap: 4px; }
+.iv-process-contracts em {
+  padding: 2px 5px;
+  border-radius: 3px;
+  background: #edf3ee;
+  color: #4f675a;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+}
+.iv-process-worst { color: #a1423b; font-size: 10px; font-weight: 900; }
+.iv-process-detail { padding: 20px 23px; }
+.iv-process-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 14px 0;
+}
+.iv-process-metrics > div {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid #d7e2d9;
+  border-radius: 6px;
+  background: #f7faf7;
+}
+.iv-process-metrics span {
+  color: #68806f;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.iv-process-metrics strong {
+  color: #244c38;
+  font-family: Georgia, Cambria, serif;
+  font-size: 21px;
+}
+.iv-process-alerts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+}
+.iv-section-note { margin: -2px 0 10px; color: #718274; font-size: 11px; line-height: 1.5; }
+.iv-contract-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 8px;
+}
+.iv-contract-card {
+  display: grid;
+  gap: 8px;
+  padding: 10px 11px;
+  border: 1px solid #d7e2d9;
+  border-radius: 7px;
+  background: #fbfdfb;
+}
+.iv-contract-card header { display: grid; gap: 1px; }
+.iv-contract-card header strong {
+  color: #244c38;
+  font-family: Georgia, Cambria, serif;
+  font-size: 20px;
+  line-height: 1;
+}
+.iv-contract-card header span, .iv-contract-card header em {
+  color: #6b8071;
+  font-size: 10px;
+  font-style: normal;
+}
+.iv-contract-rates { display: grid; gap: 4px; }
+.iv-rate {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 40px;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+}
+.iv-rate-label { color: #5c6f66; font-weight: 900; }
+.iv-rate-track {
+  height: 6px;
+  border-radius: 99px;
+  background: #e4ece6;
+  overflow: hidden;
+}
+.iv-rate-track i { display: block; height: 100%; background: #2f7a5f; }
+.iv-rate.bad .iv-rate-track i { background: #b64a42; }
+.iv-rate b { text-align: right; color: #40584a; font-size: 10px; }
+.iv-contract-flags { display: flex; flex-wrap: wrap; gap: 4px; }
+.iv-process-pools {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.iv-pool-block {
+  overflow: hidden;
+  border: 1px solid #d7e2d9;
+  border-radius: 7px;
+  background: #fff;
+}
+.iv-pool-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 11px;
+  border-bottom: 1px solid #d7e2d9;
+  background: #f2f7f3;
+}
+.iv-pool-heading h4 { margin: 0; }
+.iv-pool-heading span { color: #68806f; font-size: 10px; font-weight: 700; }
+.iv-pool-scroll { max-height: 260px; overflow: auto; }
+.iv-pool-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.iv-pool-table th, .iv-pool-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #eef3f0;
+  text-align: left;
+  white-space: nowrap;
+}
+.iv-pool-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f7faf7;
+  color: #5c6f66;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+.iv-shape-chip {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: #edf3ee;
+  color: #385c46;
+  font-family: Georgia, Cambria, serif;
+  font-weight: 700;
+}
+.iv-pool-clean { color: #9aab9f; }
+.iv-pool-flags { display: flex; flex-wrap: wrap; gap: 3px; }
+@media (max-width: 900px) {
+  .iv-process-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .iv-process-pools { grid-template-columns: 1fr; }
+}
