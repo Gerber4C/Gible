@@ -109,7 +109,10 @@ function ThresholdControl({ control, value, onUpdate }) {
 
 function compactSuits(hand = "") {
   const fields = hand.match(/^S(.*?)H(.*?)D(.*?)C(.*)$/);
-  return fields ? fields.slice(1).map((holding) => holding || "—") : ["—", "—", "—", "—"];
+  return fields
+    ? fields.slice(1).map((holding) => (
+      holding && holding !== "-" ? holding : "—"))
+    : ["—", "—", "—", "—"];
 }
 
 const HAND_POINTS = { A: 4, K: 3, Q: 2, J: 1 };
@@ -575,7 +578,7 @@ function ProcessView({ processes, thresholds, selectedKey, onSelect, search, onS
                 }, `#${index + 1} · ${hand}`)))))),
             e("div", { className: "iv-hand-pair" },
               primaryHand
-                ? miniHand(primaryHand, `${primaryLabel} primary`, "primary")
+                ? miniHand(primaryHand, `${primaryLabel} primary`, "is-primary")
                 : e("p", { className: "iv-empty-list" },
                   `No stored ${primaryLabel} hand in this pool.`),
               partnerHand

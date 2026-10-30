@@ -26,7 +26,7 @@ export default function App() {
   const [originalContent, setOriginalContent] = React.useState("");
   const [fileContent, setFileContent] = React.useState("");
   const [status, setStatus] = React.useState("");
-  const [workspaceView, setWorkspaceView] = React.useState("editor");
+  const [workspaceView, setWorkspaceView] = React.useState("table");
   const [viewMode, setViewMode] = React.useState("guide");
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
   const [deal, setDeal] = React.useState(initialDeal);
@@ -391,11 +391,6 @@ export default function App() {
       sidebarCollapsed
         ? e("div", { className: "sidebar-rail" },
             e("button", {
-              className: workspaceView === "editor" ? "rail-tab active" : "rail-tab",
-              title: "System Editor",
-              onClick: () => setWorkspaceView("editor"),
-            }, "E"),
-            e("button", {
               className: workspaceView === "table" ? "rail-tab active" : "rail-tab",
               title: "Table",
               onClick: () => setWorkspaceView("table"),
@@ -405,6 +400,11 @@ export default function App() {
               title: "IV Scanner",
               onClick: () => setWorkspaceView("scanner"),
             }, "IV"),
+            e("button", {
+              className: workspaceView === "editor" ? "rail-tab active" : "rail-tab",
+              title: "System Editor",
+              onClick: () => setWorkspaceView("editor"),
+            }, "E"),
           )
         : e(React.Fragment, null,
             e("label", { className: "field-label" }, "Profile"),
@@ -413,10 +413,6 @@ export default function App() {
             ),
             e("div", { className: "workspace-switcher" },
               e("button", {
-                className: workspaceView === "editor" ? "nav-tab active" : "nav-tab",
-                onClick: () => setWorkspaceView("editor"),
-              }, "System Editor"),
-              e("button", {
                 className: workspaceView === "table" ? "nav-tab active" : "nav-tab",
                 onClick: () => setWorkspaceView("table"),
               }, "Table"),
@@ -424,6 +420,10 @@ export default function App() {
                 className: workspaceView === "scanner" ? "nav-tab active" : "nav-tab",
                 onClick: () => setWorkspaceView("scanner"),
               }, "IV Scanner"),
+              e("button", {
+                className: workspaceView === "editor" ? "nav-tab active" : "nav-tab",
+                onClick: () => setWorkspaceView("editor"),
+              }, "System Editor"),
             ),
             workspaceView === "editor" && e(FileTree, {
               files,
