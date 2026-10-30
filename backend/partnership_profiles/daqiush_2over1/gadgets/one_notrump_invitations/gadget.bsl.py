@@ -1497,7 +1497,9 @@ class OneNotrumpInvitations(Gadget):
                         and not any(minor_control(ctx, x) for x in p)))
                     cue_call.meaning.action = 'minor_slam_control_cue'
                     cue_call.meaning.nature = ['artificial']
-                    cue_call.meaning.acts = ['slam_try', 'control_showing']
+                    cue_call.meaning.acts = ['slam_try', 'control_showing',
+                                             'game_forcing']
+                    cue_call.meaning.forcing = 'game_forcing'
                     cue_call.meaning.control_suit = control
                     cue_call.meaning.agreed_suit = suit
                     cue_call.meaning.target_suit = suit
