@@ -48,13 +48,23 @@ Normalize the descriptive shape iteratively:
 3. if either rank is tied, branch over the Cartesian product of tied donors and
    receivers, excluding a pair that names the same suit;
 4. stop a branch as soon as its shape is no longer extreme;
-5. deduplicate identical final shapes and cumulative per-suit move counts, then
-   let normal proxy ranking select the least distorted legal hand.
+5. deduplicate by final named shape plus cumulative per-suit donation and
+   receipt counts. If several step sequences reach the same key, retain the
+   lexicographically smallest transition sequence, encoding every transition
+   as `(donor_suit_index, receiver_suit_index)` in S/H/D/C order;
+6. let normal proxy ranking select the least distorted legal hand.
 
-The operation terminates because every move transfers a card from a strictly
-longer suit to a shorter suit and strictly decreases the sum of squared suit
-lengths. It is shape normalization inside proxy construction, not recursive
-`choose_bid` execution. Representative paths are:
+The operation terminates by the integer variant `sum(length ** 2)`. In an
+eligible eight-plus single suit, the donor is at least eight and the third suit
+is at most three. In an eligible eleven-plus two suit, the two long suits use
+at least eleven cards, so the third suit is at most two and a longest donor is
+at least six. The same bounds apply after every reclassification that remains
+eligible. Therefore every selected donor length `a` and receiver length `b`
+satisfy `a - b >= 2`, and one move decreases the variant by
+`2 * (a - b - 1)`, at least two. With thirteen cards the variant is at most 169
+and at least 43, so every branch has at most 63 moves. It is shape
+normalization inside proxy construction, not recursive `choose_bid`
+execution. Representative paths are:
 
 - `10-3-0-0 -> 9-3-1-0 -> 8-3-2-0 -> 7-3-3-0`;
 - `8-3-2-0 -> 7-3-3-0`;
@@ -228,12 +238,15 @@ versioned schema:
 - selected call and originating authored rule;
 - reason the real-hand pass reached TD.
 
-`ProxyDiagnostic` is for explanations, traces, IV Scanner, and TD reports. It
+`ProxyDiagnostic` is for explanations, traces, IV Scanner, and TD reports. Its
+ordered normalization steps are always the canonical transition sequence
+retained during deduplication, so traversal order and cache warming cannot
+change serialized provenance. It
 is never passed to axioms or call applicability. Candidate generation also
 projects a separate immutable `DescriptiveProxyEvidence` containing only
-descriptive HCP, K–R, donor suit, and four description lengths. It does not
-expose synthetic holdings, changed Q/J locations, synthetic controls, or a
-`Hand` interface.
+descriptive HCP, K–R, four description lengths, and cumulative
+`donations_by_suit` / `receipts_by_suit`. It does not expose synthetic
+holdings, changed Q/J locations, synthetic controls, or a `Hand` interface.
 
 Universal axioms receive only `DescriptiveProxyEvidence` through an optional
 `alternative_description` parameter. Code review and tests enforce that
@@ -321,7 +334,11 @@ Tests must be written before implementation and demonstrate:
 17. existing backend tests remain green.
 
 Shape-boundary fixtures include 8-2-2-1 and 8-3-1-1 single-suit hands as well
-as tied 6-6-1-0 two-suit donor choices.
+as tied 6-6-1-0 two-suit donor choices. Multi-step tied fixtures assert the
+canonical deduplicated transition sequence, final target shape, cumulative
+donation and receipt counts, masked description lengths, selected proxy, and
+serialized multi-donor evidence. Run each fixture against cold and warm caches
+and require byte-for-byte equal normalization provenance.
 
 ## Non-goals
 
