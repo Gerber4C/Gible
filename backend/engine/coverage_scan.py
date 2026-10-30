@@ -460,6 +460,174 @@ def scan_coverage(
     process_souths = {}
     cell_processes = {}
     done_cells = set()
+    online_pools = {}
+    online_overflow = {}
+    online_overflow_entries = []
+    online_next_id = [len(schedule) + 1]
+
+    def _online_meta(pool, side, hand, case):
+        if side == 'n':
+            shape = tuple(case.get('north_shape') or ())
+            hcp = case.get('north_hcp')
+            kr = case.get('north_kr')
+        else:
+            shape = tuple(case.get('south_shape') or ())
+            hcp = case.get('south_hcp')
+            kr = case.get('south_kr')
+        pool['meta'][(side, hand)] = (shape, hcp, kr)
+
+    def _online_make_case(deal_hands, simulation, source_case):
+        case = {
+            'id': online_next_id[0], 'trial': online_next_id[0],
+            'stratum': 'coverage', 'dealer': 'n', 'vulnerability': 'none',
+            'hands': {seat: _compact(hand) for seat, hand in deal_hands.items()},
+            'north_hcp': deal_hands['n'].hcp, 'south_hcp': deal_hands['s'].hcp,
+            'north_kr': hand_kr(deal_hands['n']),
+            'south_kr': hand_kr(deal_hands['s']),
+            'north_shape': list(hand_shape(deal_hands['n'])),
+            'south_shape': list(hand_shape(deal_hands['s'])),
+            'calls': list(simulation.calls),
+            'auction': simulation.compact_sequence(),
+            'history': _history(simulation),
+        }
+        online_next_id[0] += 1
+        cell = source_case.get('coverage_cell')
+        if isinstance(cell, dict):
+            case['coverage_cell'] = {**cell, 'pair_slot': 0}
+        summary['pairs'] += 1
+        summary[simulation.status] += 1
+        if simulation.status == 'blocked':
+            case.update(blocked=simulation.blocked, review_status='unreviewed')
+            cases.append(case)
+        elif simulation.status == 'complete':
+            contract, declarer = _contract(simulation.calls)
+            case.update(contract=contract, declarer=declarer)
+            boards = []
+            for index in range(ew_samples):
+                deal = (deal_hands if index == 0 else
+                        complete_opponents(rng, deal_hands['n'], deal_hands['s']))
+                boards.append(solve_table(deal))
+            case['dds_tables'] = boards
+            summary['dds_boards'] += len(boards)
+            complete_cases.append(case)
+        else:
+            case['status'] = 'limit'
+            limit_cases.append(case)
+        return case
+
+    def _online_overflow(process, side, hand, pool):
+        from .coverage_extend import _merge_overflow_hand
+        candidates = list(pool[side])
+        target = _merge_overflow_hand(
+            rng, process, side, hand, candidates, pool['meta'],
+            online_overflow_entries, online_overflow)
+        return target
+
+    def _online_try_pair(process, north_key, south_key, source_case):
+        pool = online_pools[process]
+        if south_key in pool['partners'].get(north_key, set()):
+            return
+        if len(pool['partners'].get(north_key, set())) >= south_cap:
+            if _online_overflow(process, 'n', north_key, pool) is not None:
+                return
+        if len(pool['partners'].get(south_key, set())) >= north_cap:
+            if _online_overflow(process, 's', south_key, pool) is not None:
+                return
+        from .coverage_extend import _repair_partner_low_cards
+        north = Hand.parse(north_key)
+        mutated = _repair_partner_low_cards(north, south_key)
+        if mutated is None:
+            from .coverage_extend import _sample_disjoint_south
+            mutated = _sample_disjoint_south(rng, north, source_case)
+        if mutated is None:
+            return
+        mutated_key = _compact(mutated)
+        if mutated_key == north_key or mutated_key in pool['partners'].get(
+                north_key, set()):
+            return
+        try:
+            simulation = simulate_auction(
+                profile, {'n': north, 's': mutated}, dealer='n',
+                vulnerability='none',
+                environment={'dealer': 'n', 'vulnerability': 'none',
+                             'scoring': 'IMP'}, max_calls=80)
+        except (RuntimeError, ValueError):
+            return
+        if (not simulation.calls
+                or tuple(str(call) for call in simulation.calls) != process):
+            return
+        deal = complete_opponents(rng, north, mutated)
+        case = _online_make_case(deal, simulation, source_case)
+        pool['partners'].setdefault(north_key, set()).add(mutated_key)
+        pool['partners'].setdefault(mutated_key, set()).add(north_key)
+        pool['s'].add(mutated_key)
+        _online_meta(pool, 's', mutated_key, case)
+        _online_register(case)
+
+    def _online_try_pair_south(process, north_key, south_key, source_case):
+        """Fill the South hand's partner cap by fixing South and mutating North."""
+        pool = online_pools[process]
+        if north_key in pool['partners'].get(south_key, set()):
+            return
+        if len(pool['partners'].get(south_key, set())) >= north_cap:
+            if _online_overflow(process, 's', south_key, pool) is not None:
+                return
+        if len(pool['partners'].get(north_key, set())) >= south_cap:
+            if _online_overflow(process, 'n', north_key, pool) is not None:
+                return
+        from .coverage_extend import (_repair_partner_low_cards,
+                                      _sample_disjoint_north)
+        south = Hand.parse(south_key)
+        mutated = _repair_partner_low_cards(south, north_key)
+        if mutated is None:
+            mutated = _sample_disjoint_north(rng, south, source_case, profile)
+        if mutated is None:
+            return
+        mutated_key = _compact(mutated)
+        if mutated_key == south_key or mutated_key in pool['partners'].get(
+                south_key, set()):
+            return
+        try:
+            simulation = simulate_auction(
+                profile, {'n': mutated, 's': south}, dealer='n',
+                vulnerability='none',
+                environment={'dealer': 'n', 'vulnerability': 'none',
+                             'scoring': 'IMP'}, max_calls=80)
+        except (RuntimeError, ValueError):
+            return
+        if (not simulation.calls
+                or tuple(str(call) for call in simulation.calls) != process):
+            return
+        deal = complete_opponents(rng, mutated, south)
+        case = _online_make_case(deal, simulation, source_case)
+        pool['partners'].setdefault(south_key, set()).add(mutated_key)
+        pool['partners'].setdefault(mutated_key, set()).add(south_key)
+        pool['n'].add(mutated_key)
+        _online_meta(pool, 'n', mutated_key, case)
+        _online_register(case)
+
+    def _online_register(case):
+        hands = case.get('hands') or {}
+        north_key = hands.get('n')
+        south_key = hands.get('s')
+        if not north_key or not south_key:
+            return
+        process = case_process_key(case)
+        pool = online_pools.setdefault(process, {
+            'n': set(), 's': set(), 'partners': {}, 'meta': {}})
+        pool['n'].add(north_key)
+        pool['s'].add(south_key)
+        _online_meta(pool, 'n', north_key, case)
+        _online_meta(pool, 's', south_key, case)
+        pool['partners'].setdefault(north_key, set()).add(south_key)
+        pool['partners'].setdefault(south_key, set()).add(north_key)
+        for existing_south in list(pool['s']):
+            _online_try_pair(process, north_key, existing_south, case)
+            _online_try_pair_south(process, north_key, existing_south, case)
+        for existing_north in list(pool['n']):
+            _online_try_pair(process, existing_north, south_key, case)
+            _online_try_pair_south(process, existing_north, south_key, case)
+
     for trial, (cell, stratum, slot) in enumerate(schedule, 1):
         if stop is not None and stop():
             break
@@ -576,28 +744,33 @@ def scan_coverage(
                 boards.append(solve_table(deal))
             case['dds_tables'] = boards
             summary['dds_boards'] += len(boards)
-            # Pool capping: once a process bucket holds its cap of stored
-            # hands, further deals keep their DDS evidence but lose their
-            # stored hands, contributing only lose/down/wrong weight.
-            process = case_process_key(case)
-            north_key = north_bucket_key(case)
-            south_key = south_bucket_key(case)
-            stored_north = pool_counts.get((process, 'n', north_key), 0)
-            stored_south = pool_counts.get((process, 's', south_key), 0)
-            if ((north_cap and stored_north >= north_cap)
-                    or (south_cap and stored_south >= south_cap)):
-                del case['hands']
-                case['stored'] = False
-                overflow_cases.append(case)
-                summary['overflow'] += 1
-                for side, key in (('n', north_key), ('s', south_key)):
-                    drop_key = (process, side, key)
-                    pool_overflow[drop_key] = pool_overflow.get(drop_key, 0) + 1
-            else:
+            if adaptive:
+                # Online matching owns the caps; keep hands for pairing.
                 case['stored'] = True
                 complete_cases.append(case)
-                pool_counts[(process, 'n', north_key)] = stored_north + 1
-                pool_counts[(process, 's', south_key)] = stored_south + 1
+            else:
+                # Pool capping: once a process bucket holds its cap of stored
+                # hands, further deals keep their DDS evidence but lose their
+                # stored hands, contributing only lose/down/wrong weight.
+                process = case_process_key(case)
+                north_key = north_bucket_key(case)
+                south_key = south_bucket_key(case)
+                stored_north = pool_counts.get((process, 'n', north_key), 0)
+                stored_south = pool_counts.get((process, 's', south_key), 0)
+                if ((north_cap and stored_north >= north_cap)
+                        or (south_cap and stored_south >= south_cap)):
+                    del case['hands']
+                    case['stored'] = False
+                    overflow_cases.append(case)
+                    summary['overflow'] += 1
+                    for side, key in (('n', north_key), ('s', south_key)):
+                        drop_key = (process, side, key)
+                        pool_overflow[drop_key] = pool_overflow.get(drop_key, 0) + 1
+                else:
+                    case['stored'] = True
+                    complete_cases.append(case)
+                    pool_counts[(process, 'n', north_key)] = stored_north + 1
+                    pool_counts[(process, 's', south_key)] = stored_south + 1
         elif simulation.status == 'limit':
             case['status'] = 'limit'
             limit_cases.append(case)
@@ -608,17 +781,28 @@ def scan_coverage(
                 process_norths.setdefault(process, set()).add(hands['n'])
                 process_souths.setdefault(process, set()).add(hands['s'])
                 cell_processes.setdefault(cell_identity, set()).add(process)
+                _online_register(case)
                 if (slot + 1 >= 2
-                        and all(len(process_norths[p]) >= north_cap
-                                and len(process_souths[p]) >= south_cap
-                                for p in cell_processes[cell_identity])):
+                        and all(
+                            all(len(online_pools[p]['partners'].get(h, set()))
+                                >= south_cap for h in online_pools[p]['n'])
+                            and all(len(online_pools[p]['partners'].get(h, set()))
+                                    >= north_cap for h in online_pools[p]['s'])
+                            for p in cell_processes[cell_identity])):
                     done_cells.add(cell_identity)
         if progress is not None:
             progress(summary.copy(), len(schedule))
         if snapshot is not None and trial % snapshot_every == 0:
             snapshot(_build_report(**state))
 
-    return _build_report(**state)
+    report = _build_report(**state)
+    if adaptive:
+        report['partner_overflow'] = [
+            {**entry, 'process': list(entry['process'])}
+            for entry in online_overflow_entries]
+        report['online_matching'] = {'kind': 'online_process_matching',
+                                     'pools': len(online_pools)}
+    return report
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description='Balanced North-1NT coverage and DDS audit')
