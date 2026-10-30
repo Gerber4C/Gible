@@ -122,13 +122,19 @@ After a quantitative 4NT, opener's 5C means:
   immediately;
 - responder must answer aces and does not yet try to identify opener's feature.
 
-The hidden feature is not restricted to four spades. In the covered prefixes it
-can include:
+The hidden feature is not restricted to four spades. Eligibility is fixed by
+prefix; no feature may leak from one row into another:
 
-- exactly four spades when that holding was not already shown;
-- at least five clubs or diamonds when that length was not already shown;
-- at least five hearts after the 2H reply;
-- any other feature must remain unsupported until explicitly authored.
+| Prefix ending in quantitative 4NT | Features eligible for 5C and later natural description |
+| --- | --- |
+| `1NT-2C-2D-4NT` | at least five clubs or at least five diamonds |
+| `1NT-2C-2H-4NT` | exactly four spades, at least five clubs, at least five diamonds, or at least five hearts |
+| `1NT-3C-3D-4NT` | at least five clubs or at least five diamonds |
+
+Only the `2C-2H-4NT` row publicly guarantees responder four spades. Therefore
+only that row can treat opener's four spades as a known fit, expose 6S, or use
+5S as the strain-aware stop. Any other feature remains unsupported until
+explicitly authored.
 
 For each exact prefix, the implementation enumerates only the legal feature
 calls above and asks the existing public-information simulation selector to
@@ -162,10 +168,16 @@ No six-level descriptive call is made in this branch.
 
 When the 1/4 or 0/3 response remains genuinely ambiguous after accounting for
 opener's own hand, the selector samples only deals compatible with the public
-auction and the response category. Continue to slam only when the selected
-policy determines that the partnership is not missing two aces; otherwise take
-the appropriate five-level stop. If sampling fails and the category permits both
-outcomes, TD rather than using responder's private cards.
+auction and the response category. It computes the weighted share of compatible
+samples in which the partnership is missing fewer than two aces:
+
+- greater than 50%: take the six-level natural-description branch;
+- exactly 50% or less: take the appropriate five-level stop;
+- no compatible samples, timeout, or sampling failure: take the conservative
+  five-level stop.
+
+The stable tie rule is therefore “stop.” No private responder cards may be used
+to resolve the category.
 
 ### Not missing two aces
 
