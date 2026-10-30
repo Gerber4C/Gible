@@ -493,6 +493,31 @@ class IVScannerTests(unittest.TestCase):
             self.assertFalse(target.exists())
             self.assertFalse(target.with_suffix('.html').exists())
 
+    def test_process_primary_hand_aggregation_and_td(self):
+        projected = project_report(self.sample_report(), 'sample.json')
+        complete = next(
+            process for process in projected['process_groups']
+            if process['auction'] == '1NP2HP2SP4SPPP')
+        primary = next(
+            row for row in complete['primary_hands']['n']
+            if row['hcp'] == 16)
+        self.assertEqual(primary['metrics']['contract'], '4S')
+        self.assertEqual(primary['metrics']['make'], 0.0)
+        self.assertIsNone(primary['metrics']['lose_game'])
+        self.assertAlmostEqual(primary['metrics']['lose_small_slam'], 0.1)
+        self.assertEqual(primary['metrics']['best_other'],
+                         {'contract': '4H', 'make': 0.1})
+        self.assertEqual(primary['metrics']['make_ratio'], 0.0)
+        self.assertEqual(primary['boards'], 10)
+        blocked = next(
+            process for process in projected['process_groups']
+            if process['auction'] == '1NP2HP2SP3DP')
+        primary = blocked['primary_hands']['n'][0]
+        self.assertIsNone(primary['metrics']['make'])
+        self.assertIsNone(primary['metrics']['best_other'])
+        self.assertEqual(primary['partners'][0]['status'], 'blocked')
+        self.assertEqual(primary['partners'][0]['td']['seat'], 's')
+
 
 if __name__ == '__main__':
     unittest.main()

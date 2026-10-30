@@ -2165,3 +2165,194 @@ textarea {
 }
 .iv-report-actions button.danger { border-color: #d7a6a0; color: #a1423b; background: #fff8f6; }
 .iv-report-actions button:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Process Inspect: fixed process first, then Process x Primary Hand aggregation. */
+.iv-process-main {
+  min-width: 0;
+  max-height: 665px;
+  overflow: auto;
+  background: #f4f8f5;
+}
+.iv-process-auction {
+  margin: 14px 16px 0;
+  padding: 14px 16px;
+  border: 1px solid #d7e2d9;
+  border-radius: 8px;
+  background: #fff;
+}
+.iv-process-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.iv-process-section-head > span:last-child {
+  color: #6b8071;
+  font-size: 11px;
+  font-weight: 700;
+}
+.iv-process-call-rows { display: grid; gap: 7px; }
+.iv-process-call-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+.iv-process-call {
+  display: grid;
+  gap: 3px;
+  min-height: 52px;
+  padding: 7px 10px;
+  border: 1px solid #e0e8e2;
+  border-radius: 5px;
+  background: #f4f8f5;
+}
+.iv-process-call span {
+  color: #7a8b7f;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .06em;
+}
+.iv-process-call strong {
+  color: #234b37;
+  font-family: Georgia, Cambria, serif;
+  font-size: 18px;
+  line-height: 1;
+}
+.iv-process-call.td { border-color: #e3b7ad; background: #fff3ef; }
+.iv-process-call.td strong { color: #a1423b; }
+.iv-process-workbench {
+  display: grid;
+  grid-template-columns: minmax(205px, .62fr) minmax(0, 2.2fr);
+  gap: 12px;
+  padding: 12px 16px 18px;
+}
+.iv-primary-list {
+  overflow: hidden;
+  border: 1px solid #d7e2d9;
+  border-radius: 8px;
+  background: #fff;
+  align-self: start;
+}
+.iv-primary-list-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #d7e2d9;
+  background: #f2f7f3;
+}
+.iv-primary-list-head h4 { margin: 0; }
+.iv-primary-scroll { max-height: 520px; overflow: auto; }
+.iv-primary-item {
+  display: grid;
+  width: 100%;
+  gap: 3px;
+  padding: 9px 12px;
+  border: 0;
+  border-bottom: 1px solid #e6eee8;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.iv-primary-item:hover { background: #f2f8f3; }
+.iv-primary-item.selected { background: #e4f2e7; box-shadow: inset 3px 0 #1e7660; }
+.iv-primary-item strong { color: #2b5c45; font-size: 12px; }
+.iv-primary-item span { color: #557063; font-size: 11px; }
+.iv-primary-item small { color: #7a8b7f; font-size: 10px; }
+.iv-primary-inspect { min-width: 0; }
+.iv-primary-inspect-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.iv-primary-inspect-head h3 {
+  margin: 0;
+  color: #244c38;
+  font-family: Georgia, Cambria, serif;
+  font-size: 17px;
+}
+.iv-primary-inspect-head span { color: #6b8071; font-size: 10px; font-weight: 700; }
+.iv-primary-metrics {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 7px;
+  margin-bottom: 10px;
+}
+.iv-process-metric {
+  display: grid;
+  gap: 4px;
+  min-height: 78px;
+  padding: 9px 10px;
+  border: 1px solid #d7e2d9;
+  border-radius: 6px;
+  background: #fff;
+}
+.iv-process-metric.make { background: #eaf5ed; border-color: #c7ddcf; }
+.iv-process-metric.bad { background: #fff0ee; border-color: #e3b7ad; }
+.iv-process-metric.empty { background: #f7f9f7; }
+.iv-process-metric-title {
+  color: #5b7264;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.iv-process-metric strong {
+  color: #244c38;
+  font-family: Georgia, Cambria, serif;
+  font-size: 20px;
+  line-height: 1.05;
+}
+.iv-process-metric.bad strong { color: #a1423b; }
+.iv-process-metric small { color: #718274; font-size: 9px; }
+.iv-partner-panel {
+  padding: 12px;
+  border: 1px solid #d7e2d9;
+  border-radius: 8px;
+  background: #fff;
+}
+.iv-partner-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 9px;
+}
+.iv-partner-panel-head h4 { margin: 0; }
+.iv-partner-nav { display: flex; gap: 5px; }
+.iv-partner-nav button {
+  min-width: 34px;
+  min-height: 30px;
+  border: 1px solid #c6d7cc;
+  border-radius: 5px;
+  background: #f7faf7;
+  color: #2b5c45;
+  font-size: 14px;
+  cursor: pointer;
+}
+.iv-partner-nav button:disabled { opacity: .35; cursor: not-allowed; }
+.iv-process-td {
+  margin-top: 10px;
+  padding: 8px 11px;
+  border-left: 3px solid #a1423b;
+  border-radius: 4px;
+  background: #fff3ef;
+  color: #874239;
+  font-size: 11px;
+}
+.iv-process-td.limit { border-left-color: #b36a46; background: #fff7f0; color: #8d573a; }
+.iv-process-td p { margin: 4px 0 0; font-size: 11px; line-height: 1.45; }
+@media (max-width: 1100px) {
+  .iv-primary-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 800px) {
+  .iv-process-workbench { grid-template-columns: minmax(0, 1fr); }
+  .iv-process-call-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .iv-primary-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

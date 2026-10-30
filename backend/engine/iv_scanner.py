@@ -16,9 +16,9 @@ from .coverage_extend import complete_report
 from .coverage_scan import COVERAGE_SHAPES, scan_coverage
 from .loader import load_profile
 from .outcome_metrics import (
-    RULE_ID, assess_auction_groups, board_result, case_process_key,
-    north_bucket_key, rates_for_boards, reclassify_analysis,
-    south_bucket_key,
+    RULE_ID, assess_auction_groups, available_level, board_result,
+    case_process_key, north_bucket_key, rates_for_boards, reached_game,
+    reclassify_analysis, south_bucket_key,
 )
 
 
@@ -303,10 +303,126 @@ def project_by_process(report: dict, *, analyses=None,
             'south_groups': [_finish(group, 'south_hands',
                                      'matched_north_hands', south_cap)
                              for group in south_groups.values()],
+            'primary_hands': _primary_hand_groups(members),
         })
     result.sort(key=lambda item: (-item['cases'], item.get('auction') or ''))
     return result
 
+
+
+def _primary_hand_groups(members):
+    """Aggregate weighted metrics per Process x Primary Hand."""
+    groups = {'n': {}, 's': {}}
+    for case in members:
+        hands = case.get('hands') or {}
+        for side, partner_side in (('n', 's'), ('s', 'n')):
+            hand = hands.get(side)
+            partner = hands.get(partner_side)
+            if not isinstance(hand, str) or not hand:
+                continue
+            item = groups[side].setdefault(hand, {
+                'hand': hand, 'cases': [], 'partners': {},
+                'hcp': case.get('north_hcp' if side == 'n' else 'south_hcp'),
+                'kr': case.get('north_kr' if side == 'n' else 'south_kr'),
+                'shape': list(case.get('north_shape' if side == 'n'
+                                       else 'south_shape') or ()),
+            })
+            item['cases'].append(case)
+            if isinstance(partner, str) and partner:
+                instance = item['partners'].setdefault(partner, {
+                    'hand': partner, 'status': None, 'td': None})
+                status = 'blocked' if case.get('blocked') else (
+                    'limit' if case.get('status') == 'limit' else 'complete')
+                if instance['status'] != 'blocked' and status == 'blocked':
+                    instance['status'] = 'blocked'
+                    instance['td'] = case.get('blocked')
+    result = {}
+    for side, entries in groups.items():
+        rows = []
+        for hand, item in entries.items():
+            metric = _primary_metrics(item['cases'])
+            partners = sorted(item['partners'].values(),
+                              key=lambda value: value['hand'])
+            rows.append({
+                'label': '',
+                'hand': hand,
+                'shape': item['shape'],
+                'hcp': item['hcp'], 'kr': item['kr'],
+                'boards': metric['boards'],
+                'partner_count': len(partners),
+                'partners': partners,
+                'metrics': metric,
+            })
+        rows.sort(key=lambda row: (-(row['hcp'] or 0), row['hand']))
+        for index, row in enumerate(rows, 1):
+            row['label'] = ('N' if side == 'n' else 'S') + f'-{index:03d}'
+        result[side] = rows
+    return result
+
+
+def _primary_metrics(cases):
+    boards = []
+    contract = declarer = None
+    for case in cases:
+        if not case.get('dds_tables'):
+            continue
+        candidate = case.get('contract')
+        who = case.get('declarer')
+        if not isinstance(candidate, str) or who not in ('n', 's'):
+            continue
+        contract = contract or candidate
+        declarer = declarer or who
+        boards.extend(case.get('dds_tables') or ())
+    if not boards or contract is None:
+        return {
+            'contract': None, 'declarer': None, 'boards': 0,
+            'make': None, 'lose_game': None, 'lose_small_slam': None,
+            'lose_grand_slam': None, 'best_other': None,
+            'make_ratio': None,
+        }
+    strain = contract[1:]
+    level = int(contract[0])
+    make = sum(table[strain][declarer] >= level + 6 for table in boards) / len(boards)
+    reached_game_contract = reached_game(contract)
+    lose_game = None if reached_game_contract else (
+        sum(available_level(table, 'game') for table in boards) / len(boards))
+    lose_small = None if level >= 6 else (
+        sum(available_level(table, 'small_slam') for table in boards) / len(boards))
+    lose_grand = None if level >= 7 else (
+        sum(available_level(table, 'grand_slam') for table in boards) / len(boards))
+    best = _best_same_level(contract, boards)
+    ratio = None
+    if best is not None and best['make']:
+        ratio = make / best['make']
+    return {
+        'contract': contract, 'declarer': declarer, 'boards': len(boards),
+        'make': make, 'lose_game': lose_game,
+        'lose_small_slam': lose_small, 'lose_grand_slam': lose_grand,
+        'best_other': best, 'make_ratio': ratio,
+    }
+
+
+def _best_same_level(contract, boards):
+    level = int(contract[0])
+    if level >= 7:
+        candidates = [(7, strain) for strain in ('C', 'D', 'H', 'S', 'NT')]
+    elif level == 6:
+        candidates = [(6, strain) for strain in ('C', 'D', 'H', 'S', 'NT')]
+    elif reached_game(contract):
+        candidates = [(3, 'NT'), (4, 'H'), (4, 'S'), (5, 'C'), (5, 'D')]
+    else:
+        return None
+    best = None
+    for candidate_level, strain in candidates:
+        candidate = f'{candidate_level}{strain}'
+        if candidate == contract:
+            continue
+        made = sum(max(table[strain][seat] for seat in 'ns')
+                   >= candidate_level + 6 for table in boards)
+        rate = made / len(boards)
+        if best is None or rate > best['make']:
+            best = {'contract': candidate, 'make': rate}
+    return best
 
 def project_report(report: dict, report_id: str, *,
                    include_pairs: bool = True) -> dict:
