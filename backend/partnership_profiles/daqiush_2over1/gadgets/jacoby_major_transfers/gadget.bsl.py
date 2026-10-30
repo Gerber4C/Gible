@@ -465,6 +465,7 @@ class JacobyMajorTransfers(Gadget):
                 new_suit.meaning.acts = ['game_forcing']
                 new_suit.meaning.forcing = 'game_forcing'
                 new_suit.meaning.target_suit = minor
+                new_suit.meaning.minimum_length = 4
                 new_suit.description = 'Natural four-plus second minor after Jacoby; game forcing.'
 
                 minor_prefix = ordinary_prefix + '3' + minor + 'P'

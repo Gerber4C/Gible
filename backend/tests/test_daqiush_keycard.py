@@ -32,9 +32,15 @@ class DaqiushKeycardPrefixTests(unittest.TestCase):
             with self.subTest(call=call):
                 self.assertEqual(choose_bid(self.profile, prefix, Hand.parse(cards)).call, call)
 
-    def test_void_response_remains_blocked_until_special_answers_are_authored(self):
+    def test_void_response_uses_the_useful_void_answer(self):
         hand = Hand.parse('SA765HKQ9876D432C-')
-        self.assertIsNone(choose_bid(self.profile, Auction.parse('1NP4CP4HP4NP'), hand).call)
+        decision = choose_bid(self.profile, Auction.parse('1NP4CP4HP4NP'), hand)
+        self.assertEqual(decision.call, '5N')
+        trace = replay_auction(self.profile, Auction.parse('1NP4CP4HP4NP5NP'))
+        self.assertTrue(trace.state_exists({'key': 'keycard_context',
+                                            'method': 'rkcb_1430',
+                                            'status': 'answered',
+                                            'trump_suit': 'H'}))
 
     def test_diamond_trump_and_splinter_trump_are_used_by_responses(self):
         diamond = choose_bid(self.profile, Auction.parse('1NP2DP2HP3DP3SP4HP4NP'),

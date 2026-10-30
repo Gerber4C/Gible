@@ -13,6 +13,19 @@ from .hand_quality import (inquiry_stopper, minor_game_control_points,
                            shapely_combined_effective_points, shapely_description_proxy)
 from .voidwood import (answer_bids, effective_keycards,
                        is_safe_voidwood_ask, voidwood_jump)
+from .rkcb_continuation import ordinary_response, useful_voids
+
+
+def _ordinary_rkcb_pending(ctx, trump):
+    return (ctx.state.exists('keycard_context', method='rkcb_1430',
+                             trump_suit=trump, status='pending')
+            or ctx.state.exists('keycard_context', method='rkcb_1430',
+                                trump_suit=trump, status='pending_answer'))
+
+
+def _ordinary_rkcb_response_call(ctx, trump):
+    voids = useful_voids(ctx.trace, ctx.auction.actor_to_call, ctx.hand, trump)
+    return ordinary_response(ctx.hand, trump, voids).call
 from .zar import ZarFitContext, evaluate_zar
 
 
@@ -1184,6 +1197,8 @@ def _base_namespace(collector: _Collector) -> dict[str, Any]:
         "effective_keycards": effective_keycards,
         "is_safe_voidwood_ask": is_safe_voidwood_ask,
         "voidwood_jump": voidwood_jump,
+        "ordinary_rkcb_pending": _ordinary_rkcb_pending,
+        "ordinary_rkcb_response_call": _ordinary_rkcb_response_call,
         "zar_total": _zar_total,
         "shapely_effective_points": shapely_effective_points,
         "shapely_combined_effective_points": shapely_combined_effective_points,

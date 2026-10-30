@@ -118,24 +118,65 @@ class ConfirmedKeycard(Gadget):
             ('5H', (2,), False, '2 keycards without trump queen'),
             ('5S', (2,), True, '2 keycards with trump queen'),
         )
-        for branch, prefix, trump in asks:
-            for bid, counts, queen, explanation in steps:
-                answer = self.call(branch + '_answer_' + bid.lower())
-                answer.when = prefix
+        for trump in 'CDHS':
+            for bid, counts, queen, category in (
+                ('5C', (1, 4), None, '1/4'),
+                ('5D', (0, 3), None, '0/3'),
+                ('5H', (2,), False, '2/no_q'),
+                ('5S', (2,), True, '2/q'),
+                ('5N', (0, 2, 4), None, '0/2/4/void'),
+                ('6C', (1, 3), None, '1/3/void'),
+                ('6D', (1, 3), None, '1/3/void'),
+                ('6H', (1, 3), None, '1/3/void'),
+                ('6S', (1, 3), None, '1/3/void'),
+            ):
+                answer = self.call('ordinary_rkcb_' + trump.lower()
+                                   + '_answer_' + bid.lower())
+                answer.when = '*'
+                answer.requires = StateExists('keycard_context', method='rkcb_1430',
+                                              trump_suit=trump)
                 answer.bid = bid
-                answer.applies = lambda ctx, t=trump, c=counts, q=queen: ordinary_keycard_answer(ctx, t, c, q)
+                answer.applies = (lambda ctx, t=trump, b=bid: (
+                    ordinary_rkcb_pending(ctx, t)
+                    and ordinary_rkcb_response_call(ctx, t) == b))
                 answer.meaning.action = 'rkcb_1430_answer'
                 answer.meaning.nature = ['artificial']
                 answer.meaning.acts = ['descriptive', 'keycard_answer']
                 answer.meaning.target_suit = trump
                 answer.meaning.agreed_suit = trump
                 answer.meaning.keycard_counts = list(counts)
-                if bid == '5D':
-                    answer.meaning.preferred_keycard_count = 3
                 if queen is not None:
                     answer.meaning.trump_queen = queen
-                answer.description = explanation + '; later continuations are not yet defined.'
+                if bid == '5N':
+                    answer.meaning.useful_void_category = 'unspecified'
+                elif bid[0] == '6':
+                    if bid[-1] == trump:
+                        answer.meaning.useful_void_category = 'higher_than_trump'
+                    else:
+                        answer.meaning.useful_void = bid[-1]
+                        answer.meaning.useful_void_category = 'exact'
+                answer.description = ('Ordinary RKCB answer ' + bid
+                                      + ' from the public pending frame.')
 
+                record = answer.effect('keycard_context')
+                record.method = 'rkcb_1430'
+                record.trump_suit = trump
+                record.status = 'answered'
+                record.answer_category = category
+                record.keycard_counts = list(counts)
+                if queen is not None:
+                    record.trump_queen = queen
+                if bid == '5N':
+                    record.useful_void_category = 'unspecified'
+                elif bid[0] == '6':
+                    if bid[-1] == trump:
+                        record.useful_void_category = 'higher_than_trump'
+                    else:
+                        record.useful_void = bid[-1]
+                        record.useful_void_category = 'exact'
+
+        for branch, prefix, trump in asks:
+            for bid, counts, queen, explanation in steps:
                 # The asker's private keycard purpose selects five or six of
                 # the agreed suit. These public declarations make that final
                 # placement legible to the other player, who can then pass.
