@@ -92,17 +92,30 @@ class PurposeAxiomTests(unittest.TestCase):
         self.assertEqual(decision.call, '5S')
         self.assertEqual(decision.private_memory.purposes[0].status, 'active')
 
-    def test_reviewed_zero_or_three_answer_defaults_to_three_unless_asker_has_three(self):
-        for own_count, cards, expected in (
-            (2, 'SA2HAJ9876D432C42', '6H'),
-            (3, 'SA2HKJ9876DA32C42', '5H'),
-        ):
-            with self.subTest(own_count=own_count):
-                purpose = {'kind': 'keycard_slam', 'owner': 's', 'source_index': 6,
-                           'source_call': '4N', 'trump': 'H', 'own_keycards': own_count,
-                           'owns_trump_queen': False, 'status': 'active'}
-                decision = self.choose('1NP4CP4HP4NP5DP', cards, purpose)
-                self.assertEqual(decision.call, expected)
+    def test_zero_or_three_answer_uses_sampling_when_counts_are_ambiguous(self):
+        from unittest.mock import patch
+        from engine.rkcb_simulation import AmbiguousDecision
+        purpose = {'kind': 'keycard_slam', 'owner': 's', 'source_index': 6,
+                   'source_call': '4N', 'trump': 'H', 'own_keycards': 2,
+                   'owns_trump_queen': False, 'status': 'active'}
+        with patch('engine.purpose_axiom.compare_ambiguous_continuations',
+                   return_value=AmbiguousDecision('6H', 'test mixture')):
+            sampled = self.choose('1NP4CP4HP4NP5DP',
+                                  'SA2HAJ9876D432C42', purpose)
+        self.assertEqual(sampled.call, '6H')
+        purpose['own_keycards'] = 3
+        deterministic = self.choose('1NP4CP4HP4NP5DP',
+                                    'SA2HKJ9876DA32C42', purpose)
+        self.assertEqual(deterministic.call, '5H')
+
+    def test_ambiguous_answer_tds_when_sampling_is_unavailable(self):
+        purpose = {'kind': 'keycard_slam', 'owner': 's', 'source_index': 6,
+                   'source_call': '4N', 'trump': 'H', 'own_keycards': 2,
+                   'owns_trump_queen': False, 'status': 'active'}
+        decision = self.choose('1NP4CP4HP4NP5DP', 'SA2HAJ9876D432C42', purpose)
+        self.assertIsNone(decision.call)
+        self.assertTrue(any('ambiguous' in item.lower()
+                            for item in decision.trace.diagnostics))
 
     def test_queen_ask_is_authored_but_its_answer_table_is_not(self):
         purpose = {'kind': 'keycard_slam', 'owner': 's', 'source_index': 6,

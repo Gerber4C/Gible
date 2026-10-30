@@ -204,5 +204,46 @@ class RescueSimulationTests(unittest.TestCase):
         self.assertEqual(decision.call, '6H')
 
 
+class AmbiguousMixtureTests(unittest.TestCase):
+    def test_possible_counts_are_pruned_by_the_askers_cards(self):
+        from engine.rkcb_continuation import possible_partner_counts
+        frame = OrdinaryRKCBFrame(trump='H', status='answered',
+                                  answer_category='0/2/4/void',
+                                  keycard_counts=(0, 2, 4))
+        self.assertEqual(possible_partner_counts(frame, 4), (0,))
+        self.assertEqual(possible_partner_counts(frame, 3), (0, 2))
+
+    def test_mixture_compares_the_complete_category(self):
+        from engine.rkcb_simulation import compare_ambiguous_continuations
+        zero = Hand.parse('S32HQ8765D432C432')
+        two = Hand.parse('SA2HKQ8765D432C32')
+        deals = ({'n': zero, 's': Hand.parse('S32HQ8765D432C432')},
+                 {'n': two, 's': Hand.parse('S32HQ8765D432C432')})
+
+        def fake_solver(deal):
+            two_keycards = deal['n'].keycard_count('H') == 2
+            return {'H': {'s': 12 if two_keycards else 11},
+                    'NT': {'n': 11}}
+
+        frame = OrdinaryRKCBFrame(
+            trump='H', status='answered', answer_category='0/2/4/void',
+            keycard_counts=(0, 2, 4), useful_void_category='unspecified')
+        decision = compare_ambiguous_continuations(
+            None, Auction.parse('1NP4CP4HP4NP5NP'),
+            AuctionTrace(), Hand.parse('SA2HKQ976D432C432'), frame,
+            ('P', '6H'), deals=deals, solve=fake_solver)
+        self.assertEqual((decision.call, decision.unavailable), ('P', False))
+
+    def test_one_exposed_call_is_deterministic_without_a_solver(self):
+        from engine.rkcb_simulation import compare_ambiguous_continuations
+        frame = OrdinaryRKCBFrame(trump='H', status='answered',
+                                  answer_category='1/4', keycard_counts=(1, 4))
+        decision = compare_ambiguous_continuations(
+            None, Auction.parse('1NP4CP4HP4NP5CP'), AuctionTrace(),
+            Hand.parse('SA2HKQ976D432C432'), frame, ('6H',),
+            evaluator=lambda calls: self.fail('solver must not run'))
+        self.assertEqual(decision.call, '6H')
+
+
 if __name__ == '__main__':
     unittest.main()

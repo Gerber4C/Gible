@@ -9,10 +9,10 @@ from .legality import SIDE_BY_SEAT, is_call_legal, last_contract_state
 from .memory import Purpose, SeatMemory
 from .rkcb_continuation import (
     bid_rank, five_spade_role, five_trump_available,
-    lowest_showable_side_king, ordinary_rkcb_frame, queen_ask_call,
-    relay_terminal_call,
+    lowest_showable_side_king, ordinary_rkcb_frame, possible_partner_counts,
+    queen_ask_call, relay_terminal_call,
 )
-from .rkcb_simulation import compare_rescue_routes
+from .rkcb_simulation import compare_ambiguous_continuations, compare_rescue_routes
 from .slam_intent import (
     PARTNER_1NT_MIN, PARTNER_DEFAULT_MIN, detect_slam_intent,
 )
@@ -88,7 +88,8 @@ def resolve_purpose(auction, trace, memory: SeatMemory, hand=None,
                                      error=f'Unknown saved purpose: {purpose.kind}')
         if len(auction.calls) < purpose.source_index + 4:
             return PurposeResolution(memory)
-        result = _keycard_slam(auction, trace, purpose, hand, profile)
+        result = _keycard_slam(auction, trace, purpose, hand, profile,
+                               candidates)
         if result.purpose is not None and result.purpose != purpose:
             memory = memory.replace_purpose(purpose, result.purpose)
         resolved = result.purpose or purpose
@@ -208,13 +209,15 @@ class _StageResult:
     authored_only: bool = False
 
 
-def _keycard_slam(auction, trace, purpose, hand=None, profile=None) -> _StageResult:
+def _keycard_slam(auction, trace, purpose, hand=None, profile=None,
+                  candidates=()) -> _StageResult:
     if purpose.own_keycards is None or purpose.owns_trump_queen is None:
         return _StageResult(error='Keycard purpose lacks the asker\'s saved private count')
     stage = purpose.rkcb_stage or 'await_keycard_answer'
     frame = ordinary_rkcb_frame(trace)
     if stage == 'await_keycard_answer':
-        return _choose_after_answer(auction, trace, purpose, hand, frame, profile)
+        return _choose_after_answer(auction, trace, purpose, hand, frame, profile,
+                                    candidates)
     if stage == 'choose_continuation':
         return _choose_continuation(auction, trace, purpose, hand, frame)
     if stage == 'await_relay_completion':
@@ -224,7 +227,8 @@ def _keycard_slam(auction, trace, purpose, hand=None, profile=None) -> _StageRes
     return _StageResult(error=f'Unknown RKCB continuation stage: {stage}')
 
 
-def _choose_after_answer(auction, trace, purpose, hand, frame, profile=None):
+def _choose_after_answer(auction, trace, purpose, hand, frame, profile=None,
+                         candidates=()):
     meaning = _answer_meaning(trace, purpose)
     if not meaning or 'keycard_counts' not in meaning:
         return _StageResult(
@@ -234,20 +238,22 @@ def _choose_after_answer(auction, trace, purpose, hand, frame, profile=None):
                 or meaning.get('answer_category'))
     with_stage = replace(purpose, rkcb_stage='choose_continuation',
                          answer_category=category)
-    possible_counts = [count for count in meaning['keycard_counts']
-                       if 0 <= 5 - purpose.own_keycards - count <= 5]
-    # The partnership may state a preferred interpretation of an ambiguous
-    # answer. Apply it only when that count is still possible from the asker's
-    # own cards; otherwise keep the mathematically possible interpretation.
-    preferred = meaning.get('preferred_keycard_count')
-    if preferred in possible_counts:
-        possible_counts = [preferred]
+    if frame is not None and frame.keycard_counts:
+        possible_counts = list(possible_partner_counts(
+            frame, purpose.own_keycards))
+    else:
+        possible_counts = [count for count in meaning['keycard_counts']
+                           if 0 <= 5 - purpose.own_keycards - count <= 5]
     missing = {5 - purpose.own_keycards - count for count in possible_counts
                if 0 <= 5 - purpose.own_keycards - count <= 5}
-    if len(missing) != 1:
+    if not missing:
         return _StageResult(
-            error='Partner keycard answer leaves the number of missing keycards ambiguous',
+            error='Partner keycard answer is impossible with the asker\'s cards',
             purpose=with_stage)
+    if len(missing) > 1:
+        return _choose_ambiguous_continuation(
+            auction, trace, purpose, hand, frame, with_stage, profile,
+            candidates)
     missing_count = missing.pop()
     game, slam = f'5{purpose.trump}', f'6{purpose.trump}'
     if missing_count >= 2:
@@ -269,6 +275,35 @@ def _choose_after_answer(auction, trace, purpose, hand, frame, profile=None):
         return _game_or_rescue(auction, trace, purpose, hand, frame,
                                with_stage, profile)
     return _StageResult(slam, purpose=_completed(with_stage))
+
+
+def _choose_ambiguous_continuation(auction, trace, purpose, hand, frame,
+                                   with_stage, profile, candidates):
+    game = f'5{purpose.trump}'
+    slam = f'6{purpose.trump}'
+    proposed = [call for call in (game, slam) if is_call_legal(auction, call)]
+    last = _last_non_pass_call(auction)
+    if last is not None and (last == '5NT' or last.startswith('6')):
+        proposed.append('P')
+    if not proposed:
+        return _StageResult(
+            error='Partner keycard answer is ambiguous and no safe continuation is legal',
+            purpose=with_stage)
+    decision = compare_ambiguous_continuations(
+        profile, auction, trace, hand, frame, tuple(proposed))
+    if decision.unavailable or decision.call is None:
+        return _StageResult(
+            error=('Partner keycard answer leaves the number of missing '
+                   'keycards ambiguous: ' + decision.reason),
+            purpose=with_stage)
+    return _StageResult(decision.call, purpose=_completed(with_stage))
+
+
+def _last_non_pass_call(auction):
+    for call in reversed(auction.calls):
+        if call not in ('P', 'X', 'R'):
+            return call
+    return None
 
 
 def _game_or_rescue(auction, trace, purpose, hand, frame, with_stage, profile):

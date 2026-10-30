@@ -193,3 +193,33 @@ def lowest_showable_side_king(hand: Hand | None, trump: str, auction,
 def relay_terminal_call(auction, hand: Hand | None, trump: str) -> str | None:
     small_slam = f'6{trump}'
     return small_slam if is_call_legal(auction, small_slam) else None
+
+
+def possible_partner_counts(frame: OrdinaryRKCBFrame | None,
+                            own_keycards: int) -> tuple[int, ...]:
+    if frame is None:
+        return ()
+    return tuple(count for count in frame.keycard_counts
+                 if 0 <= 5 - own_keycards - count <= 5)
+
+
+def void_category_matches(hand: Hand, frame: OrdinaryRKCBFrame,
+                          trump: str) -> bool:
+    if frame.useful_void is not None:
+        return hand.length(frame.useful_void) == 0
+    if frame.useful_void_category == 'higher_than_trump':
+        return any(hand.length(suit) == 0
+                   for suit in 'CDHS'
+                   if suit != trump
+                   and 'CDHS'.index(suit) > 'CDHS'.index(trump))
+    if frame.useful_void_category == 'unspecified':
+        return any(hand.length(suit) == 0 for suit in 'CDHS'
+                   if suit != trump)
+    return True
+
+
+def answer_category_filter(frame: OrdinaryRKCBFrame, trump: str):
+    def accepts(hand: Hand) -> bool:
+        return (hand.keycard_count(trump) in frame.keycard_counts
+                and void_category_matches(hand, frame, trump))
+    return accepts
