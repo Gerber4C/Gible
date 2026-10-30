@@ -1022,6 +1022,11 @@ export function IVScanner({ profileId }) {
           `${report.summary?.pairs ?? 0} N/S pairs · ${report.summary?.dds_boards ?? 0} DDS boards · `,
           `${report.summary?.overflow ?? 0} overflow hands (weighted, not stored) · `,
           `${report.summary?.unassessed ?? 0} completed cases without enough comparable boards`),
+        report && !report.partner_matching && e("p", {
+          className: "iv-completion-note warn",
+        }, "This report predates process partner matching. "
+          + "Restart the backend if needed, rerun the scan, or use "
+          + "Complete report to add the missing partner matches."),
         report?.completion && e("p", { className: "iv-completion-note" },
           `Completed report · ${report.completion.rebidded_pairs ?? 0} hands re-bid · `
           + `${report.completion.changed_pairs ?? 0} process changes · `

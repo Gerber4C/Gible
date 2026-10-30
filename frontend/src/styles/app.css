@@ -2435,3 +2435,9 @@ textarea {
   font-size: 10px;
   font-weight: 900;
 }
+
+.iv-completion-note.warn {
+  border-color: #e3c08f;
+  background: #fff8ed;
+  color: #7a5524;
+}
