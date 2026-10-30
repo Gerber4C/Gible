@@ -890,4 +890,3 @@ git commit -m "docs: explain extreme hand proxy decisions"
 Run: `python -m pytest backend/tests -q`
 
 Expected: PASS. Report the exact command/output, the final commit list, any pre-existing unstaged user files left untouched, and whether the branch is ahead of its remote. Do not claim completion from an earlier test run.
-
