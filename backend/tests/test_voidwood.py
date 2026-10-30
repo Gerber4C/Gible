@@ -128,23 +128,19 @@ class VoidwoodProfileTests(unittest.TestCase):
         self.assertEqual(
             self.bid(heart_route + '5CP', 'S987H432DQ876CQJ2'), '5D')
 
-    def test_generic_voidwood_has_no_asker_trump_length_limit(self):
+    def test_generic_voidwood_requires_five_trumps(self):
         auction = Auction.parse('1NP2HP2SP3DP3HP')
-        for cards in ('SAKQ76H9876DKQ54C-',
-                      'SAKQ76H987DAKQ54C-'):
-            with self.subTest(cards=cards):
-                decision = choose_bid(
-                    self.profile, auction, Hand.parse(cards))
-                self.assertTrue(any(
-                    candidate.call == '5C'
-                    and candidate.public_meaning.get('action_type')
-                    == 'voidwood_ask'
-                    for candidate in decision.candidate_pool.candidates))
+        decision = choose_bid(
+            self.profile, auction, Hand.parse('SAQJ765HKQ5DAKQJC-'))
+        self.assertFalse(any(
+            candidate.call == '5C'
+            and candidate.public_meaning.get('action_type') == 'voidwood_ask'
+            for candidate in decision.candidate_pool.candidates))
 
     def test_undefined_jump_derives_voidwood_with_inferred_trump(self):
         decision = choose_bid(
             self.profile, Auction.parse('1NP2CP2HP3CP'),
-            Hand.parse('S-HKQ32DAKQ54CA432'))
+            Hand.parse('S-HKQ32DAKQ5CA432'))
         asks = [
             candidate for candidate in decision.candidate_pool.candidates
             if candidate.public_meaning.get('action_type') == 'voidwood_ask']

@@ -22,7 +22,8 @@ CALL_ORDER = ('4C', '4D', '4H', '4S', '4NT', '5C', '5D', '5H', '5S',
               '5NT', '6C', '6D', '6H', '6S', '6NT', '7C', '7D', '7H', '7S', '7NT')
 
 MINIMUM_ASK_KR = 17.0
-MINIMUM_VOIDWOOD_ASKER_LENGTH = 6
+DIRECT_VOIDWOOD_ASKER_LENGTH = 6
+STATE_VOIDWOOD_ASKER_LENGTH = 5
 MINIMUM_EFFECTIVE_QUEEN_FIT = 9
 
 # ask bid, trump, void suit, five answer bids (0/3, 1/4 no Q, 1/4 Q, 2 no Q, 2 Q)
@@ -66,7 +67,7 @@ def next_non_trump(anchor, trump):
 
 def voidwood_ask_eligible(ctx, trump, void):
     return (ctx.hand is not None
-            and ctx.hand.length(trump) >= MINIMUM_VOIDWOOD_ASKER_LENGTH
+            and ctx.hand.length(trump) >= DIRECT_VOIDWOOD_ASKER_LENGTH
             and ctx.hand.length(void) == 0
             and state_exists(ctx, 'agreed_suit', suit=trump)
             and ctx.hand_quality['kr_points'] >= MINIMUM_ASK_KR)
@@ -149,7 +150,7 @@ def public_voidwood_requires(ctx, trump):
 def state_voidwood_ask(ctx, trump, void, ask):
     """The generic confirmed- or inferred-trump Voidwood gate."""
     if (ctx.hand is None
-            or ctx.hand.length(trump) < MINIMUM_VOIDWOOD_ASKER_LENGTH
+            or ctx.hand.length(trump) < STATE_VOIDWOOD_ASKER_LENGTH
             or ctx.hand.length(void) != 0):
         return False
     current = current_voidwood_trump(ctx.trace, ctx.auction.actor_to_call)
@@ -335,10 +336,10 @@ class Voidwood(Gadget):
             call.meaning.target_suit = trump
             call.meaning.agreed_suit = trump
             call.meaning.void_suit = void
-            call.meaning.asker_trump_length_min = MINIMUM_VOIDWOOD_ASKER_LENGTH
+            call.meaning.asker_trump_length_min = DIRECT_VOIDWOOD_ASKER_LENGTH
             agreement = call.effect('agreed_suit')
             agreement.suit = trump
-            agreement.asker_min_length = MINIMUM_VOIDWOOD_ASKER_LENGTH
+            agreement.asker_min_length = DIRECT_VOIDWOOD_ASKER_LENGTH
             agreement.min_total = MINIMUM_EFFECTIVE_QUEEN_FIT
             agreement.voidwood_direct_fit = True
             context = call.effect('keycard_context')
