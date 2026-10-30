@@ -376,3 +376,12 @@ The ordinary (`method='rkcb_1430'`) engine reads the latest public
   sampled evidence. No second counter-invitation is allowed.
 - Voidwood, quantitative 4NT, and NFRKCB are separate methods. Completed or
   disrupted frames expose no generic ordinary continuation.
+
+## Derived semantics boundary
+
+`docs/19_derived_semantics.md` documents the separate derivation layer, which
+is enabled per profile with `derived_semantics=True`. It fills otherwise undefined 4NT, NFRKCB, three-level fit, 6NT, and Pass meanings
+after explicit profile calls and committed purposes. Derived 4NT keycard uses
+`method='rkcb_1430'` and then follows the ordinary-RKCB continuations above.
+NFRKCB uses `nfrkcb_offer`/`nfrkcb_answered`, and Voidwood keeps `voidwood`;
+these methods are never aliases.

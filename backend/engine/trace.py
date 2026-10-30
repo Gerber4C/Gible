@@ -118,6 +118,7 @@ class AuctionTrace:
     trump_states: dict[str, TrumpState] = field(default_factory=dict)
     perspective_side: str | None = None
     active_seat: str | None = None
+    derivation: dict[str, Any] | None = None
 
     def trump_state(self, side: str) -> TrumpState:
         return self.trump_states.get(side, TrumpState())

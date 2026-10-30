@@ -267,6 +267,7 @@ class PartnershipProfile:
     system_notes: str | None = None
     axioms: dict[str, Any] = field(default_factory=dict)
     missing_call_behavior: str = 'fallback'
+    derived_semantics: bool = False
 
     def __post_init__(self) -> None:
         if self.missing_call_behavior not in ('fallback', 'block'):

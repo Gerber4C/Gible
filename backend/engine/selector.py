@@ -21,8 +21,11 @@ from .memory import SeatMemory
 from .purpose_axiom import complete_purpose, remember_selected_purpose, resolve_purpose, terminal_pass_candidate
 from .replay import active_environment_for, replay_auction
 from .rkcb_continuation import (
-    lowest_counterinvite_king, ordinary_rkcb_frame, partner_of_last_bidder,
+    lowest_counterinvite_king, ordinary_response, ordinary_rkcb_frame,
+    partner_of_last_bidder,
 )
+from .context import CallCandidate
+from .nfrkcb_policy import answer_effect, decide_offer
 from .slam_conventions import keycard_ask_restricted
 from .slam_intent import detect_slam_intent
 from .cue_slam_policy import (cue_gate, cue_three_way, decide_from_hands,
@@ -97,14 +100,47 @@ def choose_bid(
                            candidate_pool=CandidatePool((), auction), trace=trace,
                            private_memory=actor_memory)
     terminal = terminal_pass_candidate(auction, trace) if purpose.candidate is None else None
+    purpose_controls = purpose.purpose is not None
     if purpose.candidate is not None:
         candidates = (purpose.filtered_candidates
                       if purpose.filtered_candidates is not None
                       else (purpose.candidate,))
     elif terminal is not None:
         candidates = (terminal,)
-    else:
+    elif purpose_controls or generated or not profile.derived_semantics:
         candidates = generated
+    else:
+        from .derived_evidence import collect_evidence
+        from .derived_semantics import derive_candidates, reserved_calls
+        evidence = collect_evidence(profile, auction, trace)
+        reserved = reserved_calls(profile, auction, trace, active_environment)
+        derived = derive_candidates(profile, auction, trace, evidence, reserved, hand)
+        for conflict in derived.conflicts:
+            trace.warn(f"Derived semantics {conflict['code']}: "
+                       + conflict.get('message', ''))
+        trace.derivation = {
+            'candidates': [
+                {'call': candidate.call,
+                 'rule': candidate.metadata.get('derived_rule'),
+                 'confidence': candidate.metadata.get('derived_confidence'),
+                 'evidence': candidate.metadata.get('derived_evidence')}
+                for candidate in derived.candidates],
+            'conflicts': list(derived.conflicts),
+        }
+        derived_candidates = derived.candidates
+        if generated:
+            derived_candidates = tuple(
+                candidate for candidate in derived_candidates
+                if candidate.call != 'P')
+        candidates = tuple(generated) + derived_candidates
+    nfrkcb = _nfrkcb_response(profile, auction, trace, hand, candidates)
+    if nfrkcb == 'error':
+        trace.warn('NFRKCB response needs sampled evidence')
+        return BidDecision(call=None, selected_candidate=None,
+                           candidate_pool=CandidatePool((), auction), trace=trace,
+                           private_memory=actor_memory)
+    if nfrkcb is not None:
+        candidates = (nfrkcb,)
     frame = ordinary_rkcb_frame(trace)
     if (frame is not None
             and frame.continuation_stage == 'grand_invitation'
@@ -405,3 +441,52 @@ def choose_bid(
     )
 
 
+
+
+def _nfrkcb_response(profile, auction, trace, hand, candidates):
+    offer = None
+    for record in reversed(trace.current_state_records):
+        if (record.key == 'nfrkcb'
+                and record.attribute('method') == 'nfrkcb_offer'):
+            offer = record
+            break
+    if offer is None:
+        return None
+    offerer = offer.attribute('offerer')
+    partner = {'n': 's', 's': 'n', 'e': 'w', 'w': 'e'}[offerer]
+    if auction.actor_to_call != partner:
+        return None
+    trump = offer.attribute('trump_suit')
+    if trump not in 'CDHS':
+        return None
+    decision = decide_offer(profile, auction, trace, hand, trump)
+    if decision.unavailable or decision.call is None:
+        return 'error'
+    origin = {'namespace': 'derived', 'object_type': 'rule',
+              'object_id': 'nfrkcb_response',
+              'qualified_id': 'derived/rule:nfrkcb_response'}
+    if decision.call == 'P':
+        return CallCandidate(
+            'P', origin,
+            {'nature_labels': ['natural'],
+             'call_act_types': ['signoff', 'final_placement'],
+             'action_type': 'nfrkcb_accept', 'target_suit': 'N',
+             'agreed_suit': trump},
+            'derived_semantics', 'nfrkcb_response', 2, (),
+            capabilities=('place_contract',),
+            metadata={'derived_rule': 'nfrkcb_pass',
+                      'derived_effects': [answer_effect(trump, offerer, 'P')]})
+    response = ordinary_response(hand, trump)
+    return CallCandidate(
+        response.call, origin,
+        {'nature_labels': ['artificial'],
+         'call_act_types': ['descriptive', 'keycard_answer'],
+         'action_type': 'nfrkcb_answer', 'target_suit': trump,
+         'agreed_suit': trump,
+         'keycard_counts': list(response.keycard_counts),
+         'trump_queen': response.trump_queen},
+        'derived_semantics', 'nfrkcb_response', 2, (),
+        capabilities=('keycard_answer',),
+        metadata={'derived_rule': 'nfrkcb_answer',
+                  'derived_effects': [answer_effect(trump, offerer,
+                                                    response.call)]})

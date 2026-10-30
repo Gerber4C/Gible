@@ -8,6 +8,7 @@ from .candidate_generation import call_for_call_specification
 from .cards import Hand
 from .context import BridgeContext
 from .effects import apply_effect
+from .derived_replay import derive_historical_call
 from .evaluator import evaluate
 from .frame_runtime import advance_frame_states, recover_frame_states
 from .matcher import historical_pattern_for, matches_context
@@ -50,9 +51,30 @@ def replay_auction(
         call_specification = _unique_match(matches)
         if len(matches) > 1 and call_specification is None:
             trace.warn(f"Ambiguous prior call {call} at auction position {index + 1}")
-        if not matches:
+        if not matches and getattr(profile, 'derived_semantics', False):
+            derived = derive_historical_call(profile, prior_auction, call, trace)
+            if derived.public_meaning is not None:
+                origin = {'namespace': 'derived', 'object_type': 'rule',
+                          'object_id': derived.rule,
+                          'qualified_id': f'derived/rule:{derived.rule}'}
+                state_start = len(trace.state_records)
+                for effect in derived.effects:
+                    apply_effect(trace, effect, origin, _PublicHand(),
+                                 active_environment)
+                trace.add_applied_meaning({
+                    'call': call, 'index': index, 'seat': seat,
+                    'effects': [r.to_dict() for r in
+                                trace.state_records[state_start:]],
+                    'auction_pattern': pattern,
+                    'origin': origin,
+                    'public_meaning': derived.public_meaning,
+                })
+                continue
             if call != "P":
                 trace.warn(f"Undefined prior call {call} at auction position {index + 1}")
+                if derived.conflict:
+                    trace.warn('Derived semantics ' + derived.conflict['code']
+                               + ': ' + derived.conflict.get('message', ''))
             continue
         if call_specification is None:
             continue

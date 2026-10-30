@@ -25,7 +25,7 @@ from collections.abc import Mapping
 import math
 from numbers import Real
 
-from .cards import Hand, normalize_suit_name
+from .cards import RANK_POINTS, Hand, normalize_suit_name
 
 
 DEFAULT_WEIGHTS = {
@@ -301,3 +301,15 @@ def assess_quality(
         "threshold": threshold,
         "hcp": hand.hcp,
     }
+
+
+def has_good_five_card_suit(hand: Hand) -> bool:
+    """True when a five-card-plus suit's K-R points exceed raw HCP by 0.5."""
+    for suit in 'SHDC':
+        holding = hand.holding(suit)
+        if len(holding) < 5:
+            continue
+        raw_hcp = sum(RANK_POINTS.get(rank, 0) for rank in holding)
+        if _kr_suit(holding)['points'] - raw_hcp >= 0.5:
+            return True
+    return False

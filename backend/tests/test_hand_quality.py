@@ -151,5 +151,21 @@ class HandQualityTests(unittest.TestCase):
                 self.assertEqual(set(result["suit_evaluations"][suit]["steps"]), {str(n) for n in range(1, 27)})
 
 
+class GoodFiveCardSuitTests(unittest.TestCase):
+    def test_returns_true_when_a_five_card_suit_beats_its_raw_hcp(self):
+        from engine.cards import Hand
+        from engine.hand_quality import has_good_five_card_suit
+        self.assertTrue(has_good_five_card_suit(
+            Hand.parse('SAKQJ2HK32D432C32')))
+
+    def test_returns_false_for_flat_or_poor_five_card_suits(self):
+        from engine.cards import Hand
+        from engine.hand_quality import has_good_five_card_suit
+        self.assertFalse(has_good_five_card_suit(
+            Hand.parse('SAKQ2HK32DQJ2C432')))
+        self.assertFalse(has_good_five_card_suit(
+            Hand.parse('S98765HK32DAQ2C32')))
+
+
 if __name__ == "__main__":
     unittest.main()
