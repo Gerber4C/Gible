@@ -186,5 +186,16 @@ class DaqiushOneNotrumpExpansionTests(unittest.TestCase):
         self.assertNotEqual(
             self.bid('1NP2CP2HP', 'SAQT9HKQ74DAKQC32'), '5N')
 
+    def test_nine_plus_shortage_and_strong_notrump_priority(self):
+        # A nine-count 3-1-5-4 shortage is now accepted by 3C.
+        self.assertEqual(self.bid('1NP', 'SKQ3H2DJ8765CA765'), '3C')
+        # A 20-count shortage takes the 3C shape route, not the direct 5NT.
+        strong = 'SKQ3H2DAKQJ5CAJ76'
+        self.assertEqual(self.bid('1NP', strong), '3C')
+        self.assertEqual(self.bid('1NP3CP3DP', strong), '3H')
+        # A 20-count with the shown major fit shows the other major, not 5NT.
+        fit = 'S2HKQ3DAKQJ5CAJ76'
+        self.assertEqual(self.bid('1NP3CP3HP', fit), '3S')
+
 if __name__ == '__main__':
     unittest.main()

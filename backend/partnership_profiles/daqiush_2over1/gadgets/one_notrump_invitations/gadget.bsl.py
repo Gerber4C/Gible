@@ -510,7 +510,9 @@ class OneNotrumpInvitations(Gadget):
             power.bid = contract
             power.applies = (lambda ctx, c=contract: (
                 direct_notrump_power(ctx) == c
-                and not (c == '5NT' and game_stayman(ctx))))
+                and not (c == '5NT' and game_stayman(ctx))
+                and not (c == '5NT'
+                         and named_evaluator(ctx, 'five_four_shortage_any'))))
             power.meaning.action = 'strong_notrump_placement'
             power.meaning.nature = ['natural']
             power.meaning.acts = ['invite'] if contract == '5NT' else ['signoff', 'final_placement']
@@ -551,7 +553,13 @@ class OneNotrumpInvitations(Gadget):
                              and named_evaluator(ctx, 'flat_five_major_any'))
                     and not (c == '5NT'
                              and p in ('1NP2CP2HP', '1NP2CP2SP')
-                             and ctx.hand.length(p[-2]) >= 4)))
+                             and ctx.hand.length(p[-2]) >= 4)
+                    and not (c == '5NT'
+                             and p in ('1NP3CP3HP', '1NP3CP3SP')
+                             and ctx.hand.length(p[-2]) >= 3)
+                    and not (c == '5NT'
+                             and p in ('1NP3CP3DP', '1NP3CP3HP', '1NP3CP3SP')
+                             and named_evaluator(ctx, 'five_four_shortage_any'))))
                 call.meaning.action = 'strong_notrump_placement'
                 call.meaning.nature = ['natural']
                 call.meaning.acts = (['invite', 'slam_try'] if contract == '5NT'

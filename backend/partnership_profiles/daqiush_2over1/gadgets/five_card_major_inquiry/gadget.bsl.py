@@ -22,8 +22,8 @@ def inquiry_hand(ctx):
                    and ctx.hand.hcp >= 8)
     flat_game = (sorted(ctx.hand.length(s) for s in 'SHDC') == [3, 3, 3, 4]
                  and max(majors) == 4 and 10 <= ctx.hand.hcp <= 17)
-    return (((ordinary and 10 <= ctx.hand.hcp <= 21)
-             or (shortage and 10 <= ctx.hand.hcp <= 15))
+    return ((ordinary and 10 <= ctx.hand.hcp <= 21)
+            or (shortage and 9 <= ctx.hand.hcp <= 21)
             or good_minor_5422(ctx) or solid_clubs or flat_game)
 
 
@@ -131,6 +131,7 @@ class FiveCardMajorInquiry(Gadget):
     author = Author('Daqiush')
 
     def build(self):
+        self.evaluator('five_four_shortage_any', five_four_shortage)
         ask = self.call('ask_five_card_major')
         ask.when = '1NP'
         ask.bid = '3C'
@@ -176,10 +177,12 @@ class FiveCardMajorInquiry(Gadget):
                 notrump = self.call('five_one_' + suit.lower() + '_three_notrump')
                 notrump.when = prefix
                 notrump.bid = '3NT'
-                notrump.applies = (lambda ctx, s=suit: inquiry_hand(ctx)
-                                   and ctx.hand.length(s) <
-                                   (4 if sorted(ctx.hand.length(x) for x in 'SHDC')
-                                    == [3, 3, 3, 4] else 3))
+                notrump.applies = (lambda ctx, s=suit: (
+                    inquiry_hand(ctx)
+                    and ctx.hand.length(s) <
+                    (4 if sorted(ctx.hand.length(x) for x in 'SHDC')
+                     == [3, 3, 3, 4] else 3)
+                    and named_evaluator(ctx, 'strong_notrump_power') is None))
                 notrump.meaning.action = 'five_card_major_game_placement'
                 notrump.meaning.nature = ['natural']
                 set_final(notrump, 'N')
@@ -413,10 +416,11 @@ class FiveCardMajorInquiry(Gadget):
         ordinary_notrump = self.call('ordinary_three_notrump_after_denial')
         ordinary_notrump.when = '1NP3CP3DP'
         ordinary_notrump.bid = '3NT'
-        ordinary_notrump.applies = (lambda ctx: inquiry_hand(ctx)
+        ordinary_notrump.applies = (lambda ctx: (inquiry_hand(ctx)
                                     and singleton_major(ctx) is None
                                     and not good_minor_5422(ctx)
-                                    and not flat_high_quantitative(ctx))
+                                    and not flat_high_quantitative(ctx)
+                                    and named_evaluator(ctx, 'strong_notrump_power') is None))
         ordinary_notrump.meaning.action = 'five_card_major_game_placement'
         ordinary_notrump.meaning.nature = ['natural']
         set_final(ordinary_notrump, 'N')
