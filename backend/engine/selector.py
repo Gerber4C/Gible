@@ -79,7 +79,10 @@ def choose_bid(
             f"Illegal prior call {illegal_call.call} at auction position {illegal_call.index + 1}: {illegal_call.reason}"
         )
     active_environment = active_environment_for(profile, environment, auction)
-    purpose = resolve_purpose(auction, trace, actor_memory, hand)
+    generated = generate_candidates(profile, auction, hand, trace,
+                                    active_environment, actor_memory)
+    generated = _apply_keycard_restrictions(auction, hand, generated, trace)
+    purpose = resolve_purpose(auction, trace, actor_memory, hand, generated)
     actor_memory = purpose.memory
     if purpose.error:
         trace.warn('Purpose axiom: ' + purpose.error)
@@ -90,9 +93,14 @@ def choose_bid(
                            candidate_pool=CandidatePool((), auction), trace=trace,
                            private_memory=actor_memory)
     terminal = terminal_pass_candidate(auction, trace) if purpose.candidate is None else None
-    candidates = ((purpose.candidate,) if purpose.candidate is not None else
-                  (terminal,) if terminal is not None else
-                  generate_candidates(profile, auction, hand, trace, active_environment, actor_memory))
+    if purpose.candidate is not None:
+        candidates = (purpose.filtered_candidates
+                      if purpose.filtered_candidates is not None
+                      else (purpose.candidate,))
+    elif terminal is not None:
+        candidates = (terminal,)
+    else:
+        candidates = generated
     diagnostics_before_resolution = len(trace.diagnostics)
     candidates = _resolve_same_call_meanings(candidates, trace)
     if any('Ambiguous meaning for call' in message
@@ -100,7 +108,6 @@ def choose_bid(
         return BidDecision(call=None, selected_candidate=None,
                            candidate_pool=CandidatePool((), auction), trace=trace,
                            private_memory=actor_memory)
-    candidates = _apply_keycard_restrictions(auction, hand, candidates, trace)
     fallback = None
 
     if not candidates and profile.missing_call_behavior == 'block':

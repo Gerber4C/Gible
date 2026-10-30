@@ -210,6 +210,75 @@ class PurposeAxiomTests(unittest.TestCase):
         self.assertIsNone(result.candidate)
         self.assertIn('not completed', result.error)
         self.assertEqual(result.purpose.status, 'active')
+
+    def test_purpose_selects_an_authored_continuation_and_keeps_its_meaning(self):
+        from engine.model import Author, Gadget, PartnershipProfile
+        author = Author('test')
+        gadget = Gadget.from_parts(
+            {'id': 'continuation', 'namespace': 'test',
+             'name': 'Continuation', 'author': {'name': 'test'}},
+            [{'id': 'answer_five_clubs', 'context': {'auction_pattern': '*'},
+              'call': '5C',
+              'meaning': {'call_act_types': ['keycard_answer'],
+                          'keycard_counts': [1, 4]}},
+             {'id': 'authored_heart_place', 'context': {'auction_pattern': '*'},
+              'call': '6H',
+              'meaning': {'nature_labels': ['natural'],
+                          'call_act_types': ['final_placement'],
+                          'action_type': 'authored_heart_place'}}])
+        profile = PartnershipProfile('continuation', 'Continuation', '0.1',
+                                     author, (gadget,),
+                                     missing_call_behavior='block')
+        purpose = {'kind': 'keycard_slam', 'owner': 's', 'source_index': 6,
+                   'source_call': '4N', 'trump': 'H', 'own_keycards': 4,
+                   'owns_trump_queen': True, 'status': 'active'}
+        decision = choose_bid(
+            profile, Auction.parse('1NP4CP4HP4NP5CP'),
+            Hand.parse('SA2HAKQ976DA32C42'),
+            private_memory={'purposes': [purpose]})
+        self.assertEqual(decision.call, '6H')
+        self.assertEqual(
+            decision.selected_candidate.public_meaning['action_type'],
+            'authored_heart_place')
+        self.assertEqual(
+            decision.selected_candidate.origin['object_id'],
+            'authored_heart_place')
+
+    def test_mutually_exclusive_same_call_requirements_avoid_replay_ambiguity(self):
+        from engine.model import Author, Gadget, PartnershipProfile
+        from engine.replay import replay_auction
+        author = Author('test')
+
+        def requires_agreed(suit):
+            return {'expr': {'op': 'state_exists',
+                             'query': {'key': 'agreed_suit', 'suit': suit}}}
+
+        gadget = Gadget.from_parts(
+            {'id': 'same_call', 'namespace': 'test',
+             'name': 'Same call', 'author': {'name': 'test'}},
+            [
+                {'id': 'agree_hearts', 'context': {'auction_pattern': ''},
+                 'call': '1H',
+                 'meaning': {'nature_labels': ['natural'], 'target_suit': 'H'},
+                 'effects': [{'key': 'agreed_suit', 'suit': 'H'}]},
+                {'id': 'heart_relay', 'context': {'auction_pattern': '*'},
+                 'call': '5S', 'requires': requires_agreed('H'),
+                 'meaning': {'action_type': 'heart_relay'}},
+                {'id': 'spade_relay', 'context': {'auction_pattern': '*'},
+                 'call': '5S', 'requires': requires_agreed('S'),
+                 'meaning': {'action_type': 'spade_relay'}},
+            ])
+        profile = PartnershipProfile('same_call', 'Same call', '0.1', author,
+                                     (gadget,), missing_call_behavior='block')
+        trace = replay_auction(profile, Auction.parse('1HP5S'))
+        entries = [entry for entry in trace.applied_meanings
+                   if entry['call'] == '5S']
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]['public_meaning']['action_type'],
+                         'heart_relay')
+        self.assertFalse(any('Ambiguous prior call 5S' in item
+                             for item in trace.diagnostics))
+
     def test_keycard_plan_does_not_override_enemy_interference(self):
         purpose = {'kind': 'keycard_slam', 'owner': 's', 'source_index': 6,
                    'source_call': '4N', 'trump': 'H', 'own_keycards': 4,

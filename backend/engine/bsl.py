@@ -13,14 +13,13 @@ from .hand_quality import (inquiry_stopper, minor_game_control_points,
                            shapely_combined_effective_points, shapely_description_proxy)
 from .voidwood import (answer_bids, effective_keycards,
                        is_safe_voidwood_ask, voidwood_jump)
-from .rkcb_continuation import ordinary_response, useful_voids
+from .rkcb_continuation import ordinary_response, ordinary_rkcb_frame, useful_voids
 
 
 def _ordinary_rkcb_pending(ctx, trump):
-    return (ctx.state.exists('keycard_context', method='rkcb_1430',
-                             trump_suit=trump, status='pending')
-            or ctx.state.exists('keycard_context', method='rkcb_1430',
-                                trump_suit=trump, status='pending_answer'))
+    frame = ordinary_rkcb_frame(ctx.trace)
+    return (frame is not None and frame.trump == trump
+            and frame.status == 'pending_answer')
 
 
 def _ordinary_rkcb_response_call(ctx, trump):

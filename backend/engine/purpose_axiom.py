@@ -50,7 +50,8 @@ def terminal_pass_candidate(auction, trace) -> CallCandidate | None:
         metadata={'source_index': index, 'purpose_kind': 'terminal_pass'})
 
 
-def resolve_purpose(auction, trace, memory: SeatMemory, hand=None) -> PurposeResolution:
+def resolve_purpose(auction, trace, memory: SeatMemory, hand=None,
+                    candidates=()) -> PurposeResolution:
     for purpose in reversed(memory.purposes):
         if purpose.status != 'active' or purpose.owner != auction.actor_to_call:
             continue
@@ -71,6 +72,11 @@ def resolve_purpose(auction, trace, memory: SeatMemory, hand=None) -> PurposeRes
             if not is_call_legal(auction, call):
                 return PurposeResolution(memory, purpose=purpose,
                                          error=f'Planned call {call} is illegal in this auction')
+            authored = _authored_candidates(candidates, call)
+            if authored:
+                return PurposeResolution(
+                    memory, authored[0], purpose,
+                    filtered_candidates=authored)
             return PurposeResolution(memory, _candidate(call, purpose), purpose)
         if purpose.kind != 'keycard_slam':
             return PurposeResolution(memory, purpose=purpose,
@@ -90,9 +96,25 @@ def resolve_purpose(auction, trace, memory: SeatMemory, hand=None) -> PurposeRes
         if not is_call_legal(auction, result.call):
             return PurposeResolution(memory, purpose=resolved,
                                      error=f'Planned call {result.call} is illegal in this auction')
+        authored = _authored_candidates(candidates, result.call)
+        if authored:
+            return PurposeResolution(
+                memory, authored[0], resolved,
+                filtered_candidates=authored, completes=result.completes)
+        if result.authored_only:
+            return PurposeResolution(
+                memory, purpose=resolved,
+                error=f'Planned keycard call {result.call} has no authored candidate')
+        # Legacy compatibility for already-saved terminal placements.
         return PurposeResolution(memory, _candidate(result.call, resolved),
                                  resolved, completes=result.completes)
     return PurposeResolution(memory)
+
+
+def _authored_candidates(candidates, call):
+    target = normalize_call(call)
+    return tuple(candidate for candidate in candidates
+                 if candidate.call == target)
 
 
 def remember_selected_purpose(memory: SeatMemory, auction, hand, candidate) -> SeatMemory:
@@ -178,6 +200,7 @@ class _StageResult:
     error: str | None = None
     purpose: Purpose | None = None
     completes: bool = False
+    authored_only: bool = False
 
 
 def _keycard_slam(auction, trace, purpose, hand=None) -> _StageResult:
