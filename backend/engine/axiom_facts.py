@@ -174,6 +174,9 @@ def gf_satisfied(source, facts, auction, config, call=None, meaning=None):
         if not current or current not in facts['ours'] or current['index'] < source['index']:
             return False
         call, meaning = current['call'],current['public_meaning']
+    if (is_game(call)
+            and (meaning or {}).get('action_type') == 'quantitative_5c_feature_ask'):
+        return True
     if not natural(meaning or {}):
         return False
     origin = source['origin'].get('qualified_id')

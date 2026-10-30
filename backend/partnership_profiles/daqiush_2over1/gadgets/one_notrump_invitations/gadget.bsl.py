@@ -239,6 +239,8 @@ def shortage_has_control(ctx, suit):
 
 
 def asks_stayman(ctx):
+    if named_evaluator(ctx, 'good_16_17_3c_family'):
+        return False  # These hands use the 3C major inquiry first.
     return (ordinary_invite(ctx) or spade_invite(ctx) or heart_invite(ctx)
             or double_major_invite(ctx) or both_four_major_invite(ctx) or game_stayman(ctx)
             or minor_slam_probe(ctx) or minor_stayman_probe(ctx)
@@ -491,6 +493,7 @@ def minor_featureless_invite(ctx):
 
 def flat_minor_333_three_notrump(ctx):
     return (ctx.hand is not None
+            and not named_evaluator(ctx, 'good_16_17_3c_family')
             and sorted(ctx.hand.length(s) for s in 'SHDC') == [3, 3, 3, 4]
             and max(ctx.hand.length('H'), ctx.hand.length('S')) == 3
             and 10 <= ctx.hand.hcp <= 17)
@@ -752,6 +755,7 @@ class OneNotrumpInvitations(Gadget):
                 no_fit.description = 'No major fit after Stayman: place five of the seven-card minor.'
             for bid, applies, action in (
                 ('3NT', lambda ctx, a=answer: game_stayman(ctx)
+                 and not named_evaluator(ctx, 'good_16_17_4324')
                  and (a == '2D' or ctx.hand.length(a[-1]) < 4)
                  and not four_four_four_one(ctx, a)
                  and not any(strong_minor_with_other_major(ctx, a, m) for m in 'CD'),
@@ -788,6 +792,26 @@ class OneNotrumpInvitations(Gadget):
                 if not (answer == '2H' and bid == '3NT'):
                     continuation.meaning.purpose_completed = True
                 continuation.description = 'Game-going Stayman hand places game after opener describes the majors.'
+
+            if answer in ('2D', '2H'):
+                quantitative = self.call('good_16_17_4324_quantitative_after_'
+                                         + answer.lower())
+                quantitative.when = prefix
+                quantitative.bid = '4NT'
+                quantitative.applies = lambda ctx: named_evaluator(
+                    ctx, 'good_16_17_4324')
+                quantitative.meaning.action = 'quantitative_notrump_invitation'
+                quantitative.meaning.nature = ['natural']
+                quantitative.meaning.acts = ['invite']
+                quantitative.meaning.target_suit = 'N'
+                quantitative.meaning.hcp_min = 16
+                quantitative.meaning.hcp_max = 17
+                quantitative.meaning.shape_class = '4-3-2-4'
+                quantitative.meaning.min_lengths = {'S': 4}
+                quantitative.description = (
+                    'Good 16-17 4-3-2-4 invites 6NT; after 2H the promised '
+                    'four-card major is spades, and a fit uses the existing '
+                    'major-fit route instead.')
 
             if answer in ('2H', '2S'):
                 shortage = self.call('stayman_' + answer.lower() + '_fit_shortage_slam')

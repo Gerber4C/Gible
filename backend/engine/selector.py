@@ -194,7 +194,10 @@ def choose_bid(
         return BidDecision(call=None, selected_candidate=None, candidate_pool=CandidatePool((),auction),
                            trace=trace, private_memory=actor_memory)
 
-    if is_minor_5422_decision(profile.id, auction):
+    new_quantitative_5c = any(
+        (candidate.public_meaning or {}).get('action_type')
+        == 'quantitative_5c_feature_ask' for candidate in candidates)
+    if is_minor_5422_decision(profile.id, auction) and not new_quantitative_5c:
         try:
             simulated = decide_minor_5422(auction, hand)
         except (DDSUnavailableError, SamplingExhausted, RuntimeError, ValueError) as exc:

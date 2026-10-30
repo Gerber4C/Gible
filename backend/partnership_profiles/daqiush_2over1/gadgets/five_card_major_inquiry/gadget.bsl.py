@@ -24,7 +24,32 @@ def inquiry_hand(ctx):
                  and max(majors) == 4 and 10 <= ctx.hand.hcp <= 17)
     return ((ordinary and 10 <= ctx.hand.hcp <= 21)
             or (shortage and 9 <= ctx.hand.hcp <= 21)
-            or good_minor_5422(ctx) or solid_clubs or flat_game)
+            or good_minor_5422(ctx) or solid_clubs or flat_game
+            or good_16_17_3c_family(ctx))
+
+
+def good_16_17(ctx):
+    return (ctx.hand is not None and ctx.hand.hcp in (16, 17)
+            and ctx.hand_quality['good'])
+
+
+def good_16_17_3c_family(ctx):
+    """Good 16-17 hands that must start with the 3C major inquiry."""
+    if not good_16_17(ctx):
+        return False
+    lengths = sorted(ctx.hand.length(s) for s in 'SHDC')
+    max_major = max(ctx.hand.length(s) for s in 'HS')
+    max_minor = max(ctx.hand.length(s) for s in 'CD')
+    return ((max_major <= 3 and max_minor <= 4)
+            or (lengths == [3, 3, 3, 4] and max_major == 4))
+
+
+def good_16_17_4324(ctx):
+    return (good_16_17(ctx)
+            and ctx.hand.length('S') == 4
+            and ctx.hand.length('H') == 3
+            and ctx.hand.length('D') == 2
+            and ctx.hand.length('C') == 4)
 
 
 def flat_high_quantitative(ctx):
@@ -132,6 +157,9 @@ class FiveCardMajorInquiry(Gadget):
 
     def build(self):
         self.evaluator('five_four_shortage_any', five_four_shortage)
+        self.evaluator('good_16_17', good_16_17)
+        self.evaluator('good_16_17_3c_family', good_16_17_3c_family)
+        self.evaluator('good_16_17_4324', good_16_17_4324)
         ask = self.call('ask_five_card_major')
         ask.when = '1NP'
         ask.bid = '3C'
@@ -164,10 +192,12 @@ class FiveCardMajorInquiry(Gadget):
                 game = self.call('five_three_' + suit.lower() + '_game')
                 game.when = prefix
                 game.bid = '4' + suit
-                game.applies = (lambda ctx, s=suit: inquiry_hand(ctx)
-                                and ctx.hand.length(s) >=
-                                (4 if sorted(ctx.hand.length(x) for x in 'SHDC')
-                                 == [3, 3, 3, 4] else 3))
+                game.applies = (lambda ctx, s=suit: (
+                    inquiry_hand(ctx)
+                    and not good_16_17_3c_family(ctx)
+                    and ctx.hand.length(s) >=
+                    (4 if sorted(ctx.hand.length(x) for x in 'SHDC')
+                     == [3, 3, 3, 4] else 3)))
                 game.meaning.action = 'five_card_major_game_placement'
                 game.meaning.nature = ['natural']
                 set_final(game, suit)
@@ -179,6 +209,7 @@ class FiveCardMajorInquiry(Gadget):
                 notrump.bid = '3NT'
                 notrump.applies = (lambda ctx, s=suit: (
                     inquiry_hand(ctx)
+                    and not good_16_17_3c_family(ctx)
                     and ctx.hand.length(s) <
                     (4 if sorted(ctx.hand.length(x) for x in 'SHDC')
                      == [3, 3, 3, 4] else 3)
@@ -188,10 +219,27 @@ class FiveCardMajorInquiry(Gadget):
                 set_final(notrump, 'N')
                 notrump.description = 'Without a usable fit, play three notrump.'
 
+                family_quantitative = self.call('good_16_17_' + suit.lower()
+                                                + '_quantitative_4nt')
+                family_quantitative.when = prefix
+                family_quantitative.bid = '4NT'
+                family_quantitative.applies = (
+                    lambda ctx, s=suit: (good_16_17_3c_family(ctx)
+                                         and ctx.hand.length(s) < 3))
+                family_quantitative.meaning.action = 'quantitative_notrump_invitation'
+                family_quantitative.meaning.nature = ['natural']
+                family_quantitative.meaning.acts = ['invite']
+                family_quantitative.meaning.target_suit = 'N'
+                family_quantitative.description = (
+                    'Good 16-17 without three-card support invites 6NT.')
+
                 strength = self.call('five_three_' + suit.lower() + '_strength_show')
                 strength.when = prefix
                 strength.bid = ('3S' if suit == 'H' else '4H')
-                strength.applies = (lambda ctx, s=suit: major_fit(ctx, s))
+                strength.applies = (lambda ctx, s=suit: (
+                    major_fit(ctx, s)
+                    or (good_16_17_3c_family(ctx)
+                        and ctx.hand.length(s) >= 3)))
                 strength.meaning.action = 'five_three_major_strength_show'
                 strength.meaning.nature = ['artificial']
                 strength.meaning.acts = ['slam_try', 'strength_showing']
@@ -222,12 +270,12 @@ class FiveCardMajorInquiry(Gadget):
         quantitative = self.call('flat_4333_quantitative_after_denial')
         quantitative.when = '1NP3CP3DP'
         quantitative.bid = '4NT'
-        quantitative.applies = flat_high_quantitative
+        quantitative.applies = good_16_17_3c_family
         quantitative.meaning.action = 'quantitative_notrump_invitation'
         quantitative.meaning.nature = ['natural']
         quantitative.meaning.acts = ['invite']
         quantitative.meaning.target_suit = 'N'
-        quantitative.description = 'A good 16–17 HCP 4333 invites 6NT after the five-major inquiry denies a fit.'
+        quantitative.description = 'Good 16–17 hands in the 3C family invite 6NT after the five-major inquiry denies a fit.'
 
         for bid, high in (('P', False), ('6NT', True)):
             answer = self.call('flat_4333_quantitative_' + bid.lower())
@@ -240,6 +288,170 @@ class FiveCardMajorInquiry(Gadget):
             answer.meaning.target_suit = 'N'
             answer.meaning.purpose_completed = True
             answer.description = 'Answer the natural quantitative 6NT invitation.'
+
+        # Bounded quantitative 5C continuation. Only these exact prefixes
+        # create it; every other quantitative 4NT keeps its old behavior.
+        def five_c_features(ctx, row):
+            if ctx.hand is None:
+                return False
+            clubs = ctx.hand.length('C')
+            diamonds = ctx.hand.length('D')
+            hearts = ctx.hand.length('H')
+            spades = ctx.hand.length('S')
+            if row in ('2d', '3d'):
+                return clubs >= 5 or diamonds >= 5
+            return (spades == 4 or clubs >= 5 or diamonds >= 5
+                    or hearts >= 5)
+
+        def ace_branch(ctx):
+            calls = [call for call in ctx.auction.calls if call != 'P']
+            if not calls:
+                return None
+            answer = calls[-1]
+            own = ctx.hand.ace_count() if ctx.hand is not None else 0
+            if answer == '5S':
+                return 'stop' if own == 0 else 'slam' if own in (1, 2) else None
+            if answer == '5D':
+                return 'stop' if own <= 1 else 'slam' if own in (2, 3) else None
+            if answer == '5H':
+                return 'slam' if own >= 3 else 'stop'
+            return None
+
+        def feature_applies(ctx, suit, row):
+            if ctx.hand is None:
+                return False
+            if suit == 'S':
+                return row == '2h' and ctx.hand.length('S') == 4
+            if suit == 'H':
+                return row == '2h' and ctx.hand.length('H') >= 5
+            return ctx.hand.length(suit) >= 5
+
+        for prefix, row in (
+                ('1NP2CP2DP4NP', '2d'),
+                ('1NP2CP2HP4NP', '2h'),
+                ('1NP3CP3DP4NP', '3d')):
+            ask = self.call('quantitative_5c_' + row)
+            ask.when = prefix
+            ask.bid = '5C'
+            ask.applies = lambda ctx, r=row: five_c_features(ctx, r)
+            ask.meaning.action = 'quantitative_5c_feature_ask'
+            ask.meaning.nature = ['artificial']
+            ask.meaning.acts = ['slam_try', 'inquiry']
+            ask.meaning.target_suit = 'N'
+            ask.meaning.feature_scope = row
+            ask.priority = 5
+            ask.description = ('Accept slam investigation and show that an '
+                               'unshown distributional feature is available; '
+                               'responder answers aces next.')
+
+            if row == '3d':
+                old_5422_pass = self.call('quantitative_5c_5422_pass')
+                old_5422_pass.when = prefix + '5CP'
+                old_5422_pass.bid = 'P'
+                old_5422_pass.applies = (lambda ctx: (
+                    ctx.hand is not None
+                    and not good_16_17_3c_family(ctx)
+                    and sorted(ctx.hand.length(s) for s in 'CD') == [4, 5]
+                    and sorted(ctx.hand.length(s) for s in 'HS') == [2, 2]))
+                old_5422_pass.meaning.action = 'good_5422_minor_game'
+                old_5422_pass.meaning.nature = ['natural']
+                old_5422_pass.meaning.acts = ['signoff', 'final_placement']
+                old_5422_pass.meaning.target_suit = 'C'
+                old_5422_pass.meaning.purpose_completed = True
+                old_5422_pass.description = (
+                    'The older good 5-4-2-2 probe keeps its five-card minor '
+                    'placement when the responder is not the new good 16-17 '
+                    '3C family.')
+
+            for answer, counts in (('5D', (1, 4)), ('5H', (0, 3)), ('5S', (2,))):
+                reply = self.call('quantitative_ace_' + row + '_'
+                                  + answer.lower())
+                reply.when = prefix + '5CP'
+                reply.bid = answer
+                reply.applies = (lambda ctx, c=counts, r=row: (
+                    ctx.hand is not None and ctx.hand.ace_count() in c
+                    and (r != '3d' or good_16_17_3c_family(ctx))))
+                reply.meaning.action = 'quantitative_ace_answer'
+                reply.meaning.nature = ['artificial']
+                reply.meaning.acts = ['descriptive']
+                reply.meaning.target_suit = 'N'
+                reply.meaning.ace_counts = list(counts)
+                reply.description = ('Ordinary ace answer: '
+                                     + ('1/4' if answer == '5D'
+                                        else '0/3' if answer == '5H' else '2')
+                                     + '.')
+
+                after = prefix + '5CP' + answer + 'P'
+                if answer == '5S':
+                    stop_pass = self.call('quantitative_stop_pass_5s_' + row)
+                    stop_pass.when = after
+                    stop_pass.bid = 'P'
+                    stop_pass.applies = (lambda ctx, r=row: (
+                        ace_branch(ctx) == 'stop'
+                        and ctx.hand is not None
+                        and r == '2h' and ctx.hand.length('S') == 4))
+                    stop_pass.meaning.action = 'quantitative_5s_stop'
+                    stop_pass.meaning.nature = ['natural']
+                    stop_pass.meaning.acts = ['signoff', 'final_placement']
+                    stop_pass.meaning.target_suit = 'S'
+                    stop_pass.meaning.purpose_completed = True
+                    stop_pass.description = ('The 5S answer is artificial; '
+                                             'Pass plays 5S with the known fit.')
+                else:
+                    stop_spade = self.call('quantitative_stop_5s_' + row
+                                           + '_' + answer.lower())
+                    stop_spade.when = after
+                    stop_spade.bid = '5S'
+                    stop_spade.applies = (lambda ctx, r=row: (
+                        ace_branch(ctx) == 'stop'
+                        and ctx.hand is not None
+                        and r == '2h' and ctx.hand.length('S') == 4))
+                    stop_spade.meaning.action = 'quantitative_5s_stop'
+                    stop_spade.meaning.nature = ['natural']
+                    stop_spade.meaning.acts = ['signoff', 'final_placement']
+                    stop_spade.meaning.target_suit = 'S'
+                    stop_spade.meaning.agreed_suit = 'S'
+                    stop_spade.meaning.purpose_completed = True
+                    stop_spade.effect('agreed_suit').suit = 'S'
+                    stop_spade.description = ('Missing at least two aces with '
+                                              'a known spade fit: stop in 5S.')
+
+                stop_nt = self.call('quantitative_stop_5nt_' + row
+                                    + '_' + answer.lower())
+                stop_nt.when = after
+                stop_nt.bid = '5NT'
+                stop_nt.applies = (lambda ctx, r=row: (
+                    ace_branch(ctx) == 'stop'
+                    and not (r == '2h' and ctx.hand is not None
+                             and ctx.hand.length('S') == 4)))
+                stop_nt.meaning.action = 'quantitative_5nt_stop'
+                stop_nt.meaning.nature = ['natural']
+                stop_nt.meaning.acts = ['signoff', 'final_placement']
+                stop_nt.meaning.target_suit = 'N'
+                stop_nt.meaning.purpose_completed = True
+                stop_nt.description = ('Missing at least two aces without a '
+                                       'selected spade strain: stop in 5NT.')
+
+                for suit in 'CDHS':
+                    feature = self.call('quantitative_feature_' + row + '_'
+                                        + answer.lower() + '_6'
+                                        + suit.lower())
+                    feature.when = after
+                    feature.bid = '6' + suit
+                    feature.applies = (lambda ctx, s=suit, r=row: (
+                        ace_branch(ctx) == 'slam'
+                        and feature_applies(ctx, s, r)))
+                    feature.meaning.action = 'quantitative_feature_slam'
+                    feature.meaning.nature = ['natural']
+                    feature.meaning.acts = ['signoff', 'final_placement']
+                    feature.meaning.target_suit = suit
+                    feature.meaning.purpose_completed = True
+                    if suit == 'S' and row == '2h':
+                        feature.meaning.agreed_suit = 'S'
+                        feature.effect('agreed_suit').suit = 'S'
+                    feature.description = ('Not missing two aces: describe the '
+                                           'hidden feature naturally at the '
+                                           'six level.')
 
         for shortage in 'HS':
             show = self.call('show_singleton_' + shortage.lower())
@@ -419,7 +631,7 @@ class FiveCardMajorInquiry(Gadget):
         ordinary_notrump.applies = (lambda ctx: (inquiry_hand(ctx)
                                     and singleton_major(ctx) is None
                                     and not good_minor_5422(ctx)
-                                    and not flat_high_quantitative(ctx)
+                                    and not good_16_17_3c_family(ctx)
                                     and named_evaluator(ctx, 'strong_notrump_power') is None))
         ordinary_notrump.meaning.action = 'five_card_major_game_placement'
         ordinary_notrump.meaning.nature = ['natural']

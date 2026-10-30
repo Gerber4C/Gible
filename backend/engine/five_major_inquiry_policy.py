@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from .cards import Hand, normalize_suit_name
 from .call_space import contract_rank
 from .hand_quality import (
-    inquiry_stopper, minor_game_control_points, minor_slam_interest,
-    shapely_control_points,
+    assess_quality, inquiry_stopper, minor_game_control_points,
+    minor_slam_interest, shapely_control_points,
 )
 
 
@@ -88,12 +88,35 @@ def _both_minor_special(opener: Hand, reported: str,
     return not side_honors or (side_honors == {'K'} and 'A' in holding)
 
 
+def _good_16_17_3c_family(hand: Hand) -> bool:
+    if hand is None or hand.hcp not in (16, 17) or not assess_quality(hand)['good']:
+        return False
+    lengths = sorted(hand.length(s) for s in 'SHDC')
+    max_major = max(hand.length(s) for s in 'HS')
+    max_minor = max(hand.length(s) for s in 'CD')
+    return ((max_major <= 3 and max_minor <= 4)
+            or (lengths == [3, 3, 3, 4] and max_major == 4))
+
+
 def deterministic_after_major(opener_major: str,
                               responder: Hand) -> InquiryDecision:
     """Responder's fallback after opener shows a five-card major."""
     major = _major_code(opener_major)
+    family = _good_16_17_3c_family(responder)
     threshold = (4 if sorted(responder.length(s) for s in 'SHDC') == [3, 3, 3, 4]
                  else 3)
+    # The new good 16-17 family counts any three-card fit and uses the
+    # lowest other-major call to show it; without a fit it invites 6NT.
+    if family:
+        if responder.length(major) >= 3:
+            call = '3S' if major == 'H' else '4H'
+            return InquiryDecision(
+                call=call, source='deterministic',
+                reason='Good 16-17 with three-card support: lowest other-major fit show',
+                agreed_suit=major)
+        return InquiryDecision(
+            call='4NT', source='deterministic',
+            reason='Good 16-17 without three-card support: quantitative 4NT')
     support = responder.length(major) >= threshold
     singleton_shape = (responder.length(major) == 1
                        and sorted(responder.length(s) for s in 'CD') == [4, 5])
@@ -243,6 +266,8 @@ def decide_five_major_inquiry(profile, auction, hand: Hand, *,
     elif kind == 'responder_after_major':
         major = auction.calls[4][-1]
         fallback = deterministic_after_major(major, hand)
+        if _good_16_17_3c_family(hand):
+            return fallback
         targets, mapping = _major_targets(hand, actor, partner, major)
     elif kind == 'opener_after_minor':
         shown = auction.calls[6][-1]
