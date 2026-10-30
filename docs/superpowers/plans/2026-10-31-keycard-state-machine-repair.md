@@ -4,7 +4,7 @@
 
 **Goal:** Make Voidwood and ordinary RKCB retain a replayable keycard state, so effective trump-queen rules, king inquiries, and final placements cannot create false grand-slam routes or TD.
 
-**Architecture:** A Voidwood ask that relies on the nine-trump effective-Q convention must publish a nine-card fit floor; otherwise the responder may only use an actual Q. Voidwood answers advance a *latest-frame* public state from `pending` to `answered` and retain answer facts, so earlier records cannot remain eligible. King inquiries and final placements read that same state in live bidding and replay. Ordinary RKCB's ten-trump convention is deliberately excluded from this repair unless its own public fit predicate and tests are implemented in a later slice.
+**Architecture:** An effective Voidwood trump Q is derived from route-specific public length facts, not a universal Voidwood length. The responder treats Q as effective when the asker's guaranteed trump length plus the responder's actual length reaches nine; if the auction had already shown a nine-card fit before the ask, the threshold is ten. Direct unilateral trump agreement after a 1NT transfer must therefore publicly promise six trumps. Voidwood answers advance a *latest-frame* public state from `pending` to `answered` and retain answer facts, so earlier records cannot remain eligible. King inquiries and final placements read that same state in live bidding and replay. Ordinary RKCB's ten-trump convention is deliberately excluded from this repair unless its own public fit predicate and tests are implemented in a later slice.
 
 **Tech Stack:** Python 3, unittest, Gible BSL gadget DSL, public auction replay state.
 
@@ -19,10 +19,10 @@
 - Modify: `backend/tests/test_voidwood.py`
 - Modify: `backend/partnership_profiles/daqiush_2over1/gadgets/voidwood/gadget.bsl.py`
 
-- [ ] Write a failing owner-route test for South `S-HAKJ972DAQJT3CKQ`, North `SAKH843DK76542CAJ`, and `1NP2DP2HP4SP`; North must bid `5D`, the `1/4 + effective Q` answer on the publicly confirmed nine-card heart fit.
+- [ ] Write a failing owner-route test for South `S-HAKJ972DAQJT3CKQ`, North `SAKH843DK76542CAJ`, and `1NP2DP2HP4SP`; the direct 1NT-transfer Voidwood ask publicly promises six hearts, so North must bid `5D`, the `1/4 + effective Q` answer. Add a distinct already-nine-fit fixture proving its threshold is ten.
 - [ ] Run `cd backend; ..\\.venv\\Scripts\\python.exe -m unittest tests.test_daqiush_owner_routes` and confirm it fails because current code returns `5C`.
-- [ ] Split/publicly mark Voidwood asks that establish a nine-card fit floor. The reported Jacoby route must require the asker to hold six hearts and publish `min_total=9`; a five-card Voidwood keeps only an actual-Q interpretation. This prevents a responder from reading the asker's private sixth trump.
-- [ ] Add a Voidwood-only effective-Q helper: true for an actual Q or the latest public Voidwood frame's `min_total >= 9`. It must not infer unseen cards.
+- [ ] Publish each asker's route-specific minimum trump length into the Voidwood frame. The reported direct-transfer route requires/publishes six; other routes preserve their own existing promises. This prevents a responder from reading a private sixth trump.
+- [ ] Add a Voidwood-only effective-Q helper: true when public asker-minimum plus responder actual length reaches nine, or ten if a nine-card fit was already public before the ask. It must not infer unseen cards.
 - [ ] Use that helper in legacy and state-driven answer maps, and record the effective result in the public answer state.
 - [ ] Run `cd backend; ..\\.venv\\Scripts\\python.exe -m unittest tests.test_daqiush_owner_routes tests.test_voidwood`; confirm PASS.
 - [ ] Commit only this test and Voidwood change as `fix: apply effective queen to Voidwood answers`.
