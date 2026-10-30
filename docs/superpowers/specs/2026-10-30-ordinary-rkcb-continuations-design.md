@@ -40,9 +40,11 @@ Within ordinary RKCB, interpretation priority is:
 5. another generic ordinary-RKCB continuation;
 6. TD when the available evidence cannot choose safely.
 
-Thus `5S` after a `5D` answer with hearts agreed is a queen ask while the
-queen remains unknown. If the asker owns the queen, or public evidence already
-shows it, there is nothing to ask and the same legal `5S` may be the 5NT relay.
+Thus `5S` after a `5D` answer with hearts agreed is structurally a queen ask.
+It remains a queen ask even when the asker privately owns the queen: the
+responder cannot reconstruct a private holding from the auction. The relay is
+available only in frames where public auction geometry does not assign `5S`
+to the queen ask. This keeps replay and both players' interpretation identical.
 
 ## 3. State model
 
@@ -53,10 +55,16 @@ The public `keycard_context` continues to identify:
 - method `rkcb_1430`;
 - one of `pending_answer`, `answered`, `relay_pending`, `relay_completed`,
   `completed`, or `disrupted`;
+- an optional continuation stage such as `queen_ask`, `grand_invitation`, or
+  `counterinvited`, without inventing additional top-level statuses;
 - the public answer category;
 - a useful-void category: exact suit, one-of-higher-than-trump, or unspecified;
 - publicly known trump-queen information;
 - kings that a later grand invitation explicitly does not require.
+
+Grand-invitation state also records the invitation call and a counter-invite
+count. The count begins at zero and may advance to one; it prevents a second
+counter-invitation while retaining top-level status `answered`.
 
 The asker's private `Purpose` retains only private information needed for a
 decision:
@@ -70,7 +78,7 @@ decision:
 Private counts never appear in replay or explanations.
 
 The private stages are `await_keycard_answer`, `choose_continuation`,
-`await_forced_5nt`, and `place_after_5nt`. Selecting a queen ask or relay
+`await_relay_completion`, and `place_after_5nt`. Selecting a queen ask or relay
 advances the existing Purpose; it does not replace or complete it. The Purpose
 completes only on a final placement, a final grand decision, or disruption.
 
@@ -157,9 +165,9 @@ Otherwise the auction TDs.
 
 ## 7. The `5S -> 5NT` relay
 
-`5S` is a relay only when it is legal and is not a queen ask. A queen ask
-exists only while the queen is unknown from the asker's cards and public
-evidence; it is not permanently reserved by auction shape alone.
+`5S` is a relay only when it is legal and public auction geometry does not
+make it the queen ask. Private ownership of the queen cannot change the public
+meaning of the call.
 
 The same public relay supports two private purposes:
 

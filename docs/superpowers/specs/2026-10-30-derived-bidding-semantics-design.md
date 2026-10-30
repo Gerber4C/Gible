@@ -211,8 +211,10 @@ placement when:
   35 HCP;
 - a good five-card suit may lower the required total by one point.
 
-The exact good-five-card predicate uses the shared hand-quality subsystem and
-must not be redefined inside the inference engine.
+The shared `hand_quality.has_good_five_card_suit` predicate is true when at
+least one suit of five or more cards has K-R suit points at least 0.5 above
+that suit's raw HCP. It lives in the hand-quality subsystem and must not be
+redefined inside the inference engine.
 
 ## 9. Derived Pass
 
