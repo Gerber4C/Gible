@@ -27,6 +27,18 @@ identity. A hand is eligible in exactly these cases:
 The two-suit classification wins if a hand could otherwise match both labels.
 Ordinary hands never invoke this mechanism.
 
+Define `protected_qj_suits` independently from length-order tie breaking:
+
+- for an eight-plus single suit, it contains only the unique eight-plus suit;
+- for an eleven-plus two suit, it contains exactly the two suits of length four
+  or more whose combined length triggered the classification;
+- every real actor suit of length two or fewer is Q/J-frozen regardless of
+  rank order or ties.
+
+Thus an 8-2-2-1 hand never arbitrarily chooses one two-card suit as a second
+long suit. An 8-3-1-1 hand may change Q/J only in the eight-card suit; the
+three-card suit is neither short nor a protected long suit and remains fixed.
+
 The target descriptive shape moves one card from a longest suit to a
 third-longest suit. If suits tie for longest or third place, proxy search
 considers the Cartesian product of every tied donor and receiver, excluding a
@@ -46,12 +58,12 @@ route. Represent a hand as a set of thirteen `(suit, rank)` cards. Search
 observes these constraints:
 
 1. Every ace and king remains in its real suit.
-2. In the two real longest suits, queen/jack membership may independently be
+2. In `protected_qj_suits`, queen/jack membership may independently be
    retained, removed, or added unless the suit is frozen by public partner-
-   shortage evidence. Moving a queen or jack is represented by its removal
-   from one long suit and addition to the other. Outside those two suits, real
-   queen/jack membership is fixed.
-3. A queen or jack is never added to a real actor suit of length two or fewer.
+   shortage evidence. With two protected suits, moving a queen or jack is
+   represented by its removal from one and addition to the other. Outside
+   `protected_qj_suits`, real queen/jack membership is fixed.
+3. Every real actor suit of length two or fewer has frozen Q/J membership.
    Public partner-shortage evidence means an explicit public maximum length of
    two cards in that suit. Such a suit freezes its real Q/J membership: proxy
    search may neither add, remove, nor move a Q/J there.
@@ -228,7 +240,8 @@ synthetic card or synthetic length survives in seat memory.
 Proxy search may be expensive, so cache it by:
 
 - canonical real hand;
-- real longest-suit identities;
+- trigger class and `protected_qj_suits`;
+- candidate donor/receiver identities for tied lengths;
 - suits carrying an explicit public partner maximum of two cards;
 - proxy algorithm version.
 
@@ -266,9 +279,9 @@ Tests must be written before implementation and demonstrate:
    eligible extreme lengths to the descriptive attempt;
 5. 6-5, 7-4, and other eleven-plus two-suit hands use the same generic path;
 6. A/K never move;
-7. Q/J changes occur only in the two real longest suits; no Q/J is added to a
-   real actor-short suit, and all Q/J membership is frozen in a suit where the
-   partner has a public maximum of two cards;
+7. Q/J changes occur only in `protected_qj_suits`; all Q/J membership is
+   frozen in real actor suits of length two or fewer and in suits where partner
+   has a public maximum of two;
 8. every selected proxy is a legal thirteen-card hand and has K–R error no
    greater than 0.15;
 9. ranking minimizes changed cards, then K–R error, then maximizes preserved
@@ -286,6 +299,9 @@ Tests must be written before implementation and demonstrate:
 15. no legal DP result, illegal projection, and ambiguity each produce the
     specified TD diagnostic;
 16. existing backend tests remain green.
+
+Shape-boundary fixtures include 8-2-2-1 and 8-3-1-1 single-suit hands as well
+as tied 6-6-1-0 two-suit donor choices.
 
 ## Non-goals
 
