@@ -54,6 +54,14 @@ def below_five_notrump(bid):
     return CALL_ORDER.index(bid) < CALL_ORDER.index('5NT')
 
 
+def next_non_trump(anchor, trump):
+    """The next call above the answer that is not the trump strain."""
+    for candidate in CALL_ORDER[CALL_ORDER.index(anchor) + 1:]:
+        if candidate[1] != trump:
+            return candidate
+    return None
+
+
 def voidwood_ask_eligible(ctx, trump, void):
     return (ctx.hand is not None and ctx.hand.length(trump) >= 5
             and ctx.hand.length(void) == 0
@@ -387,13 +395,14 @@ class Voidwood(Gadget):
                                                  'suit ace counts as its king.')
 
                 if index in (3, 4) and below_five_notrump(answer_map[index]):
-                    # With two keycards already known, 5NT asks kings while
-                    # the asker is still deciding between six and seven.
+                    # Two-keycard continuations: the next non-trump call asks
+                    # kings; the asker may instead place 6/7 directly.
+                    k_bid = next_non_trump(answer_map[index], trump)
                     kcall = self.call('voidwood_' + trump.lower() + '_void_'
-                                      + void.lower() + '_king_ask_5nt_after_'
+                                      + void.lower() + '_king_ask_after_'
                                       + answer_map[index].lower())
                     kcall.when = answer_prefix + answer_map[index] + 'P'
-                    kcall.bid = '5NT'
+                    kcall.bid = k_bid
                     kcall.applies = (lambda ctx, t=trump, v=void,
                                      qa=STEPS[index][1]: (
                         ctx.hand is not None
@@ -404,9 +413,9 @@ class Voidwood(Gadget):
                     kcall.meaning.nature = ['artificial']
                     kcall.meaning.acts = ['inquiry']
                     kcall.meaning.target_suit = trump
-                    kcall.description = ('Ask kings after the two-keycard answer; '
-                                         'five notrump is the hesitation between '
-                                         'six and seven.')
+                    kcall.description = ('The next non-trump call asks kings while '
+                                         'the asker is still deciding between six '
+                                         'and seven.')
                     for final_bid, grand in (('6' + trump, False),
                                              ('7' + trump, True)):
                         final = self.call('voidwood_' + trump.lower() + '_void_'
@@ -490,16 +499,16 @@ class Voidwood(Gadget):
             for index in range(len(STEPS)):
                 counts, _ = STEPS[index]
                 if index in (3, 4):
-                    king_ask = '5NT'
+                    king_ask = next_non_trump(answer_map[index], trump)
                 elif counts in ((0, 3), (1, 4)):
                     offset = 2 if counts == (0, 3) else 1
                     king_ask = step_bid(answer_map[index], offset)
                 else:
                     continue
-                if (king_ask is None
-                        or (king_ask != '5NT'
-                            and not below_five_notrump(king_ask))):
-                    continue
+                if king_ask is None or not below_five_notrump(king_ask):
+                    # 5NT itself can be the king ask after a two-keycard answer.
+                    if not (index in (3, 4) and king_ask == '5NT'):
+                        continue
                 after_king = answer_prefix + answer_map[index] + 'P' + king_ask + 'P'
                 shown = []
                 for suit in 'CDHS':
@@ -525,6 +534,33 @@ class Voidwood(Gadget):
                                         'as that suit king.')
                     shown.append(suit)
 
+                if king_ask != '5NT' and CALL_ORDER.index('5NT') > CALL_ORDER.index(king_ask):
+                    beyond = [suit for suit in 'CDHS'
+                              if suit != trump
+                              and CALL_ORDER.index('6' + suit)
+                              > CALL_ORDER.index('6' + trump)]
+                    if beyond:
+                        show5 = self.call('voidwood_' + trump.lower() + '_void_'
+                                          + void.lower() + '_king_show_5nt_after_'
+                                          + answer_map[index].lower())
+                        show5.when = after_king
+                        show5.bid = '5NT'
+                        show5.applies = (lambda ctx, t=trump, v=void,
+                                         suits=tuple(beyond): (
+                            any(king_in(ctx, s, v) for s in suits)
+                            and not any(king_in(ctx, s, v) for s in 'CDHS'
+                                        if s != t and s not in suits
+                                        and CALL_ORDER.index('6' + s)
+                                        <= CALL_ORDER.index('6' + t))))
+                        show5.meaning.action = 'voidwood_king_show'
+                        show5.meaning.nature = ['artificial']
+                        show5.meaning.acts = ['descriptive']
+                        show5.meaning.control_suit = 'S'
+                        show5.meaning.target_suit = trump
+                        show5.description = ('Five notrump shows a king in a suit '
+                                             'whose six-level bid lies beyond six '
+                                             'of trumps.')
+
                 no_king = self.call('voidwood_' + trump.lower() + '_void_'
                                     + void.lower() + '_no_king_after_'
                                     + answer_map[index].lower())
@@ -533,13 +569,63 @@ class Voidwood(Gadget):
                 no_king.applies = (lambda ctx, t=trump, v=void: (
                     ctx.hand is not None
                     and not any(king_in(ctx, s, v) for s in 'CDHS'
-                                if s != t
-                                and CALL_ORDER.index('6' + s) <= CALL_ORDER.index('6' + t))))
+                                if s != t)))
                 no_king.meaning.action = 'voidwood_no_king'
                 no_king.meaning.nature = ['natural']
                 no_king.meaning.acts = ['signoff', 'final_placement']
                 no_king.meaning.target_suit = trump
                 no_king.meaning.purpose_completed = True
+
+                # After any six-level (or 5NT) king show, the asker accepts
+                # with seven of trumps or rejects with six.
+                accept7 = self.call('voidwood_' + trump.lower() + '_void_'
+                                    + void.lower() + '_accept_seven_after_'
+                                    + answer_map[index].lower())
+                accept7.when = after_king
+                accept7.bid = '7' + trump
+                accept7.applies = (lambda ctx, a=ask, t=trump, v=void:
+                                   grand_accept_applies(ctx, t, v, a))
+                accept7.meaning.action = 'voidwood_grand_acceptance'
+                accept7.meaning.nature = ['natural']
+                accept7.meaning.acts = ['accept', 'final_placement']
+                accept7.meaning.target_suit = trump
+                accept7.meaning.purpose_completed = True
+                accept7.description = ('The king ask itself is enough to '
+                                       'accept the grand slam.')
+
+                show_bids = ['5NT'] + ['6' + s for s in 'CDHS'
+                                       if s != trump
+                                       and CALL_ORDER.index('6' + s)
+                                       <= CALL_ORDER.index('6' + trump)]
+                for show_bid in show_bids:
+                    if CALL_ORDER.index(show_bid) <= CALL_ORDER.index(king_ask):
+                        continue
+                    for final_bid, grand in (('6' + trump, False),
+                                             ('7' + trump, True)):
+                        finish = self.call('voidwood_' + trump.lower() + '_void_'
+                                           + void.lower() + '_after_king_'
+                                           + answer_map[index].lower() + '_'
+                                           + show_bid.lower() + '_'
+                                           + final_bid.lower())
+                        finish.when = after_king + show_bid + 'P'
+                        finish.bid = final_bid
+                        finish.applies = (lambda ctx, t=trump, v=void,
+                                         g=grand, qa=STEPS[index][1]: (
+                            ctx.hand is not None
+                            and ((ctx.hand.keycard_count(t, excluded_suit=v) + 2 == 3)
+                                 if not g else
+                                 (ctx.hand.keycard_count(t, excluded_suit=v) + 2 == 4
+                                  and (ctx.hand.contains_rank(t, 'Q') or qa is True)))))
+                        finish.meaning.action = ('voidwood_grand_acceptance'
+                                                 if grand else 'voidwood_slam')
+                        finish.meaning.nature = ['natural']
+                        finish.meaning.acts = ['signoff', 'final_placement']
+                        finish.meaning.target_suit = trump
+                        finish.meaning.purpose_completed = True
+                        finish.description = ('After the king show, '
+                                              + ('accept the grand' if grand
+                                                 else 'reject with the small slam')
+                                              + '.')
 
         # State-driven Voidwood: any confirmed-trump auction may use the
         # one-level jump into a void suit. The legacy transfer blocks above

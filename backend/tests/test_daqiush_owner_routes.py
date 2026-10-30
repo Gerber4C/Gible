@@ -84,11 +84,13 @@ class OwnerRouteTests(unittest.TestCase):
         south = 'S-HKQJT864DK85CAK8'
         north = 'SA754HA752DACQJ43'
         self.assertEqual(
-            self.bid('1NP2DP2HP4SP5HP', south), '5N')
+            self.bid('1NP2DP2HP4SP5HP', south), '5S')
         self.assertEqual(
-            self.bid('1NP2DP2HP4SP5HP5NP', north), '6H')
+            self.bid('1NP2DP2HP4SP5HP5SP', north), '5N')
         self.assertEqual(
-            self.bid('1NP2DP2HP4SP5HP5NP6HP', south), 'P')
+            self.bid('1NP2DP2HP4SP5HP5SP5NP', south), '7H')
+        self.assertEqual(
+            self.bid('1NP2DP2HP4SP5HP5SP5NP7HP', north), 'P')
 
 
 class ExclusionKeycardTests(unittest.TestCase):
