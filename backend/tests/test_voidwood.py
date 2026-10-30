@@ -159,6 +159,54 @@ class VoidwoodProfileTests(unittest.TestCase):
         self.assertEqual(
             self.bid('1NP2DP2HP', 'S-HAQJ765DKQCKQ765'), '4S')
 
+    def test_legacy_and_state_voidwood_answers_publish_effective_queen(self):
+        from engine.replay import replay_auction
+
+        legacy = replay_auction(
+            self.profile, Auction.parse('1NP2DP2HP4SP5DP'))
+        state_driven = replay_auction(
+            self.profile, Auction.parse('1NP2HP2SP3DP3HP4SP5DP'))
+        for trace in (legacy, state_driven):
+            self.assertTrue(trace.state_exists({
+                'key': 'voidwood_answer', 'effective_trump_queen': True,
+            }))
+
+    def test_public_nine_fit_requires_ten_cards_for_effective_queen(self):
+        class Record:
+            def __init__(self, **attributes):
+                self.attributes = attributes
+
+            def attribute(self, name):
+                return self.attributes.get(name)
+
+        class State:
+            def __init__(self, records):
+                self.records = records
+
+            def records_matching(self, key, **attributes):
+                return tuple(record for record in self.records
+                             if all(record.attribute(name) == value
+                                    for name, value in attributes.items()))
+
+            def exists(self, key, **attributes):
+                return bool(self.records_matching(key, **attributes))
+
+        predicate = next(
+            call.applicability.__globals__['has_effective_trump_queen']
+            for call in self.profile.call_specifications
+            if call.origin_dict()['gadget_id'] == 'voidwood')
+        direct_fit = Record(suit='H', asker_min_length=6, min_total=9,
+                            voidwood_direct_fit=True)
+        public_nine = Record(suit='H', min_total=9)
+        three_hearts = Hand.parse('SAKH843DK76542CAJ')
+        four_hearts = Hand.parse('SAKH8432DK765CAJ3')
+        self.assertTrue(predicate(SimpleNamespace(hand=three_hearts,
+                                                   state=State((direct_fit,))), 'H'))
+        self.assertFalse(predicate(SimpleNamespace(hand=three_hearts,
+                                                    state=State((direct_fit, public_nine))), 'H'))
+        self.assertTrue(predicate(SimpleNamespace(hand=four_hearts,
+                                                   state=State((direct_fit, public_nine))), 'H'))
+
 
 if __name__ == '__main__':
     unittest.main()

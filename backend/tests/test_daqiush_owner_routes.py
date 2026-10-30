@@ -156,10 +156,14 @@ class OwnerRouteTests(unittest.TestCase):
         self.assertEqual(
             self.bid('1NP2DP2HP4SP5HP5SP5NP7HP', north), 'P')
 
-    def test_voidwood_uses_nine_card_fit_as_effective_trump_queen(self):
+    def test_direct_transfer_voidwood_publishes_six_card_nine_fit(self):
         north = 'SAKH843DK76542CAJ'
         self.assertEqual(
             self.bid('1NP2DP2HP4SP', north), '5D')
+
+    def test_direct_transfer_voidwood_requires_six_trumps(self):
+        south = 'S-HAKJ97DAQJT3CKQ2'
+        self.assertNotEqual(self.bid('1NP2DP2HP', south), '4S')
 
 
 class ExclusionKeycardTests(unittest.TestCase):
@@ -183,6 +187,7 @@ class ExclusionKeycardTests(unittest.TestCase):
         self.assertEqual(self.bid('1NP2HP2SP5CP5DP5HP', zero), '5N')
         self.assertEqual(self.bid('1NP2HP2SP5CP5DP5HP',
                                   'SJ95HQJ4DQJ765C32'), '5N')
+        self.assertEqual(self.bid('1NP2HP2SP5CP5HP5SP', opener), '6D')
 
 
 class GrandSlamPolicyTests(unittest.TestCase):

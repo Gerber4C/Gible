@@ -73,12 +73,24 @@ def voidwood_ask_eligible(ctx, trump, void):
 
 
 def has_effective_trump_queen(ctx, trump):
-    """An actual queen, or the public nine-card fit announced by Voidwood."""
-    return (ctx.hand.contains_rank(trump, 'Q')
-            or ctx.state.exists(
-                'agreed_suit', suit=trump,
-                asker_min_length=MINIMUM_VOIDWOOD_ASKER_LENGTH,
-                min_total=MINIMUM_EFFECTIVE_QUEEN_FIT))
+    """An actual queen, or a publicly sufficient route-specific trump fit."""
+    if ctx.hand.contains_rank(trump, 'Q'):
+        return True
+    agreements = ctx.state.records_matching('agreed_suit', suit=trump)
+    asker_lengths = [record.attribute('asker_min_length')
+                      for record in agreements
+                      if record.attribute('asker_min_length') is not None]
+    if not asker_lengths:
+        return False
+    nine_fit_was_already_shown = any(
+        record.attribute('min_total') is not None
+        and record.attribute('min_total') >= MINIMUM_EFFECTIVE_QUEEN_FIT
+        and not record.attribute('voidwood_direct_fit')
+        for record in agreements)
+    required_fit = (MINIMUM_EFFECTIVE_QUEEN_FIT + 1
+                    if nine_fit_was_already_shown
+                    else MINIMUM_EFFECTIVE_QUEEN_FIT)
+    return max(asker_lengths) + ctx.hand.length(trump) >= required_fit
 
 
 def voidwood_answer(ctx, trump, void, counts, queen):
@@ -323,10 +335,12 @@ class Voidwood(Gadget):
             call.meaning.target_suit = trump
             call.meaning.agreed_suit = trump
             call.meaning.void_suit = void
+            call.meaning.asker_trump_length_min = MINIMUM_VOIDWOOD_ASKER_LENGTH
             agreement = call.effect('agreed_suit')
             agreement.suit = trump
             agreement.asker_min_length = MINIMUM_VOIDWOOD_ASKER_LENGTH
             agreement.min_total = MINIMUM_EFFECTIVE_QUEEN_FIT
+            agreement.voidwood_direct_fit = True
             context = call.effect('keycard_context')
             context.trump_suit = trump
             context.excluded_suit = void
@@ -354,6 +368,12 @@ class Voidwood(Gadget):
                 if queen is not None:
                     answer.meaning.trump_queen = queen
                     answer.meaning.trump_queen_basis = 'actual_or_nine_card_fit'
+                public_answer = answer.effect('voidwood_answer')
+                public_answer.trump = trump
+                public_answer.void = void
+                public_answer.ask = ask
+                public_answer.keycard_counts = list(counts)
+                public_answer.effective_trump_queen = queen
                 answer.description = ('Voidwood answer: ' + answer_map[index]
                                       + ' shows ' + str(counts) + ' keycards outside '
                                       + void + '.')
@@ -685,10 +705,7 @@ class Voidwood(Gadget):
                     call.meaning.target_suit = trump
                     call.meaning.agreed_suit = trump
                     call.meaning.void_suit = void
-                    agreement = call.effect('agreed_suit')
-                    agreement.suit = trump
-                    agreement.asker_min_length = MINIMUM_VOIDWOOD_ASKER_LENGTH
-                    agreement.min_total = MINIMUM_EFFECTIVE_QUEEN_FIT
+                    call.effect('agreed_suit').suit = trump
                     frame = call.effect('voidwood')
                     frame.trump = trump
                     frame.void = void
@@ -722,6 +739,12 @@ class Voidwood(Gadget):
                         if queen is not None:
                             answer.meaning.trump_queen = queen
                             answer.meaning.trump_queen_basis = 'actual_or_nine_card_fit'
+                        public_answer = answer.effect('voidwood_answer')
+                        public_answer.trump = trump
+                        public_answer.void = void
+                        public_answer.ask = ask
+                        public_answer.keycard_counts = list(counts)
+                        public_answer.effective_trump_queen = queen
                         answer.description = ('Voidwood answer ' + answers[step]
                                               + ' for the ' + void + ' void.')
                     q = queen_ask_bid(ask, trump)
