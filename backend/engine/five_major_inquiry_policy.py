@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .cards import Hand, normalize_suit_name
+from .cue_slam_policy import sample_process_hands
 from .call_space import contract_rank
 from .hand_quality import (
     assess_quality, inquiry_stopper, minor_game_control_points,
@@ -319,6 +320,64 @@ def decide_five_major_inquiry(profile, auction, hand: Hand, *,
                 final=selected in ('3NT', '4H', '4S', '5C', '5D', '6C', '6D'))
     return fallback
 
+
+
+@dataclass(frozen=True)
+class QuantitativeAceDecision:
+    branch: str
+    reason: str
+
+
+def quantitative_ace_decision(profile, auction, hand: Hand, *, trace=None):
+    """Resolve an ambiguous 1/4 or 0/3 ace answer by sampling."""
+    nonpass = tuple(call for call in auction.calls if call != 'P')
+    if len(nonpass) < 6 or nonpass[-2] != '5C':
+        return None
+    if nonpass[-1] not in ('5D', '5H'):
+        return None
+    prefix = nonpass[:-2]
+    if prefix not in (('1N', '2C', '2D', '4N'),
+                      ('1N', '2C', '2H', '4N'),
+                      ('1N', '3C', '3D', '4N')):
+        return None
+    answer = nonpass[-1]
+    category = (1, 4) if answer == '5D' else (0, 3)
+    own = hand.ace_count()
+    possible = []
+    for partner_aces in category:
+        total = own + partner_aces
+        if total <= 4:
+            possible.append(4 - total < 2)
+    if not possible:
+        return QuantitativeAceDecision(
+            'stop', 'No legal ace total is compatible with this answer')
+    if all(possible):
+        return QuantitativeAceDecision('slam', 'Every interpretation keeps at most one ace missing')
+    if not any(possible):
+        return QuantitativeAceDecision('stop', 'Every interpretation is missing at least two aces')
+    if trace is None:
+        from .replay import replay_auction
+        trace = replay_auction(profile, auction)
+    partner = _partner(auction.actor_to_call)
+    try:
+        deals = sample_process_hands(
+            profile, auction, trace, hand, partner,
+            extra_filter=lambda sampled: sampled.ace_count() in category)
+    except (RuntimeError, ValueError):
+        return QuantitativeAceDecision(
+            'stop', 'Ace-count sampling unavailable; conservative stop')
+    if not deals:
+        return QuantitativeAceDecision(
+            'stop', 'No compatible sampled responder hand; conservative stop')
+    compatible = [deal[partner].ace_count() for deal in deals
+                  if deal[partner].ace_count() in category]
+    if not compatible:
+        return QuantitativeAceDecision(
+            'stop', 'No compatible sampled ace answer; conservative stop')
+    share = sum(4 - (own + aces) < 2 for aces in compatible) / len(compatible)
+    return QuantitativeAceDecision(
+        'slam' if share > 0.5 else 'stop',
+        f'{share:.1%} of compatible samples are missing fewer than two aces')
 
 def _partner(seat: str) -> str:
     return {'n': 's', 's': 'n', 'e': 'w', 'w': 'e'}[seat]

@@ -62,11 +62,20 @@ class QuantitativeInquiryTests(unittest.TestCase):
             self.bid('1NP2CP2DP4NP5CP5SP', opener), '5N')
 
     def test_known_spade_fit_stops_in_five_spades(self):
+        from unittest.mock import patch
         opener = 'SKQ32HQJ2DKQJ2C32'  # zero aces, four spades
         self.assertEqual(
             self.bid('1NP2CP2HP4NP5CP5SP', opener), 'P')
-        self.assertEqual(
-            self.bid('1NP2CP2HP4NP5CP5DP', opener), '5S')
+        one_ace = {'s': Hand.parse('SA2HQJ2DKQJ2CQJ32')}
+        with patch('engine.five_major_inquiry_policy.sample_process_hands',
+                   return_value=(one_ace, one_ace)):
+            self.assertEqual(
+                self.bid('1NP2CP2HP4NP5CP5DP', opener), '5S')
+        four_aces = {'s': Hand.parse('SAQ2HAJ2DAQJ2CAJ2')}
+        with patch('engine.five_major_inquiry_policy.sample_process_hands',
+                   return_value=(four_aces, four_aces)):
+            self.assertEqual(
+                self.bid('1NP2CP2HP4NP5CP5DP', opener), '6S')
 
     def test_not_missing_two_aces_describes_six_card_strain(self):
         opener = 'SAQ2HQJ2DKQJ32C32'  # one ace, five diamonds

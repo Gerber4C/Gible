@@ -32,7 +32,8 @@ from .cue_slam_policy import (cue_gate, cue_three_way, decide_from_hands,
                               partner_promised_kr, sample_process_hands,
                               signoff_override)
 from .five_major_inquiry_policy import (
-    decide_five_major_inquiry, inquiry_decision_kind)
+    decide_five_major_inquiry, inquiry_decision_kind,
+    quantitative_ace_decision)
 from .simulation_decision import (decide_minor_5422, is_minor_5422_decision,
                                   decide_minor_major_74, is_minor_major_74_decision,
                                   decide_two_major_spade_slam,
@@ -289,6 +290,20 @@ def choose_bid(
                                candidate_pool=CandidatePool(candidates, auction),
                                trace=trace, private_memory=actor_memory)
         candidates = (selected,)
+
+    ace_decision = quantitative_ace_decision(
+        profile, auction, hand, trace=trace)
+    if ace_decision is not None:
+        keep = ({'5N', '5S', 'P'} if ace_decision.branch == 'stop'
+                else {'6C', '6D', '6H', '6S'})
+        filtered = tuple(c for c in candidates if c.call in keep)
+        if not filtered:
+            trace.warn('Quantitative ace decision produced no legal call: '
+                       + ace_decision.reason)
+            return BidDecision(call=None, selected_candidate=None,
+                               candidate_pool=CandidatePool((), auction),
+                               trace=trace, private_memory=actor_memory)
+        candidates = filtered
 
     cue_context = cue_three_way(auction, trace)
     if cue_context is not None:

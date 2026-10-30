@@ -312,9 +312,13 @@ class FiveCardMajorInquiry(Gadget):
             if answer == '5S':
                 return 'stop' if own == 0 else 'slam' if own in (1, 2) else None
             if answer == '5D':
-                return 'stop' if own <= 1 else 'slam' if own in (2, 3) else None
+                if own == 0:
+                    return 'ambiguous'
+                return 'stop' if own == 1 else 'slam' if own in (2, 3) else None
             if answer == '5H':
-                return 'slam' if own >= 3 else 'stop'
+                if own in (0, 1):
+                    return 'ambiguous'
+                return 'stop' if own == 2 else 'slam' if own in (3, 4) else None
             return None
 
         def feature_applies(ctx, suit, row):
@@ -387,7 +391,7 @@ class FiveCardMajorInquiry(Gadget):
                     stop_pass.when = after
                     stop_pass.bid = 'P'
                     stop_pass.applies = (lambda ctx, r=row: (
-                        ace_branch(ctx) == 'stop'
+                        ace_branch(ctx) in ('stop', 'ambiguous')
                         and ctx.hand is not None
                         and r == '2h' and ctx.hand.length('S') == 4))
                     stop_pass.meaning.action = 'quantitative_5s_stop'
@@ -403,7 +407,7 @@ class FiveCardMajorInquiry(Gadget):
                     stop_spade.when = after
                     stop_spade.bid = '5S'
                     stop_spade.applies = (lambda ctx, r=row: (
-                        ace_branch(ctx) == 'stop'
+                        ace_branch(ctx) in ('stop', 'ambiguous')
                         and ctx.hand is not None
                         and r == '2h' and ctx.hand.length('S') == 4))
                     stop_spade.meaning.action = 'quantitative_5s_stop'
@@ -421,7 +425,7 @@ class FiveCardMajorInquiry(Gadget):
                 stop_nt.when = after
                 stop_nt.bid = '5NT'
                 stop_nt.applies = (lambda ctx, r=row: (
-                    ace_branch(ctx) == 'stop'
+                    ace_branch(ctx) in ('stop', 'ambiguous')
                     and not (r == '2h' and ctx.hand is not None
                              and ctx.hand.length('S') == 4)))
                 stop_nt.meaning.action = 'quantitative_5nt_stop'
@@ -439,7 +443,7 @@ class FiveCardMajorInquiry(Gadget):
                     feature.when = after
                     feature.bid = '6' + suit
                     feature.applies = (lambda ctx, s=suit, r=row: (
-                        ace_branch(ctx) == 'slam'
+                        ace_branch(ctx) in ('slam', 'ambiguous')
                         and feature_applies(ctx, s, r)))
                     feature.meaning.action = 'quantitative_feature_slam'
                     feature.meaning.nature = ['natural']
