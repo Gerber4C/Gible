@@ -69,9 +69,46 @@ def ordinary_relay_completion_for_actor(ctx, trump):
             and partner_of_last_bidder(ctx))
 
 
+def current_bidder_is_partner(ctx):
+    seat = ordinary_partner_of_last_bidder(ctx.auction)
+    return seat is not None and ctx.auction.actor_to_call == seat
+
+
+def ordinary_high_answer_for_actor(ctx, trump):
+    frame = current_ordinary_frame(ctx, trump)
+    return (frame is not None and frame.status == 'answered'
+            and frame.continuation_stage is None
+            and ordinary_is_high_answer(frame)
+            and current_bidder_is_partner(ctx))
+
+
+def ordinary_grand_invite_actor(ctx, trump, answer_bid, invitation):
+    frame = current_ordinary_frame(ctx, trump)
+    return (frame is not None and frame.status == 'answered'
+            and frame.continuation_stage is None
+            and frame.answer_call == answer_bid
+            and ordinary_is_high_answer(frame)
+            and current_bidder_is_partner(ctx))
+
+
+def ordinary_grand_responder(ctx, trump):
+    frame = current_ordinary_frame(ctx, trump)
+    return (frame is not None
+            and frame.continuation_stage == 'grand_invitation'
+            and current_bidder_is_partner(ctx))
+
+
+def ordinary_counterinvite_asker(ctx, trump):
+    frame = current_ordinary_frame(ctx, trump)
+    return (frame is not None
+            and frame.continuation_stage == 'counterinvited'
+            and current_bidder_is_partner(ctx))
+
+
 def carry_answer_state(record, trump):
     query = {'method': 'rkcb_1430', 'trump_suit': trump}
     record.answer_category = StateAttribute('keycard_context', 'answer_category', **query)
+    record.answer_call = StateAttribute('keycard_context', 'answer_call', **query)
     record.keycard_counts = StateAttribute('keycard_context', 'keycard_counts', **query)
     record.trump_queen = StateAttribute('keycard_context', 'trump_queen', **query)
     record.useful_void = StateAttribute('keycard_context', 'useful_void', **query)
@@ -238,6 +275,7 @@ class ConfirmedKeycard(Gadget):
                 record.trump_suit = trump
                 record.status = 'answered'
                 record.answer_category = category
+                record.answer_call = bid
                 record.keycard_counts = list(counts)
                 if queen is not None:
                     record.trump_queen = queen
@@ -379,6 +417,177 @@ class ConfirmedKeycard(Gadget):
                 record.trump_suit = trump
                 record.status = 'answered'
                 record.continuation_stage = 'relay'
+                carry_answer_state(record, trump)
+
+            # Direct high-answer continuations: Pass places the current
+            # contract, a legal lower six-level side suit is a grand
+            # invitation, and seven of trumps is final.
+            place = self.call('ordinary_rkcb_' + trump.lower()
+                              + '_high_answer_pass')
+            place.when = '*'
+            place.requires = lambda ctx, t=trump: (
+                ordinary_high_answer_for_actor(ctx, t))
+            place.bid = 'P'
+            place.applies = lambda ctx, t=trump: (
+                ordinary_high_answer_for_actor(ctx, t))
+            place.meaning.action = 'rkcb_1430_high_answer_placement'
+            place.meaning.nature = ['natural']
+            place.meaning.acts = ['signoff', 'final_placement']
+            place.meaning.target_suit = trump
+            place.meaning.agreed_suit = trump
+            place.description = ('Place the current contract after a direct '
+                                 'high-answer; this is not a grand invitation.')
+            record = place.effect('keycard_context')
+            record.method = 'rkcb_1430'
+            record.trump_suit = trump
+            record.status = 'completed'
+            carry_answer_state(record, trump)
+
+            answer_bids = ['5N']
+            answer_bids.extend('6' + suit for suit in 'CDHS'
+                               if suit != trump and '6' + suit < '6' + trump)
+            answer_bids.append('6' + trump)
+            for answer_bid in answer_bids:
+                for invitation in 'CDHS':
+                    if invitation == trump:
+                        continue
+                    if answer_bid == '5N':
+                        if not ('5N' < '6' + invitation < '6' + trump):
+                            continue
+                    elif not ('6' + answer_bid[1] < '6' + invitation
+                              < '6' + trump):
+                        continue
+                    skipped = ordinary_skipped_lower_kings(
+                        answer_bid, '6' + invitation, trump,
+                        ['6' + suit for suit in 'CDHS'])
+                    invite = self.call(
+                        'ordinary_rkcb_' + trump.lower() + '_grand_invite_'
+                        + answer_bid.lower() + '_' + invitation.lower())
+                    invite.when = '*'
+                    invite.requires = (
+                        lambda ctx, t=trump, a=answer_bid, i='6' + invitation:
+                        ordinary_grand_invite_actor(ctx, t, a, i))
+                    invite.bid = '6' + invitation
+                    invite.applies = (
+                        lambda ctx, t=trump, a=answer_bid, i='6' + invitation:
+                        ordinary_grand_invite_actor(ctx, t, a, i))
+                    invite.meaning.action = 'rkcb_1430_grand_invitation'
+                    invite.meaning.nature = ['artificial']
+                    invite.meaning.acts = ['invite', 'slam_try']
+                    invite.meaning.target_suit = trump
+                    invite.meaning.agreed_suit = trump
+                    invite.description = ('Grand invitation after a direct '
+                                          'high answer; not a specific king ask.')
+                    record = invite.effect('keycard_context')
+                    record.method = 'rkcb_1430'
+                    record.trump_suit = trump
+                    record.status = 'answered'
+                    record.continuation_stage = 'grand_invitation'
+                    carry_answer_state(record, trump)
+                    record.invitation_call = '6' + invitation
+                    record.counterinvite_count = 0
+                    record.not_required_kings = list(skipped)
+
+            final = self.call('ordinary_rkcb_' + trump.lower()
+                              + '_high_answer_seven')
+            final.when = '*'
+            final.requires = lambda ctx, t=trump: (
+                ordinary_high_answer_for_actor(ctx, t))
+            final.bid = '7' + trump
+            final.applies = lambda ctx, t=trump: (
+                ordinary_high_answer_for_actor(ctx, t))
+            final.meaning.action = 'rkcb_1430_grand_placement'
+            final.meaning.nature = ['natural']
+            final.meaning.acts = ['signoff', 'final_placement']
+            final.meaning.target_suit = trump
+            final.meaning.agreed_suit = trump
+            final.description = 'A seven-level call is final, not an invitation.'
+            record = final.effect('keycard_context')
+            record.method = 'rkcb_1430'
+            record.trump_suit = trump
+            record.status = 'completed'
+            carry_answer_state(record, trump)
+
+            for suit in 'CDHS':
+                if suit == trump or '6' + suit > '6' + trump:
+                    continue
+                counter = self.call('ordinary_rkcb_' + trump.lower()
+                                    + '_counterinvite_' + suit.lower())
+                counter.when = '*'
+                counter.requires = lambda ctx, t=trump: (
+                    ordinary_grand_responder(ctx, t))
+                counter.bid = '6' + suit
+                counter.applies = (lambda ctx, t=trump, s=suit: (
+                    ordinary_grand_responder(ctx, t)
+                    and ctx.hand is not None
+                    and ctx.hand.contains_rank(s, 'K')))
+                counter.meaning.action = 'rkcb_1430_counter_invitation'
+                counter.meaning.nature = ['artificial']
+                counter.meaning.acts = ['invite', 'slam_try', 'control_showing']
+                counter.meaning.target_suit = trump
+                counter.meaning.agreed_suit = trump
+                counter.meaning.control_suit = suit
+                counter.description = ('Counter-invite with a higher unknown '
+                                       'king; this is not a specific king ask.')
+                record = counter.effect('keycard_context')
+                record.method = 'rkcb_1430'
+                record.trump_suit = trump
+                record.status = 'answered'
+                record.continuation_stage = 'counterinvited'
+                record.counterinvite_count = 1
+                record.shown_king = suit
+                carry_answer_state(record, trump)
+                record.not_required_kings = StateAttribute(
+                    'keycard_context', 'not_required_kings',
+                    method='rkcb_1430', trump_suit=trump)
+
+            for bid, action, acts in (
+                ('6' + trump, 'rkcb_1430_grand_reject',
+                 ['signoff', 'final_placement']),
+                ('7' + trump, 'rkcb_1430_grand_accept',
+                 ['final_placement']),
+            ):
+                reply = self.call('ordinary_rkcb_' + trump.lower()
+                                  + '_grand_reply_' + bid.lower())
+                reply.when = '*'
+                reply.requires = lambda ctx, t=trump: (
+                    ordinary_grand_responder(ctx, t))
+                reply.bid = bid
+                reply.applies = lambda ctx, t=trump: (
+                    ordinary_grand_responder(ctx, t))
+                reply.meaning.action = action
+                reply.meaning.nature = ['natural']
+                reply.meaning.acts = acts
+                reply.meaning.target_suit = trump
+                reply.meaning.agreed_suit = trump
+                reply.description = ('Reject with six or accept with seven of trumps.')
+                record = reply.effect('keycard_context')
+                record.method = 'rkcb_1430'
+                record.trump_suit = trump
+                record.status = 'completed'
+                carry_answer_state(record, trump)
+
+            for bid in ('6' + trump, '7' + trump):
+                finish_counter = self.call('ordinary_rkcb_' + trump.lower()
+                                           + '_after_counterinvite_'
+                                           + bid.lower())
+                finish_counter.when = '*'
+                finish_counter.requires = lambda ctx, t=trump: (
+                    ordinary_counterinvite_asker(ctx, t))
+                finish_counter.bid = bid
+                finish_counter.applies = lambda ctx, t=trump: (
+                    ordinary_counterinvite_asker(ctx, t))
+                finish_counter.meaning.action = 'rkcb_1430_counterinvite_decision'
+                finish_counter.meaning.nature = ['natural']
+                finish_counter.meaning.acts = ['final_placement']
+                finish_counter.meaning.target_suit = trump
+                finish_counter.meaning.agreed_suit = trump
+                finish_counter.description = ('Choose six or seven of trumps '
+                                              'after the single counter-invitation.')
+                record = finish_counter.effect('keycard_context')
+                record.method = 'rkcb_1430'
+                record.trump_suit = trump
+                record.status = 'completed'
                 carry_answer_state(record, trump)
 
         for branch, prefix, trump in asks:

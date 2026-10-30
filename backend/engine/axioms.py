@@ -3,7 +3,7 @@ from .axiom_facts import (INVITES, configuration, gf_satisfied, is_game, loses_p
                           natural, partner, public_facts, tags)
 from .hand_quality import (assess_quality, minor_game_control_points,
                            shapely_combined_effective_points)
-from .legality import is_call_legal
+from .legality import is_call_legal, last_contract_state
 
 
 def invitation_action(own, low, high, threshold):
@@ -87,7 +87,9 @@ def evaluate_axioms(auction, hand, trace, candidates, raw_config=None):
         obligations.append({'kind':'forcing','origin':previous['origin'],'index':previous['index']})
 
     # Invitations to slam are outside the game-invitation axiom.
-    invitation = bool(previous_tags & {'invite','invite_plus'}) and not facts['own_game']
+    invitation = (bool(previous_tags & {'invite','invite_plus'})
+                  and 'slam_try' not in previous_tags
+                  and not facts['own_game'])
     action = None
     if invitation:
         low,high = facts['ranges'].get(actor,(None,None))
@@ -172,7 +174,10 @@ def evaluate_axioms(auction, hand, trace, candidates, raw_config=None):
         if action == 'game':
             is_target = natural(m) and is_game(candidate.call)
             continues = bool(candidate_tags & {'forcing','game_forcing','inquiry','slam_try','control_showing'})
-            if not is_target and not continues and not unclassified_continuation and not (candidate.call == 'P' and not rho_pass and not loses_partner_turn(auction)):
+            contract = last_contract_state(auction)
+            passing_game = (candidate.call == 'P' and contract is not None
+                            and is_game(contract.call))
+            if not is_target and not continues and not unclassified_continuation and not passing_game and not (candidate.call == 'P' and not rho_pass and not loses_partner_turn(auction)):
                 reject('GAME_REQUIRED','Public strength guarantees game; choose game or a defined continuation')
         elif action == 'invite' and not (candidate_tags & INVITES or 'game_forcing' in candidate_tags
                                          or unclassified_continuation
@@ -189,7 +194,8 @@ def evaluate_axioms(auction, hand, trace, candidates, raw_config=None):
                                           or (candidate_tags & INVITES and certified_shape_invitation(m, hand))
                                           or (m.get('shape_invitation') and candidate_tags & INVITES
                                               and hand.length(m.get('target_suit')) >= 7
-                                              and quality['kr_delta'] >= 2)):
+                                              and quality['kr_delta'] >= 2)
+                                          or candidate_tags & {'slam_try','inquiry','control_showing'}):
             reject('SIGNOFF_REQUIRED','Even partner maximum is insufficient; choose invite_minus or signoff')
         elif action in ('accept','reject') and action not in candidate_tags:
             reject('INVITATION_RESPONSE_REQUIRED',f'Choose a call explicitly marked {action}')

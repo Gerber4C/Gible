@@ -103,6 +103,35 @@ class DaqiushKeycardPrefixTests(unittest.TestCase):
             self.profile, Auction.parse('1NP4CP4HP4NP5CP5SP5NP6HP'))
         self.assertEqual(ordinary_rkcb_frame(finished).status, 'completed')
 
+    def test_direct_high_answers_expose_pass_invitation_and_final(self):
+        placed = replay_auction(
+            self.profile, Auction.parse('1NP4CP4HP4NP5NPP'))
+        self.assertEqual(ordinary_rkcb_frame(placed).status, 'completed')
+        invited = replay_auction(
+            self.profile, Auction.parse('1NP4CP4HP4NP5NP6DP'))
+        frame = ordinary_rkcb_frame(invited)
+        self.assertEqual((frame.status, frame.continuation_stage,
+                          frame.answer_call, frame.invitation_call,
+                          frame.not_required_kings),
+                         ('answered', 'grand_invitation', '5N', '6D', ('C',)))
+        final = replay_auction(
+            self.profile, Auction.parse('1NP4CP4HP4NP5NP7HP'))
+        self.assertEqual(ordinary_rkcb_frame(final).status, 'completed')
+
+    def test_grand_invitation_counterinvite_and_asker_decision(self):
+        rejected = replay_auction(
+            self.profile, Auction.parse('1NP4CP4HP4NP5NP6DP6HP'))
+        self.assertEqual(ordinary_rkcb_frame(rejected).status, 'completed')
+        countered = replay_auction(
+            self.profile, Auction.parse('1NP4CP4HP4NP5NP6CP6DP'))
+        frame = ordinary_rkcb_frame(countered)
+        self.assertEqual((frame.status, frame.continuation_stage,
+                          frame.counterinvite_count, frame.shown_king),
+                         ('answered', 'counterinvited', 1, 'D'))
+        decided = replay_auction(
+            self.profile, Auction.parse('1NP4CP4HP4NP5NP6CP6DP7HP'))
+        self.assertEqual(ordinary_rkcb_frame(decided).status, 'completed')
+
 
 if __name__ == '__main__':
     unittest.main()

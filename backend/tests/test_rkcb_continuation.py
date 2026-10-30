@@ -152,10 +152,10 @@ class RelayGeometryTests(unittest.TestCase):
 
     def test_lowest_showable_side_king_stays_below_six_trumps(self):
         auction = Auction.parse('1NP4CP4HP4NP5CP5SP5NP')
-        hand = Hand.parse('SA2HKQ976D432CK42')
-        self.assertEqual(lowest_showable_side_king(hand, 'H', auction), '6C')
+        hand = Hand.parse('SA2HKQ976DK432C42')
+        self.assertEqual(lowest_showable_side_king(hand, 'H', auction), '6D')
         self.assertIsNone(lowest_showable_side_king(
-            hand, 'H', auction, denied=('C',)))
+            hand, 'H', auction, denied=('D',)))
         self.assertIsNone(lowest_showable_side_king(hand, 'C', auction))
 
 
@@ -243,6 +243,40 @@ class AmbiguousMixtureTests(unittest.TestCase):
             Hand.parse('SA2HKQ976D432C432'), frame, ('6H',),
             evaluator=lambda calls: self.fail('solver must not run'))
         self.assertEqual(decision.call, '6H')
+
+
+class HighAnswerGeometryTests(unittest.TestCase):
+    def test_skipped_lower_kings_only_count_calls_between_the_answer_and_invite(self):
+        from engine.rkcb_continuation import skipped_lower_kings
+        legal = ['6C', '6D', '6H', '6S']
+        self.assertEqual(skipped_lower_kings('5N', '6C', 'H', legal), ())
+        self.assertEqual(skipped_lower_kings('5N', '6D', 'H', legal), ('C',))
+        self.assertEqual(skipped_lower_kings('6C', '6D', 'H', legal), ())
+        self.assertEqual(skipped_lower_kings('5N', '6H', 'H', legal), ('C', 'D'))
+
+    def test_high_answer_invitations_stay_below_six_trumps(self):
+        from engine.rkcb_continuation import high_answer_invitations
+        trace = AuctionTrace()
+        add_context(trace, method='rkcb_1430', status='answered',
+                    trump_suit='H', answer_category='0/2/4/void',
+                    answer_call='5N', keycard_counts=[0, 2, 4],
+                    useful_void_category='unspecified')
+        frame = ordinary_rkcb_frame(trace)
+        auction = Auction.parse('1NP4CP4HP4NP5NP')
+        self.assertEqual(high_answer_invitations(auction, frame),
+                         ('6C', '6D'))
+
+    def test_lowest_counterinvite_king_skips_unnecessary_kings(self):
+        from engine.rkcb_continuation import lowest_counterinvite_king
+        trace = AuctionTrace()
+        add_context(trace, method='rkcb_1430', status='answered',
+                    trump_suit='H', answer_category='0/2/4/void',
+                    answer_call='5N', keycard_counts=[0, 2, 4],
+                    not_required_kings=['C'])
+        frame = ordinary_rkcb_frame(trace)
+        auction = Auction.parse('1NP4CP4HP4NP5NP6CP')
+        hand = Hand.parse('SA2HKQ976DK432C42')
+        self.assertEqual(lowest_counterinvite_king(hand, frame, auction), '6D')
 
 
 if __name__ == '__main__':

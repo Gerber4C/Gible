@@ -14,8 +14,10 @@ from .hand_quality import (inquiry_stopper, minor_game_control_points,
 from .voidwood import (answer_bids, effective_keycards,
                        is_safe_voidwood_ask, voidwood_jump)
 from .rkcb_continuation import (
-    five_spade_role, five_trump_available, lowest_showable_side_king,
-    ordinary_response, ordinary_rkcb_frame, queen_ask_call, useful_voids,
+    five_spade_role, five_trump_available, high_answer_invitations,
+    is_high_answer, lowest_counterinvite_king, lowest_showable_side_king,
+    ordinary_response, ordinary_rkcb_frame, partner_of_last_bidder,
+    queen_ask_call, skipped_lower_kings, useful_voids,
 )
 
 
@@ -1205,6 +1207,11 @@ def _base_namespace(collector: _Collector) -> dict[str, Any]:
         "ordinary_queen_ask_call": queen_ask_call,
         "ordinary_five_spade_role": five_spade_role,
         "ordinary_five_trump_available": five_trump_available,
+        "ordinary_is_high_answer": is_high_answer,
+        "ordinary_high_answer_invitations": high_answer_invitations,
+        "ordinary_partner_of_last_bidder": partner_of_last_bidder,
+        "ordinary_skipped_lower_kings": skipped_lower_kings,
+        "ordinary_lowest_counterinvite_king": lowest_counterinvite_king,
         "lowest_showable_side_king": lowest_showable_side_king,
         "zar_total": _zar_total,
         "shapely_effective_points": shapely_effective_points,

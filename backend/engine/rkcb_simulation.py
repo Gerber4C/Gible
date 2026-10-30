@@ -32,6 +32,68 @@ class AmbiguousDecision:
     unavailable: bool = False
 
 
+@dataclass(frozen=True)
+class GrandDecision:
+    call: str | None
+    reason: str
+    unavailable: bool = False
+
+
+def compare_grand_routes(profile, auction, trace, hand: Hand, trump: str,
+                         frame, *, evaluator=None) -> GrandDecision:
+    """Compare six and seven of trumps after a counter-invitation."""
+    six = f'6{trump}'
+    seven = f'7{trump}'
+    six_legal = is_call_legal(auction, six)
+    seven_legal = is_call_legal(auction, seven)
+    if not seven_legal and not six_legal:
+        return GrandDecision(None, 'neither six nor seven of trumps is legal',
+                             unavailable=True)
+    if not seven_legal:
+        return GrandDecision(six, 'only six of trumps is legal')
+    if not six_legal:
+        return GrandDecision(seven, 'only seven of trumps is legal')
+    if evaluator is not None:
+        try:
+            selected = evaluator(six, seven)
+        except (DDSUnavailableError, RuntimeError, ValueError, TypeError) as exc:
+            return GrandDecision(None, f'grand comparison unavailable: {exc}',
+                                 unavailable=True)
+        if selected in (six, seven):
+            return GrandDecision(selected, 'injected grand comparison')
+        return GrandDecision(None, 'grand comparison returned an unexpected call',
+                             unavailable=True)
+    if profile is None:
+        return GrandDecision(six, 'deterministic six-trump rejection')
+    try:
+        deals = _sample_grand_deals(profile, auction, trace, hand)
+    except (DDSUnavailableError, RuntimeError, ValueError) as exc:
+        return GrandDecision(six, f'deterministic rejection: {exc}')
+    if not deals:
+        return GrandDecision(six, 'deterministic rejection without samples')
+    actor = auction.actor_to_call
+    targets = (ContractTarget(6, trump, actor),
+               ContractTarget(7, trump, actor))
+    try:
+        estimates = compare_contract_targets(
+            deals, targets, solve_table=calculate_available_table)
+    except (DDSUnavailableError, RuntimeError, ValueError) as exc:
+        return GrandDecision(six, f'deterministic rejection: {exc}')
+    rates = {estimate.contract: estimate.completion_rate
+             for estimate in estimates}
+    return GrandDecision(
+        seven if rates.get('7' + trump, 0) > rates.get('6' + trump, 1) else six,
+        'sampled six/seven comparison')
+
+
+def _sample_grand_deals(profile, auction, trace, hand):
+    from .cue_slam_policy import sample_process_hands
+
+    actor = auction.actor_to_call
+    partner = {'n': 's', 's': 'n', 'e': 'w', 'w': 'e'}[actor]
+    return sample_process_hands(profile, auction, trace, hand, partner)
+
+
 def compare_ambiguous_continuations(profile, auction, trace, hand: Hand,
                                     frame, calls, *, deals=None,
                                     evaluator=None, solve=None,

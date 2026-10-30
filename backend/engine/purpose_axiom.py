@@ -8,11 +8,15 @@ from .context import CallCandidate
 from .legality import SIDE_BY_SEAT, is_call_legal, last_contract_state
 from .memory import Purpose, SeatMemory
 from .rkcb_continuation import (
-    bid_rank, five_spade_role, five_trump_available,
-    lowest_showable_side_king, ordinary_rkcb_frame, possible_partner_counts,
-    queen_ask_call, relay_terminal_call,
+    bid_rank, five_spade_role, five_trump_available, high_answer_invitations,
+    is_high_answer, lowest_showable_side_king, ordinary_rkcb_frame,
+    partner_of_last_bidder, possible_partner_counts, queen_ask_call,
+    relay_terminal_call,
 )
-from .rkcb_simulation import compare_ambiguous_continuations, compare_rescue_routes
+from .rkcb_simulation import (
+    compare_ambiguous_continuations, compare_grand_routes,
+    compare_rescue_routes,
+)
 from .slam_intent import (
     PARTNER_1NT_MIN, PARTNER_DEFAULT_MIN, detect_slam_intent,
 )
@@ -219,7 +223,7 @@ def _keycard_slam(auction, trace, purpose, hand=None, profile=None,
         return _choose_after_answer(auction, trace, purpose, hand, frame, profile,
                                     candidates)
     if stage == 'choose_continuation':
-        return _choose_continuation(auction, trace, purpose, hand, frame)
+        return _choose_continuation(auction, trace, purpose, hand, frame, profile)
     if stage == 'await_relay_completion':
         return _observe_relay_completion(auction, purpose, hand, frame)
     if stage == 'place_after_5nt':
@@ -238,6 +242,8 @@ def _choose_after_answer(auction, trace, purpose, hand, frame, profile=None,
                 or meaning.get('answer_category'))
     with_stage = replace(purpose, rkcb_stage='choose_continuation',
                          answer_category=category)
+    if frame is not None and is_high_answer(frame):
+        return _choose_high_answer(auction, purpose, with_stage, frame)
     if frame is not None and frame.keycard_counts:
         possible_counts = list(possible_partner_counts(
             frame, purpose.own_keycards))
@@ -275,6 +281,22 @@ def _choose_after_answer(auction, trace, purpose, hand, frame, profile=None,
         return _game_or_rescue(auction, trace, purpose, hand, frame,
                                with_stage, profile)
     return _StageResult(slam, purpose=_completed(with_stage))
+
+
+def _choose_high_answer(auction, purpose, with_stage, frame):
+    possible = possible_partner_counts(frame, purpose.own_keycards)
+    all_keycards = any(purpose.own_keycards + count == 5
+                       for count in possible)
+    if all_keycards and purpose.owns_trump_queen and purpose.grand_candidate:
+        invitations = high_answer_invitations(auction, frame)
+        if invitations:
+            return _StageResult(invitations[0], purpose=with_stage,
+                                authored_only=True)
+        seven = f'7{purpose.trump}'
+        if is_call_legal(auction, seven):
+            return _StageResult(seven, purpose=_completed(with_stage),
+                                authored_only=True)
+    return _StageResult('P', purpose=_completed(with_stage), authored_only=True)
 
 
 def _choose_ambiguous_continuation(auction, trace, purpose, hand, frame,
@@ -331,7 +353,7 @@ def _game_or_rescue(auction, trace, purpose, hand, frame, with_stage, profile):
                         authored_only=True)
 
 
-def _choose_continuation(auction, trace, purpose, hand, frame):
+def _choose_continuation(auction, trace, purpose, hand, frame, profile=None):
     if frame is None:
         return _StageResult(error='Ordinary keycard frame is unavailable')
     if frame.trump != purpose.trump:
@@ -355,9 +377,15 @@ def _choose_continuation(auction, trace, purpose, hand, frame):
             error='QUEEN_ASK_CONTINUATION_UNAUTHORED: the queen-ask answer table is not authored',
             purpose=purpose)
     if frame.continuation_stage == 'counterinvited':
-        return _StageResult(
-            error='Keycard counter-invitation continuation is not authored',
-            purpose=purpose)
+        if frame.counterinvite_count > 1:
+            return _StageResult(
+                error='No second counter-invitation is allowed',
+                purpose=purpose)
+        decision = compare_grand_routes(
+            profile, auction, trace, hand, purpose.trump, frame)
+        call = decision.call or f'6{purpose.trump}'
+        return _StageResult(call, purpose=_completed(purpose),
+                            authored_only=True)
     return _StageResult(
         error='No authored continuation matches this keycard frame',
         purpose=purpose)

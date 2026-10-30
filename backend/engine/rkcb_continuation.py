@@ -26,6 +26,7 @@ class OrdinaryRKCBFrame:
     trump: str
     status: str
     answer_category: str | None = None
+    answer_call: str | None = None
     keycard_counts: tuple[int, ...] = ()
     trump_queen: bool | None = None
     useful_void: str | None = None
@@ -34,6 +35,7 @@ class OrdinaryRKCBFrame:
     disrupted_reason: str | None = None
     continuation_stage: str | None = None
     invitation_call: str | None = None
+    shown_king: str | None = None
     counterinvite_count: int = 0
 
     @property
@@ -80,6 +82,7 @@ def ordinary_rkcb_frame(trace) -> OrdinaryRKCBFrame | None:
         trump=trump,
         status=status,
         answer_category=record.attribute('answer_category'),
+        answer_call=record.attribute('answer_call'),
         keycard_counts=tuple(int(value) for value in counts),
         trump_queen=record.attribute('trump_queen'),
         useful_void=record.attribute('useful_void'),
@@ -88,6 +91,7 @@ def ordinary_rkcb_frame(trace) -> OrdinaryRKCBFrame | None:
         disrupted_reason=record.attribute('disrupted_reason'),
         continuation_stage=record.attribute('continuation_stage'),
         invitation_call=record.attribute('invitation_call'),
+        shown_king=record.attribute('shown_king'),
         counterinvite_count=int(record.attribute('counterinvite_count') or 0),
     )
 
@@ -223,3 +227,58 @@ def answer_category_filter(frame: OrdinaryRKCBFrame, trump: str):
         return (hand.keycard_count(trump) in frame.keycard_counts
                 and void_category_matches(hand, frame, trump))
     return accepts
+
+
+HIGH_ANSWER_CATEGORIES = ('0/2/4/void', '1/3/void')
+
+
+def is_high_answer(frame: OrdinaryRKCBFrame | None) -> bool:
+    return frame is not None and frame.answer_category in HIGH_ANSWER_CATEGORIES
+
+
+def partner_of_last_bidder(auction) -> str | None:
+    for index in range(len(auction.calls) - 1, -1, -1):
+        if auction.calls[index] not in ('P', 'X', 'R'):
+            return partner_of(auction.actor_at(index))
+    return None
+
+
+def skipped_lower_kings(answer: str, invitation: str, trump: str,
+                        legal_at_answer: Iterable[str]) -> tuple[str, ...]:
+    return tuple(call[1] for call in legal_at_answer
+                 if call[0] == '6' and call[1] in 'CDHS'
+                 and call[1] != trump
+                 and bid_rank(answer) < bid_rank(call)
+                 < bid_rank(invitation))
+
+
+def high_answer_invitations(auction, frame: OrdinaryRKCBFrame | None,
+                            answer_call: str | None = None
+                            ) -> tuple[str, ...]:
+    if not is_high_answer(frame):
+        return ()
+    answer = answer_call or frame.answer_call
+    if answer is None:
+        return ()
+    rejection = '6' + frame.trump
+    if not is_call_legal(auction, rejection):
+        return ()
+    return tuple(call for call in legal_calls(auction)
+                 if call[0] == '6' and call[1] in 'CDHS'
+                 and call[1] != frame.trump
+                 and bid_rank(answer) < bid_rank(call)
+                 < bid_rank(rejection))
+
+
+def lowest_counterinvite_king(hand: Hand | None,
+                              frame: OrdinaryRKCBFrame, auction
+                              ) -> str | None:
+    if hand is None:
+        return None
+    calls = [f'6{suit}' for suit in 'CDHS'
+             if suit != frame.trump
+             and suit not in frame.not_required_kings
+             and hand.contains_rank(suit, 'K')
+             and is_call_legal(auction, f'6{suit}')
+             and bid_rank(f'6{suit}') < bid_rank(f'6{frame.trump}')]
+    return min(calls, key=bid_rank) if calls else None

@@ -391,6 +391,55 @@ class PurposeAxiomTests(unittest.TestCase):
             validate_profile_axioms(profile)
         self.assertEqual(raised.exception.errors[0]['code'], 'INVALID_PURPOSE')
 
+    def test_high_answer_purpose_passes_when_the_grand_is_impossible(self):
+        purpose = {'kind': 'keycard_slam', 'owner': 's', 'source_index': 6,
+                   'source_call': '4N', 'trump': 'H', 'own_keycards': 4,
+                   'owns_trump_queen': True, 'grand_candidate': True,
+                   'status': 'active'}
+        decision = self.choose('1NP4CP4HP4NP5NP',
+                               'SA2HAKQ976DA32C42', purpose)
+        self.assertEqual(decision.call, 'P')
+        self.assertEqual(decision.private_memory.purposes[0].status,
+                         'completed')
+
+    def test_high_answer_purpose_invites_grand_when_all_keycards_are_possible(self):
+        purpose = {'kind': 'keycard_slam', 'owner': 's', 'source_index': 6,
+                   'source_call': '4N', 'trump': 'H', 'own_keycards': 1,
+                   'owns_trump_queen': True, 'grand_candidate': True,
+                   'status': 'active'}
+        decision = self.choose('1NP4CP4HP4NP5NP',
+                               'S32HKQ97654D432C2', purpose)
+        self.assertEqual(decision.call, '6C')
+        saved = decision.private_memory.purposes[0]
+        self.assertEqual((saved.status, saved.rkcb_stage),
+                         ('active', 'choose_continuation'))
+
+    def test_grand_responder_rejects_or_counterinvites_without_a_private_purpose(self):
+        invite = Auction.parse('1NP4CP4HP4NP5NP6CP')
+        rejected = choose_bid(self.profile, invite,
+                              Hand.parse('SAQ2HQJ976DQJ2CQJ'))
+        self.assertEqual(rejected.call, '6H')
+        countered = choose_bid(self.profile, invite,
+                               Hand.parse('SAQ2HQJ976DKQ2CQJ'))
+        self.assertEqual(countered.call, '6D')
+
+    def test_asker_chooses_after_the_single_counterinvitation(self):
+        from unittest.mock import patch
+        from engine.rkcb_simulation import GrandDecision
+        purpose = {'kind': 'keycard_slam', 'owner': 's', 'source_index': 6,
+                   'source_call': '4N', 'trump': 'H', 'own_keycards': 1,
+                   'owns_trump_queen': True, 'grand_candidate': True,
+                   'status': 'active', 'rkcb_stage': 'choose_continuation',
+                   'answer_category': '0/2/4/void'}
+        auction = Auction.parse('1NP4CP4HP4NP5NP6CP6DP')
+        with patch('engine.purpose_axiom.compare_grand_routes',
+                   return_value=GrandDecision('7H', 'test')):
+            decision = self.choose(
+                '1NP4CP4HP4NP5NP6CP6DP', 'S32HKQ97654D432C2', purpose)
+        self.assertEqual(decision.call, '7H')
+        self.assertEqual(decision.private_memory.purposes[0].status,
+                         'completed')
+
 
 if __name__ == '__main__':
     unittest.main()

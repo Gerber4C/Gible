@@ -20,6 +20,9 @@ from .legality import illegal_calls_in_auction
 from .memory import SeatMemory
 from .purpose_axiom import complete_purpose, remember_selected_purpose, resolve_purpose, terminal_pass_candidate
 from .replay import active_environment_for, replay_auction
+from .rkcb_continuation import (
+    lowest_counterinvite_king, ordinary_rkcb_frame, partner_of_last_bidder,
+)
 from .slam_conventions import keycard_ask_restricted
 from .slam_intent import detect_slam_intent
 from .cue_slam_policy import (cue_gate, cue_three_way, decide_from_hands,
@@ -102,6 +105,21 @@ def choose_bid(
         candidates = (terminal,)
     else:
         candidates = generated
+    frame = ordinary_rkcb_frame(trace)
+    if (frame is not None
+            and frame.continuation_stage == 'grand_invitation'
+            and partner_of_last_bidder(auction) == auction.actor_to_call):
+        counter = lowest_counterinvite_king(hand, frame, auction)
+        selected = next((candidate for candidate in candidates
+                         if candidate.call == counter), None) if counter else None
+        if selected is None:
+            selected = next((candidate for candidate in candidates
+                             if candidate.call == f'6{frame.trump}'), None)
+        if selected is None:
+            selected = next((candidate for candidate in candidates
+                             if candidate.call == 'P'), None)
+        if selected is not None:
+            candidates = (selected,)
     diagnostics_before_resolution = len(trace.diagnostics)
     candidates = _resolve_same_call_meanings(candidates, trace)
     if any('Ambiguous meaning for call' in message
