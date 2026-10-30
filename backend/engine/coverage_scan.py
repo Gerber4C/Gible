@@ -233,8 +233,14 @@ def _history(simulation) -> list[dict]:
     history = []
     for record in simulation.call_records:
         selected = ((record.explanation or {}).get('internal_origin') or {}).get('selected') or {}
-        history.append({'seat': record.seat, 'call': record.call,
-                        'source_id': selected.get('source_id')})
+        meaning = ((record.explanation or {}).get('public_meaning') or {}).get('meaning') or {}
+        history.append({
+            'seat': record.seat, 'call': record.call,
+            'source_id': selected.get('source_id'),
+            'action_type': meaning.get('action_type'),
+            'call_act_types': list(meaning.get('call_act_types') or ()),
+            'target_suit': meaning.get('target_suit'),
+        })
     return history
 
 

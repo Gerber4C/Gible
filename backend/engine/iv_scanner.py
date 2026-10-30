@@ -136,6 +136,7 @@ def _pair_projection(case: dict, status: str, pair_slot: int | None,
         'north_kr': case.get('north_kr'), 'south_kr': case.get('south_kr'),
         'north_shape': case.get('north_shape'), 'south_shape': case.get('south_shape'),
         'auction': case.get('auction'), 'calls': case.get('calls'),
+        'history': case.get('history') or [],
         'coverage_cell': case.get('coverage_cell'),
     }
     if status == 'blocked':
@@ -298,6 +299,7 @@ def project_by_process(report: dict, *, analyses=None,
         result.append({
             'process': list(process),
             'auction': members[0].get('auction'),
+            'history': members[0].get('history') or [],
             'cases': len(members),
             'contracts': contracts,
             'north_groups': [_finish(group, 'north_hands',

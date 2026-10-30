@@ -171,9 +171,13 @@ function handCard(seat, caseData) {
 }
 
 function auctionRows(pair) {
-  const tiles = (pair.calls || []).map((call) => ({ call }));
+  const tiles = (pair.calls || []).map((call, index) => ({
+    call,
+    title: callMeaningText((pair.history || [])[index]),
+  }));
   if (pair.status === "blocked") {
-    tiles.push({ td: true, seat: pair.blocked?.seat });
+    tiles.push({ td: true, seat: pair.blocked?.seat,
+                 diagnostics: pair.blocked?.diagnostics || [] });
   }
   const rows = [];
   for (let index = 0; index < tiles.length; index += 4) rows.push(tiles.slice(index, index + 4));
@@ -183,12 +187,17 @@ function auctionRows(pair) {
 function auctionTile(tile, index) {
   if (tile.td) {
     const seat = tile.seat?.toUpperCase() || "?";
+    const title = [`TD · ${seat} to call`,
+                   ...(tile.diagnostics || [])].join(" | ");
     return e("span", {
       key: index, className: "iv-call-td",
-      "aria-label": `TD at ${seat}`, title: `TD · ${seat} to call`,
+      "aria-label": `TD at ${seat}`, title,
     }, "TD");
   }
-  return e("span", { key: index, className: `iv-call ${callClass(tile.call)}` }, tile.call);
+  return e("span", {
+    key: index, className: `iv-call ${callClass(tile.call)}`,
+    title: tile.title || undefined,
+  }, tile.call);
 }
 
 function warningDetail(flag, pair, thresholds) {
@@ -334,9 +343,6 @@ function processFlagTags(process, thresholds) {
     }, CATEGORY[key]?.title || key)),
     categories.length === 0 && e("b", { className: "iv-tag iv-tag-clean" },
       "CLEAN"),
-    flags.includes("wrong_game") && e("b", {
-      className: "iv-tag iv-tag-wrong", title: "chosen / best-other ratio",
-    }, "RATIO"),
   );
 }
 
@@ -437,12 +443,28 @@ function processCard(process, selected, thresholds, onSelect) {
 
 const PROCESS_SEATS = ["N", "E", "S", "W"];
 
-function processAuction(process, td) {
+function callMeaningText(entry) {
+  if (!entry) return "";
+  const bits = [];
+  if (entry.action_type) bits.push(entry.action_type);
+  if (entry.source_id) bits.push(entry.source_id);
+  if (entry.target_suit && entry.target_suit !== "N") bits.push("target " + entry.target_suit);
+  return bits.join(" · ");
+}
+
+function processAuction(process, td, history = []) {
   const calls = process.process || [];
   const tiles = calls.map((call, index) => ({
     call, seat: PROCESS_SEATS[index % 4],
+    title: callMeaningText(history[index]),
   }));
-  if (td?.seat) tiles.push({ td: true, seat: td.seat.toUpperCase() });
+  if (td?.seat) {
+    tiles.push({
+      td: true, seat: td.seat.toUpperCase(),
+      title: [`TD · ${td.seat.toUpperCase()} to call`,
+              ...(td.diagnostics || [])].join(" | "),
+    });
+  }
   const rows = [];
   for (let index = 0; index < tiles.length; index += 4) {
     rows.push(tiles.slice(index, index + 4));
@@ -495,7 +517,7 @@ function primaryMetricCards(primary, thresholds) {
 }
 
 function ProcessView({ processes, thresholds, selectedKey, onSelect, search, onSearch }) {
-  const [primarySide, setPrimarySide] = React.useState("north");
+  const [primarySide, setPrimarySide] = React.useState("south");
   const [primaryIndex, setPrimaryIndex] = React.useState(0);
   const [partnerIndex, setPartnerIndex] = React.useState(0);
   React.useEffect(() => {
@@ -533,7 +555,7 @@ function ProcessView({ processes, thresholds, selectedKey, onSelect, search, onS
   const partnerLabel = primarySide === "north" ? "South" : "North";
   const primaryLabel = primarySide === "north" ? "North" : "South";
   const blocked = partners.find((item) => item.status === "blocked");
-  const rows = processAuction(selected, blocked?.td);
+  const rows = processAuction(selected, blocked?.td, selected.history || []);
   return e("div", { className: "iv-inspection iv-process-inspection" },
     e("div", { className: "iv-list" },
       e("div", { className: "iv-list-tools" },
@@ -565,6 +587,7 @@ function ProcessView({ processes, thresholds, selectedKey, onSelect, search, onS
           }, row.map((tile, index) => e("div", {
             key: index,
             className: `iv-process-call ${tile.td ? "td" : callClass(tile.call)}`,
+            title: tile.title || undefined,
           }, e("span", null, tile.seat),
           e("strong", null, tile.td ? "TD" : tile.call)))))),
       e("div", { className: "iv-process-workbench" },
