@@ -355,7 +355,7 @@ class IVScannerTests(unittest.TestCase):
 
         def fake_scan(profile, *, seed, hcp_targets, shapes, pairs_per_cell,
                       ew_samples, north_cap, south_cap, progress, snapshot,
-                      snapshot_every, stop=None):
+                      snapshot_every, stop=None, adaptive=False):
             report = {
                 'schema_version': 2,
                 'profile': {'id': 'daqiush_2over1', 'name': 'x', 'version': '1'},
@@ -407,7 +407,7 @@ class IVScannerTests(unittest.TestCase):
 
         def fake_scan(profile, *, seed, hcp_targets, shapes, pairs_per_cell,
                       ew_samples, north_cap, south_cap, progress, snapshot,
-                      snapshot_every, stop=None):
+                      snapshot_every, stop=None, adaptive=False):
             report = {
                 'schema_version': 2,
                 'profile': {'id': 'daqiush_2over1', 'name': 'x', 'version': '1'},

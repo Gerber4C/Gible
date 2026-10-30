@@ -378,6 +378,7 @@ def scan_coverage(
     snapshot: Callable[[dict], None] | None = None,
     snapshot_every: int = 25,
     stop: Callable[[], bool] | None = None,
+    adaptive: bool = False,
 ) -> dict:
     """Cover the complete Daqiush 1NT opener space and South quota cells."""
     if pairs_per_cell < 1 or ew_samples < 1 or min_class_boards < 1 or min_class_pairs < 1:
@@ -390,10 +391,13 @@ def scan_coverage(
     assignments = dict(allocation['assignments']) if explicit else {}
     rng.shuffle(south_records)
     schedule = []
+    per_cell_limit = (min(80, max(pairs_per_cell, 3 * north_cap,
+                                  3 * south_cap)) if adaptive
+                      else pairs_per_cell)
     for cell in south_records:
         identity = (cell['target_hcp'], cell['base_shape_index'])
         stratum = assignments.get(identity) if explicit else None
-        for slot in range(pairs_per_cell):
+        for slot in range(per_cell_limit):
             schedule.append((cell, stratum, slot))
 
     empty_auction = Auction.parse('', dealer='n', vulnerability='none')
@@ -452,9 +456,16 @@ def scan_coverage(
         'cell_failures': cell_failures, 'assignments': assignments,
     }
 
+    process_norths = {}
+    process_souths = {}
+    cell_processes = {}
+    done_cells = set()
     for trial, (cell, stratum, slot) in enumerate(schedule, 1):
         if stop is not None and stop():
             break
+        cell_identity = (cell['target_hcp'], cell['base_shape_index'])
+        if adaptive and cell_identity in done_cells:
+            continue
         hcp = cell['target_hcp']
         shape_index = cell['base_shape_index']
         base_shape = tuple(cell['base_shape'])
@@ -590,6 +601,18 @@ def scan_coverage(
         elif simulation.status == 'limit':
             case['status'] = 'limit'
             limit_cases.append(case)
+        if adaptive:
+            hands = case.get('hands') or {}
+            if hands.get('n') and hands.get('s'):
+                process = case_process_key(case)
+                process_norths.setdefault(process, set()).add(hands['n'])
+                process_souths.setdefault(process, set()).add(hands['s'])
+                cell_processes.setdefault(cell_identity, set()).add(process)
+                if (slot + 1 >= 2
+                        and all(len(process_norths[p]) >= north_cap
+                                and len(process_souths[p]) >= south_cap
+                                for p in cell_processes[cell_identity])):
+                    done_cells.add(cell_identity)
         if progress is not None:
             progress(summary.copy(), len(schedule))
         if snapshot is not None and trial % snapshot_every == 0:

@@ -879,7 +879,7 @@ class ScannerJobs:
                 progress=progress,
                 snapshot=snapshot,
                 snapshot_every=options.get('snapshot_every', 20),
-                stop=stop_event.is_set)
+                stop=stop_event.is_set, adaptive=True)
             if options.get('north_cap', NORTH_CAP) > 1 or options.get(
                     'south_cap', SOUTH_CAP) > 1:
                 for _round in range(2):
@@ -902,6 +902,10 @@ class ScannerJobs:
                     status='stopped' if stopped else 'completed',
                     report_id=json_path.name,
                     completed_pairs=report['summary']['pairs'],
+                    planned_pairs=(report['summary']['pairs']
+                                   if options.get('adaptive', True)
+                                   else self._current.get('planned_pairs',
+                                                          report['summary']['pairs'])),
                     dds_boards=report['summary']['dds_boards'])
         except Exception as exc:
             with self._lock:
