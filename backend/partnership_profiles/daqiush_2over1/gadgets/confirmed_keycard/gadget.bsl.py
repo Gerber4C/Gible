@@ -381,6 +381,7 @@ class ConfirmedKeycard(Gadget):
                 finish.meaning.acts = acts
                 finish.meaning.target_suit = trump if bid != 'P' else 'N'
                 finish.meaning.agreed_suit = trump
+                finish.meaning.purpose_completed = (bid == '6' + trump)
                 finish.description = ('Place the contract after the forced relay.'
                                       if bid != 'P' else
                                       'Pass the forced five notrump relay.')
@@ -501,6 +502,7 @@ class ConfirmedKeycard(Gadget):
             final.meaning.acts = ['signoff', 'final_placement']
             final.meaning.target_suit = trump
             final.meaning.agreed_suit = trump
+            final.meaning.purpose_completed = True
             final.description = 'A seven-level call is final, not an invitation.'
             record = final.effect('keycard_context')
             record.method = 'rkcb_1430'
@@ -560,6 +562,7 @@ class ConfirmedKeycard(Gadget):
                 reply.meaning.acts = acts
                 reply.meaning.target_suit = trump
                 reply.meaning.agreed_suit = trump
+                reply.meaning.purpose_completed = True
                 reply.description = ('Reject with six or accept with seven of trumps.')
                 record = reply.effect('keycard_context')
                 record.method = 'rkcb_1430'
@@ -582,6 +585,7 @@ class ConfirmedKeycard(Gadget):
                 finish_counter.meaning.acts = ['final_placement']
                 finish_counter.meaning.target_suit = trump
                 finish_counter.meaning.agreed_suit = trump
+                finish_counter.meaning.purpose_completed = True
                 finish_counter.description = ('Choose six or seven of trumps '
                                               'after the single counter-invitation.')
                 record = finish_counter.effect('keycard_context')

@@ -80,6 +80,70 @@ class OwnerRouteTests(unittest.TestCase):
         self.assertIn('4C', result.calls)
         self.assertEqual(result.calls[-1], 'P')
 
+    def test_minor_serious_3nt_forced_cue_ladder_clubs(self):
+        serious = 'SQJHQJDAKQCAQJxxx'
+        self.assertEqual(self.bid('1NP2SP3CP', serious), '3N')
+
+        # Partner's first cue is forced and carries no extra-strength promise.
+        decision = choose_bid(self.profile,
+                              Auction.parse('1NP2SP3CP3NTP'),
+                              Hand.parse('SAK5HKQ4DAKQ76C32'))
+        self.assertEqual(decision.call, '4D')
+        self.assertEqual(
+            decision.selected_candidate.public_meaning['action_type'],
+            'serious_forced_control_cue')
+        self.assertTrue(
+            decision.selected_candidate.public_meaning['forced_control_cue'])
+
+        # No side control: return to the minor game, not four clubs.
+        self.assertEqual(
+            self.bid('1NP2SP3CP3NTP', 'SQJHQJ3DQJ4CAKQJ5'), '5C')
+        # Cues may cross four of the agreed minor; game remains five.
+        self.assertEqual(
+            self.bid('1NP2SP3CP3NTP', 'SAKQHQJ4D765CQJ32'), '4S')
+
+        # After the forced cue, an eligible serious hand asks keycards.
+        self.assertEqual(
+            self.bid('1NP2SP3CP3NTP4DP', serious), '4N')
+        # Three keycards without grand-slam intent must cue/game, not ask.
+        self.assertEqual(
+            self.bid('1NP2SP3CP3NTP4DP', 'SQJHQJDAKQCAKQJxx'), '5C')
+
+        # Ordinary 1430 answers continue to work after the ladder.
+        self.assertEqual(
+            self.bid('1NP2SP3CP3NTP4DP4NP',
+                     'SAK5HKQ4DAKQ76C32'), '5H')
+        self.assertEqual(
+            self.bid('1NP2SP3CP3NTP4DP4NP',
+                     'SAK5HKQ4DAKQ76CQ3'), '5S')
+        self.assertEqual(
+            self.bid('1NP2SP3CP3NTP4DP5CP',
+                     'SAK5HKQ4DAKQ76C32'), 'P')
+        # Six of the agreed minor is a final small slam; partner passes.
+        self.assertEqual(
+            self.bid('1NP2SP3CP3NTP4DP4NP5HP5SP5NP6CP',
+                     'SAK5HKQ4DAKQ76C32'), 'P')
+
+        # A skipped side suit plus no control in the serious hand confirms a
+        # missing control, so the ladder stops in game instead of asking.
+        self.assertEqual(
+            self.bid('1NP2SP3CP3NTP', 'SAKQHKQD7654CAJT9'), '4H')
+        self.assertEqual(
+            self.bid('1NP2SP3CP3NTP4HP', 'SQJHQJDQJ2CAKQJxx'), '5C')
+
+    def test_minor_serious_3nt_forced_cue_ladder_diamonds(self):
+        serious = 'SQJHQJDAKQJxxCQJx'
+        self.assertEqual(self.bid('1NP2NTP3DP', serious), '3N')
+        self.assertEqual(
+            self.bid('1NP2NTP3DP3NTP', 'SAK5HKQ4DQ765CA32'), '4C')
+        self.assertEqual(
+            self.bid('1NP2NTP3DP3NTP', 'SQJHQJ3CQJ4DAKQJT'), '5D')
+        self.assertEqual(
+            self.bid('1NP2NTP3DP3NTP4CP', serious), '4N')
+        self.assertEqual(
+            self.bid('1NP2NTP3DP3NTP4CP5DP',
+                     'SAK5HKQ4DQ765CA32'), 'P')
+
     def test_voidwood_two_keycard_answer_offers_king_ask_and_placement(self):
         south = 'S-HKQJT864DK85CAK8'
         north = 'SA754HA752DACQJ43'

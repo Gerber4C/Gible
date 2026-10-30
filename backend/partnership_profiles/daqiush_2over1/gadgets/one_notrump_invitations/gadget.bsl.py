@@ -1475,6 +1475,141 @@ class OneNotrumpInvitations(Gadget):
                     serious.meaning.target_suit = 'N'
                     serious.description = 'The low-level serious 3NT: slam interest without a cue.'
 
+                    # Control ladder after serious 3NT.  Partner's first
+                    # cue is forced and says nothing about extra strength.
+                    # Either partner then continues with the cheapest
+                    # unshown control until the partnership has nothing
+                    # further to show, a skipped suit is confirmed missing,
+                    # or someone asks keycards / places the minor game.
+                    serious_prefix = prefix + '3NTP'
+                    game_minor = '5' + suit
+                    cue_suits = [side for side in 'CDHS' if side != suit]
+                    cue_sequences = [()]
+                    for first_index in range(len(cue_suits)):
+                        first = cue_suits[first_index]
+                        cue_sequences.append((first,))
+                        for second_index in range(first_index + 1, len(cue_suits)):
+                            second = cue_suits[second_index]
+                            cue_sequences.append((first, second))
+                            for third_index in range(second_index + 1,
+                                                      len(cue_suits)):
+                                cue_sequences.append((first, second,
+                                                      cue_suits[third_index]))
+
+                    for sequence in cue_sequences:
+                        sequence_label = ''.join(side.lower() for side in sequence)
+                        if not sequence_label:
+                            sequence_label = 'start'
+                        node_prefix = serious_prefix
+                        for shown in sequence:
+                            node_prefix = node_prefix + '4' + shown + 'P'
+
+                        if sequence:
+                            partner_last = sequence[-1]
+                            last_index = cue_suits.index(partner_last)
+                            # Only suits above the previous cue were
+                            # available to the partner who just bid.  A lower
+                            # unshown suit was simply out of bidding space,
+                            # so it is not yet known to be missing.
+                            if len(sequence) > 1:
+                                previous_index = cue_suits.index(sequence[-2])
+                            else:
+                                previous_index = -1
+                            skipped = tuple(side for side in
+                                            cue_suits[previous_index + 1:last_index]
+                                            if side not in sequence)
+                        else:
+                            skipped = ()
+
+                        if sequence:
+                            remaining = []
+                            last_index = cue_suits.index(sequence[-1])
+                            for side_index in range(last_index + 1,
+                                                    len(cue_suits)):
+                                side = cue_suits[side_index]
+                                if side not in sequence:
+                                    remaining.append(side)
+                        else:
+                            remaining = [side for side in cue_suits
+                                         if side not in sequence]
+
+                        for target in remaining:
+                            target_index = cue_suits.index(target)
+                            lower = tuple(side for side in remaining
+                                          if cue_suits.index(side) < target_index)
+                            cue = self.call('transfer_' + suit.lower()
+                                            + '_serious_' + sequence_label
+                                            + '_cue_' + target.lower())
+                            cue.when = node_prefix
+                            cue.bid = '4' + target
+                            cue.applies = (
+                                lambda ctx, c=target, low=lower, skp=skipped:
+                                (ctx.hand is not None
+                                 and not any(not minor_control(ctx, x)
+                                             for x in skp)
+                                 and minor_control(ctx, c)
+                                 and not any(minor_control(ctx, x)
+                                             for x in low)))
+                            cue.meaning.action = ('serious_forced_control_cue'
+                                                  if not sequence
+                                                  else 'serious_control_cue')
+                            cue.meaning.nature = ['artificial']
+                            cue.meaning.acts = ['control_showing', 'slam_try']
+                            cue.meaning.control_suit = target
+                            cue.meaning.agreed_suit = suit
+                            cue.meaning.target_suit = suit
+                            if not sequence:
+                                cue.meaning.forced_control_cue = True
+                            cue.effect('agreed_suit').suit = suit
+                            cue.description = (
+                                'Control cue after serious 3NT' if sequence else
+                                'Forced control cue after serious 3NT; it does '
+                                'not promise extra strength.')
+
+                        if sequence:
+                            ask = self.call('transfer_' + suit.lower()
+                                            + '_serious_' + sequence_label
+                                            + '_keycard')
+                            ask.when = node_prefix
+                            ask.bid = '4NT'
+                            ask.applies = (
+                                lambda ctx, skp=skipped:
+                                (ctx.hand is not None
+                                 and not any(not minor_control(ctx, x)
+                                             for x in skp)))
+                            ask.meaning.action = 'rkcb_1430'
+                            ask.meaning.nature = ['artificial']
+                            ask.meaning.acts = ['inquiry', 'keycard_asking']
+                            ask.meaning.target_suit = suit
+                            ask.meaning.agreed_suit = suit
+                            ask.effect('agreed_suit').suit = suit
+                            context = ask.effect('keycard_context')
+                            context.trump_suit = suit
+                            context.ask_call = '4N'
+                            context.method = 'rkcb_1430'
+                            context.status = 'pending'
+                            ask.description = ('After the cue ladder, 4NT '
+                                               'asks keycards for the agreed '
+                                               'minor.')
+
+                        game = self.call('transfer_' + suit.lower()
+                                         + '_serious_' + sequence_label
+                                         + '_game')
+                        game.when = node_prefix
+                        game.bid = game_minor
+                        game.applies = lambda ctx: ctx.hand is not None
+                        game.meaning.action = ('serious_game_signoff'
+                                               if not sequence
+                                               else 'serious_cue_game')
+                        game.meaning.nature = ['natural']
+                        game.meaning.acts = ['signoff', 'final_placement']
+                        game.meaning.target_suit = suit
+                        game.meaning.agreed_suit = suit
+                        game.meaning.purpose_completed = True
+                        game.description = ('Sign off in five of the minor.'
+                                            if not sequence else
+                                            'Return to the minor game.')
+
                     slam_cues = [('3H', 'H'), ('3S', 'S')]
                 else:
                     # The other minor (3D for clubs, 4C for diamonds) is a
