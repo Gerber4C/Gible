@@ -60,6 +60,29 @@ class DaqiushOneNotrumpExpansionTests(unittest.TestCase):
         self.assertEqual(self.bid('1NP3DP', 'SAQ5HK96DQ73CKJ82'), '3N')
         self.assertEqual(self.bid('1NP3DP3NP', responder), 'P')
 
+    def test_minor_two_suit_slam_continuations_after_stopper_replies(self):
+        five_five_no_extra = 'ST2H9DAK543CQJ876'
+        five_five_extra = 'S32H9DAKQ54CKQ876'
+        six_diamonds = 'S2H2DAKQJ98CQJ765'
+        six_clubs = 'S2H2DAKQJ9CQJ8765'
+
+        self.assertEqual(
+            self.bid('1NP3DP3NP', five_five_no_extra), 'P')
+        for prefix in ('1NP3DP3NP', '1NP3DP3HP', '1NP3DP3SP'):
+            with self.subTest(prefix=prefix):
+                self.assertEqual(self.bid(prefix, five_five_extra), '4H')
+                self.assertEqual(self.bid(prefix, six_diamonds), '4D')
+                self.assertEqual(self.bid(prefix, six_clubs), '4C')
+
+        self.assertEqual(
+            self.bid('1NP3DP3HP', five_five_no_extra), '4N')
+        self.assertEqual(
+            self.bid('1NP3DP3NP4NTP', 'SAK2HK3DAQJ3CKQ82'), '5C')
+        self.assertEqual(
+            self.bid('1NP3DP3HP4NTP', 'SAK2HK43DAKQJ3C82'), '5D')
+        self.assertEqual(
+            self.bid('1NP3DP3SP4NTP', 'SAK2HK3DAQJ3CKQ82'), '5C')
+
     def test_minor_two_suiter_uses_partner_stopper_after_three_hearts(self):
         responder = 'SQTH9DAK543CQJ876'
         self.assertEqual(self.bid('1NP', responder), '3D')
@@ -118,7 +141,7 @@ class DaqiushOneNotrumpExpansionTests(unittest.TestCase):
         responder = 'SA3HK2DAKJ76CQJ84'
         self.assertEqual(self.bid('1NP', responder), '2C')
         self.assertEqual(self.bid('1NP2CP2DP', responder), '3D')
-        self.assertEqual(self.bid('1NP2CP2DP3DP', 'SAJ6HK83DQ92CAK72'), '3H')
+        self.assertEqual(self.bid('1NP2CP2DP3DP', 'SAJ6HK83DQ92CAK72'), '3S')
         self.assertEqual(self.bid('1NP2CP2DP3DP', 'SAJ6HK83D92CAKQ72'), '3N')
 
     def test_jacoby_then_second_minor_is_natural_game_force(self):
@@ -126,7 +149,7 @@ class DaqiushOneNotrumpExpansionTests(unittest.TestCase):
         self.assertEqual(self.bid('1NP', responder), '2D')
         self.assertEqual(self.bid('1NP2DP2HP', responder), '3C')
         self.assertEqual(self.bid('1NP2DP2HP3CP', 'SAK5HK8DA72CA9765'), '3D')
-        self.assertEqual(self.bid('1NP2DP2HP3CP', 'SAK5HK8DQ72CA9765'), '3H')
+        self.assertEqual(self.bid('1NP2DP2HP3CP', 'SAK5HK8DQ72CA9765'), '3S')
         self.assertEqual(self.bid('1NP2DP2HP3CP', 'SAK54HK832DQ72CA9'), '3H')
         self.assertEqual(self.bid('1NP2DP2HP3CP', 'SAK54HK8DQ762CA97'), '3N')
 

@@ -279,6 +279,23 @@ def second_minor_slam_interest(ctx, trump):
             and ctx.hand_quality['kr_points'] >= SECOND_MINOR_SLAM_KR)
 
 
+def major_cue_space(trump):
+    if trump == 'H':
+        return (('3NT', 'S'), ('4C', 'C'), ('4D', 'D'))
+    return (('4C', 'C'), ('4D', 'D'), ('4H', 'H'))
+
+
+def major_serious_interest(ctx, trump):
+    return second_minor_slam_interest(ctx, trump)
+
+
+def lowest_major_cue(ctx, trump):
+    for bid, suit in major_cue_space(trump):
+        if second_round_control(ctx, suit):
+            return bid
+    return None
+
+
 def two_suiter_five_plus(ctx, trump, minor):
     """A five-plus minor with the transferred major: 5-5, 5-6, or 6-5."""
     return (ctx.hand is not None and ctx.hand.length(trump) >= 5
@@ -634,13 +651,224 @@ class JacobyMajorTransfers(Gadget):
                 support_game.when = minor_prefix + '3' + trump + 'P'
                 support_game.bid = '4' + trump
                 support_game.applies = (lambda ctx, t=trump:
-                                        ctx.hand is not None and ctx.hand.length(t) >= 5)
+                                        ctx.hand is not None
+                                        and ctx.hand.length(t) >= 5
+                                        and not major_serious_interest(ctx, t)
+                                        and lowest_major_cue(ctx, t) is None)
                 support_game.meaning.action = 'major_game_after_second_minor_support'
                 support_game.meaning.nature = ['natural']
                 support_game.meaning.acts = ['signoff', 'final_placement']
                 support_game.meaning.target_suit = trump
                 support_game.meaning.purpose_completed = True
                 support_game.description = 'Place the known five-card major at game.'
+
+                support_prefix = minor_prefix + '3' + trump + 'P'
+                serious_bid = '3S' if trump == 'H' else '3NT'
+                serious = self.call('jacoby_' + trump.lower() + '_' + minor.lower()
+                                    + '_serious_relay')
+                serious.when = support_prefix
+                serious.bid = serious_bid
+                serious.applies = (lambda ctx, t=trump:
+                                   major_serious_interest(ctx, t))
+                serious.meaning.action = 'major_serious_relay'
+                serious.meaning.nature = ['artificial']
+                serious.meaning.acts = ['slam_try', 'game_forcing']
+                serious.meaning.forcing = 'game_forcing'
+                serious.meaning.agreed_suit = trump
+                serious.meaning.target_suit = trump
+                serious.effect('agreed_suit').suit = trump
+                serious.description = (
+                    'Serious relay: partner must cue below game unless no '
+                    'control is available.')
+
+                cues = major_cue_space(trump)
+                for cue_index in range(len(cues)):
+                    cue_bid, cue_suit = cues[cue_index]
+                    earlier = cues[:cue_index]
+                    cue = self.call('jacoby_' + trump.lower() + '_' + minor.lower()
+                                    + '_limited_cue_' + cue_bid.lower())
+                    cue.when = support_prefix
+                    cue.bid = cue_bid
+                    cue.applies = (
+                        lambda ctx, t=trump, s=cue_suit, prior=earlier:
+                        (ctx.hand is not None
+                         and not major_serious_interest(ctx, t)
+                         and second_round_control(ctx, s)
+                         and not any(second_round_control(ctx, x[1])
+                                     for x in prior)))
+                    cue.meaning.action = 'major_limited_control_cue'
+                    cue.meaning.nature = ['artificial']
+                    cue.meaning.acts = ['control_showing', 'slam_try']
+                    cue.meaning.control_suit = cue_suit
+                    cue.meaning.agreed_suit = trump
+                    cue.meaning.target_suit = trump
+                    cue.effect('agreed_suit').suit = trump
+                    cue.description = (
+                        'Limited cue: asks partner to cooperate only with a '
+                        'maximum.')
+
+                    limited_game = self.call('jacoby_' + trump.lower() + '_'
+                                             + minor.lower() + '_limited_cue_game_'
+                                             + cue_bid.lower())
+                    limited_game.when = support_prefix + cue_bid + 'P'
+                    limited_game.bid = '4' + trump
+                    limited_game.applies = lambda ctx: ctx.hand is not None
+                    limited_game.meaning.action = 'major_game_after_limited_cue'
+                    limited_game.meaning.nature = ['natural']
+                    limited_game.meaning.acts = ['signoff', 'final_placement']
+                    limited_game.meaning.target_suit = trump
+                    limited_game.meaning.agreed_suit = trump
+                    limited_game.meaning.purpose_completed = True
+                    limited_game.effect('agreed_suit').suit = trump
+                    limited_game.description = (
+                        'After the limited cue, four of the major is the '
+                        'forcing signoff.')
+
+                limited_game = self.call('jacoby_' + trump.lower() + '_'
+                                         + minor.lower() + '_limited_no_cue_game')
+                limited_game.when = support_prefix
+                limited_game.bid = '4' + trump
+                limited_game.applies = (
+                    lambda ctx, t=trump: (ctx.hand is not None
+                                          and not major_serious_interest(ctx, t)
+                                          and lowest_major_cue(ctx, t) is None))
+                limited_game.meaning.action = 'major_game_no_limited_cue'
+                limited_game.meaning.nature = ['natural']
+                limited_game.meaning.acts = ['signoff', 'final_placement']
+                limited_game.meaning.target_suit = trump
+                limited_game.meaning.agreed_suit = trump
+                limited_game.meaning.purpose_completed = True
+                limited_game.effect('agreed_suit').suit = trump
+                limited_game.description = 'No cue is available: play the major game.'
+
+                for cue_index in range(len(cues)):
+                    cue_bid, cue_suit = cues[cue_index]
+                    earlier = cues[:cue_index]
+                    forced = self.call('jacoby_' + trump.lower() + '_'
+                                       + minor.lower() + '_serious_forced_'
+                                       + cue_bid.lower())
+                    forced.when = support_prefix + serious_bid + 'P'
+                    forced.bid = cue_bid
+                    forced.applies = (
+                        lambda ctx, s=cue_suit, prior=earlier:
+                        (ctx.hand is not None
+                         and second_round_control(ctx, s)
+                         and not any(second_round_control(ctx, x[1])
+                                     for x in prior)))
+                    forced.meaning.action = 'major_serious_forced_control'
+                    forced.meaning.nature = ['artificial']
+                    forced.meaning.acts = ['control_showing', 'slam_try']
+                    forced.meaning.control_suit = cue_suit
+                    forced.meaning.agreed_suit = trump
+                    forced.meaning.target_suit = trump
+                    forced.meaning.forced_control_cue = True
+                    forced.effect('agreed_suit').suit = trump
+                    forced.description = (
+                        'Forced control cue after the serious relay.')
+
+                    forced_prefix = (support_prefix + serious_bid + 'P'
+                                     + cue_bid + 'P')
+                    skipped = tuple(x[1] for x in earlier)
+                    for next_index in range(cue_index + 1, len(cues)):
+                        next_bid, next_suit = cues[next_index]
+                        later = cues[cue_index + 1:next_index]
+                        follow = self.call('jacoby_' + trump.lower() + '_'
+                                           + minor.lower() + '_serious_'
+                                           + cue_bid.lower() + '_next_'
+                                           + next_bid.lower())
+                        follow.when = forced_prefix
+                        follow.bid = next_bid
+                        follow.applies = (
+                            lambda ctx, s=next_suit, skp=skipped,
+                            prior=later:
+                            (ctx.hand is not None
+                             and not any(not second_round_control(ctx, x)
+                                         for x in skp)
+                             and second_round_control(ctx, s)
+                             and not any(second_round_control(ctx, x[1])
+                                         for x in prior)))
+                        follow.meaning.action = 'major_serious_continue_cue'
+                        follow.meaning.nature = ['artificial']
+                        follow.meaning.acts = ['control_showing', 'slam_try']
+                        follow.meaning.control_suit = next_suit
+                        follow.meaning.agreed_suit = trump
+                        follow.meaning.target_suit = trump
+                        follow.effect('agreed_suit').suit = trump
+                        follow.description = (
+                            'Serious bidder continues the control ladder; '
+                            'this cue is not forcing.')
+
+                        finish = self.call('jacoby_' + trump.lower() + '_'
+                                            + minor.lower() + '_serious_'
+                                            + cue_bid.lower() + '_after_'
+                                            + next_bid.lower() + '_game')
+                        finish.when = forced_prefix + next_bid + 'P'
+                        finish.bid = '4' + trump
+                        finish.applies = lambda ctx: ctx.hand is not None
+                        finish.meaning.action = 'major_game_after_serious_cue'
+                        finish.meaning.nature = ['natural']
+                        finish.meaning.acts = ['signoff', 'final_placement']
+                        finish.meaning.target_suit = trump
+                        finish.meaning.agreed_suit = trump
+                        finish.meaning.purpose_completed = True
+                        finish.effect('agreed_suit').suit = trump
+                        finish.description = 'Sign off in the major game.'
+
+                    keycard = self.call('jacoby_' + trump.lower() + '_'
+                                        + minor.lower() + '_serious_'
+                                        + cue_bid.lower() + '_keycard')
+                    keycard.when = forced_prefix
+                    keycard.bid = '4NT'
+                    keycard.applies = (
+                        lambda ctx, t=trump, skp=skipped:
+                        (ctx.hand is not None
+                         and not any(not second_round_control(ctx, x)
+                                     for x in skp)
+                         and major_serious_interest(ctx, t)))
+                    keycard.meaning.action = 'rkcb_1430'
+                    keycard.meaning.nature = ['artificial']
+                    keycard.meaning.acts = ['inquiry', 'keycard_asking']
+                    keycard.meaning.target_suit = trump
+                    keycard.meaning.agreed_suit = trump
+                    keycard.effect('agreed_suit').suit = trump
+                    context = keycard.effect('keycard_context')
+                    context.trump_suit = trump
+                    context.ask_call = '4N'
+                    context.method = 'rkcb_1430'
+                    context.status = 'pending'
+                    keycard.description = (
+                        'Controls and strength complete: ask keycards.')
+
+                    game = self.call('jacoby_' + trump.lower() + '_'
+                                     + minor.lower() + '_serious_'
+                                     + cue_bid.lower() + '_game')
+                    game.when = forced_prefix
+                    game.bid = '4' + trump
+                    game.applies = lambda ctx: ctx.hand is not None
+                    game.meaning.action = 'major_game_after_serious_cue'
+                    game.meaning.nature = ['natural']
+                    game.meaning.acts = ['signoff', 'final_placement']
+                    game.meaning.target_suit = trump
+                    game.meaning.agreed_suit = trump
+                    game.meaning.purpose_completed = True
+                    game.effect('agreed_suit').suit = trump
+                    game.description = 'Return to the major game.'
+
+                no_forced = self.call('jacoby_' + trump.lower() + '_'
+                                      + minor.lower() + '_serious_no_cue_game')
+                no_forced.when = support_prefix + serious_bid + 'P'
+                no_forced.bid = '4' + trump
+                no_forced.applies = (
+                    lambda ctx, t=trump: (ctx.hand is not None
+                                          and lowest_major_cue(ctx, t) is None))
+                no_forced.meaning.action = 'major_game_after_serious_no_cue'
+                no_forced.meaning.nature = ['natural']
+                no_forced.meaning.acts = ['signoff', 'final_placement']
+                no_forced.meaning.target_suit = trump
+                no_forced.meaning.agreed_suit = trump
+                no_forced.meaning.purpose_completed = True
+                no_forced.effect('agreed_suit').suit = trump
+                no_forced.description = 'No control: play the major game.'
 
                 shaped_game = self.call('jacoby_' + trump.lower() + '_' + minor.lower()
                                         + '_shapely_game_after_3nt')

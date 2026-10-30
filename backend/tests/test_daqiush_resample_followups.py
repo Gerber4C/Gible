@@ -294,13 +294,22 @@ class DaqiushResampleFollowupTests(unittest.TestCase):
     def test_six_major_honor_singleton_uses_game_only_texas(self):
         self.assertEqual(self.bid('1NP', 'SKHQT8632DK74CA87'), '4C')
 
-    def test_six_five_minors_keep_their_four_notrump_choice(self):
-        cards = 'S2H2DQJT98CAKQJT9'
-        decision = choose_bid(
-            self.profile, Auction.parse('1NP'), Hand.parse(cards))
+    def test_six_five_minors_split_between_four_notrump_and_three_diamonds(self):
+        weak = 'S2H2DAQT987CQT987'
+        weak_decision = choose_bid(
+            self.profile, Auction.parse('1NP'), Hand.parse(weak))
         self.assertIn('4N', [candidate.call
-                             for candidate in decision.candidate_pool.candidates])
-        self.assertNotEqual(decision.call, '3D')
+                             for candidate in weak_decision.candidate_pool.candidates])
+        self.assertNotIn('3D', [candidate.call
+                                for candidate in weak_decision.candidate_pool.candidates])
+
+        strong = 'S2H2DQJT98CAKQJT9'
+        strong_decision = choose_bid(
+            self.profile, Auction.parse('1NP'), Hand.parse(strong))
+        self.assertIn('3D', [candidate.call
+                             for candidate in strong_decision.candidate_pool.candidates])
+        self.assertNotIn('4N', [candidate.call
+                                for candidate in strong_decision.candidate_pool.candidates])
 
 
 if __name__ == '__main__':

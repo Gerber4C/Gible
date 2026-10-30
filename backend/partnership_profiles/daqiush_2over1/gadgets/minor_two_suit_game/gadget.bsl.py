@@ -2,9 +2,10 @@
 
 
 def exact_minor_two_suit_game(ctx):
-    """5-5 minors at game-forcing strength or stronger; 6-5+ uses 4NT."""
-    return (ctx.hand is not None and ctx.hand.length('C') == 5
-            and ctx.hand.length('D') == 5
+    """Five-five, or strong six-five, minors at game-forcing strength."""
+    lengths = None if ctx.hand is None else sorted(
+        (ctx.hand.length('C'), ctx.hand.length('D')))
+    return (lengths in ([5, 5], [5, 6])
             and (ctx.hand.hcp >= 10
                  or (ctx.hand.hcp == 9
                      and ctx.hand_quality['kr_delta'] >= 1.0)))
@@ -14,7 +15,8 @@ def six_five_minor_choice(ctx):
     lengths = None if ctx.hand is None else sorted(
         ctx.hand.length(s) for s in 'CD')
     return (lengths is not None and lengths[0] >= 5 and lengths[1] >= 6
-            and shapely_combined_effective_points(ctx.hand) >= 7)
+            and shapely_combined_effective_points(ctx.hand) >= 7
+            and not exact_minor_two_suit_game(ctx))
 
 
 def six_five_after_diamond_transfer(ctx):
@@ -39,6 +41,29 @@ def major_stopper(ctx, suit):
     holding = ctx.hand.holding(suit)
     return ('A' in holding or ('K' in holding and len(holding) >= 2)
             or ('Q' in holding and ('J' in holding or 'T' in holding)))
+
+
+def five_five_minors(ctx):
+    return (ctx.hand is not None and ctx.hand.length('C') == 5
+            and ctx.hand.length('D') == 5)
+
+
+def six_five_minors(ctx):
+    if ctx.hand is None:
+        return False
+    return sorted((ctx.hand.length('C'), ctx.hand.length('D'))) == [5, 6]
+
+
+def six_card_minor(ctx):
+    return 'D' if ctx.hand.length('D') == 6 else 'C'
+
+
+def extra_minor_slam_interest(ctx):
+    return ctx.hand is not None and minor_slam_interest(ctx.hand)
+
+
+def shortage_in(ctx, suit):
+    return ctx.hand is not None and ctx.hand.length(suit) <= 1
 
 
 class MinorTwoSuitGame(Gadget):
@@ -104,7 +129,7 @@ class MinorTwoSuitGame(Gadget):
         ask.meaning.nature = ['artificial']
         ask.meaning.acts = ['game_forcing']
         ask.meaning.forcing = 'game_forcing'
-        ask.description = 'Five-five minors at game-forcing strength or stronger; 6-5+ minors use the 4NT choice first.'
+        ask.description = 'Five-five or strong six-five minors at game-forcing strength.'
 
         for answer, applies, stopper_suit in (
             ('3NT', lambda ctx: major_stopper(ctx, 'H') and major_stopper(ctx, 'S'), None),
@@ -117,11 +142,9 @@ class MinorTwoSuitGame(Gadget):
             reply.applies = lambda ctx, test=applies: ctx.hand is not None and test(ctx)
             reply.meaning.action = 'major_stopper_reply'
             reply.meaning.nature = ['natural' if answer == '3NT' else 'artificial']
-            reply.meaning.acts = ['signoff', 'final_placement'] if answer == '3NT' else ['descriptive']
+            reply.meaning.acts = ['descriptive']
             reply.meaning.target_suit = 'N' if answer == '3NT' else stopper_suit
-            if answer == '3NT':
-                reply.meaning.purpose_completed = True
-            reply.description = 'Show the available major stopper or place 3NT with both.'
+            reply.description = 'Show the available major stopper; responder may pass or continue.'
 
             if stopper_suit:
                 other = 'S' if stopper_suit == 'H' else 'H'
@@ -135,3 +158,79 @@ class MinorTwoSuitGame(Gadget):
                 placement.meaning.target_suit = 'N'
                 placement.meaning.purpose_completed = True
                 placement.description = 'The responder has the other major stopper, so play 3NT.'
+
+        # After opener's stopper reply, responder can stop in 3NT (only after
+        # the both-stoppers 3NT), choose a minor game with 4NT, show a
+        # six-card minor at the four level with 6-5, or show major shortage
+        # with 5-5.
+        for prefix in ('1NP3DP3NP', '1NP3DP3HP', '1NP3DP3SP'):
+            if prefix.endswith('3NP'):
+                pass_3nt = self.call('two_minor_pass_after_3nt')
+                pass_3nt.when = prefix
+                pass_3nt.bid = 'P'
+                pass_3nt.applies = (lambda ctx: ctx.hand is not None
+                                    and not extra_minor_slam_interest(ctx))
+                pass_3nt.meaning.action = 'two_minor_three_notrump_signoff'
+                pass_3nt.meaning.nature = ['natural']
+                pass_3nt.meaning.acts = ['signoff', 'final_placement']
+                pass_3nt.meaning.target_suit = 'N'
+                pass_3nt.meaning.purpose_completed = True
+                pass_3nt.description = 'Without extra slam strength, play 3NT.'
+
+            for minor in 'CD':
+                length = self.call('two_minor_six_card_' + prefix[-3:].lower()
+                                   + '_' + minor.lower())
+                length.when = prefix
+                length.bid = '4' + minor
+                length.applies = (lambda ctx, m=minor: (
+                    six_five_minors(ctx)
+                    and extra_minor_slam_interest(ctx)
+                    and six_card_minor(ctx) == m))
+                length.meaning.action = 'minor_six_card_slam_try'
+                length.meaning.nature = ['natural']
+                length.meaning.acts = ['slam_try']
+                length.meaning.target_suit = minor
+                length.description = ('Six-five shape: bid four of the '
+                                      'six-card minor as a slam try.')
+
+                choose = self.call('two_minor_four_notrump_' + prefix[-3:].lower()
+                                   + '_' + minor.lower())
+                choose.when = prefix + '4NTP'
+                choose.bid = '5' + minor
+                choose.applies = (lambda ctx, m=minor: (
+                    ctx.hand is not None and preferred_minor(ctx) == m))
+                choose.meaning.action = 'chosen_minor_game'
+                choose.meaning.nature = ['natural']
+                choose.meaning.acts = ['signoff', 'final_placement']
+                choose.meaning.target_suit = minor
+                choose.meaning.purpose_completed = True
+                choose.description = 'Choose the better minor game.'
+
+            for suit in 'HS':
+                shortage = self.call('two_minor_shortage_' + prefix[-3:].lower()
+                                     + '_' + suit.lower())
+                shortage.when = prefix
+                shortage.bid = '4' + suit
+                shortage.applies = (lambda ctx, s=suit: (
+                    five_five_minors(ctx)
+                    and extra_minor_slam_interest(ctx)
+                    and shortage_in(ctx, s)))
+                shortage.meaning.action = 'minor_shortage_slam_try'
+                shortage.meaning.nature = ['artificial']
+                shortage.meaning.acts = ['slam_try', 'control_showing']
+                shortage.meaning.shortage_suit = suit
+                shortage.meaning.target_suit = suit
+                shortage.description = 'Five-five shape: show a major singleton or void as a slam try.'
+
+            game_choice = self.call('two_minor_four_notrump_' + prefix[-3:].lower())
+            game_choice.when = prefix
+            game_choice.bid = '4NT'
+            game_choice.applies = (lambda ctx, p=prefix: (
+                (five_five_minors(ctx) or six_five_minors(ctx))
+                and (not p.endswith('3NP') or extra_minor_slam_interest(ctx))))
+            game_choice.meaning.action = 'minor_game_choice'
+            game_choice.meaning.nature = ['artificial']
+            game_choice.meaning.acts = ['inquiry', 'game_forcing']
+            game_choice.meaning.forcing = 'game_forcing'
+            game_choice.meaning.target_suit = 'N'
+            game_choice.description = 'Ask opener to choose five clubs or five diamonds.'
