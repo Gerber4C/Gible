@@ -1714,7 +1714,7 @@ textarea {
 .iv-control-title, .iv-results-top { display: flex; justify-content: space-between; align-items: end; gap: 16px; }
 .iv-control-title h3, .iv-results-top h3 { margin: 3px 0 0; font-family: Georgia, Cambria, serif; font-size: 23px; }
 .iv-control-title > span { color: #5b7064; font-size: 12px; font-weight: 700; }
-.iv-fields { display: grid; grid-template-columns: minmax(150px, 1.3fr) repeat(5, minmax(92px, 1fr)); gap: 10px; margin: 17px 0 13px; }
+.iv-fields { display: grid; grid-template-columns: minmax(150px, 1.3fr) repeat(6, minmax(92px, 1fr)); gap: 10px; margin: 17px 0 13px; }
 .iv-fields label, .iv-results-top label { display: grid; gap: 5px; color: #537064; font-size: 11px; font-weight: 800; }
 .iv-fields input, .iv-fields select, .iv-results-top select, .iv-list-tools input { min-width: 0; height: 37px; border: 1px solid #c6d7cc; background: #fbfdfb; color: #1d352b; }
 .iv-run-row { display: flex; align-items: center; gap: 14px; }
@@ -2010,4 +2010,119 @@ textarea {
 @media (max-width: 900px) {
   .iv-process-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .iv-process-pools { grid-template-columns: 1fr; }
+}
+
+.iv-fields .iv-cap-link {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 7px;
+  align-self: end;
+  min-height: 37px;
+  padding: 6px 9px;
+  border: 1px solid #d7e2d9;
+  border-radius: 6px;
+  background: #f7faf7;
+}
+.iv-fields .iv-cap-link input {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  accent-color: #1e7660;
+}
+.iv-fields .iv-cap-link span { color: #2b5c45; font-size: 11px; font-weight: 900; }
+.iv-fields .iv-cap-link small { width: 100%; color: #7a8b7f; font-size: 9px; font-weight: 600; }
+
+/* Current-contract completion and the process primary-hand inspector. */
+.iv-make-badge {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 5px;
+  margin-top: 8px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  background: #eaf5ed;
+  color: #1d5c43;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .05em;
+}
+.iv-make-badge.bad { background: #fff0ee; color: #a1423b; }
+.iv-make-badge strong {
+  font-family: Georgia, Cambria, serif;
+  font-size: 16px;
+  letter-spacing: 0;
+}
+.iv-make-badge small { color: #6d8172; font-size: 9px; font-weight: 600; }
+.iv-primary-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.iv-primary-head h4 { margin: 0; }
+.iv-primary-toggle { display: flex; align-items: center; gap: 5px; }
+.iv-primary-toggle button {
+  padding: 4px 10px;
+  border: 1px solid #c6d7cc;
+  border-radius: 4px;
+  background: #fff;
+  color: #537064;
+  font-size: 10px;
+  font-weight: 900;
+  cursor: pointer;
+}
+.iv-primary-toggle button.active {
+  border-color: #246e58;
+  background: #eaf5ed;
+  color: #1d352b;
+  box-shadow: inset 0 0 0 1px #246e58;
+}
+.iv-pool-row { cursor: pointer; }
+.iv-pool-row:hover td { background: #f2f8f3; }
+.iv-pool-row.selected td { background: #e4f2e7; }
+.iv-pool-row.selected td:first-child { box-shadow: inset 3px 0 #1e7660; }
+.iv-hand-inspector {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #d7e2d9;
+  border-radius: 7px;
+  background: #f8fbf8;
+}
+.iv-hand-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.iv-hand-picker label {
+  display: grid;
+  gap: 4px;
+  color: #537064;
+  font-size: 10px;
+  font-weight: 800;
+}
+.iv-hand-picker select {
+  min-width: 0;
+  height: 34px;
+  border: 1px solid #c6d7cc;
+  background: #fff;
+  color: #1d352b;
+  font-size: 11px;
+}
+.iv-hand-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.iv-mini-hand { margin: 0; }
+.iv-mini-hand.primary {
+  border-color: #246e58;
+  box-shadow: inset 0 0 0 1px #cfe4d6;
+}
+@media (max-width: 900px) {
+  .iv-hand-picker, .iv-hand-pair { grid-template-columns: 1fr; }
 }

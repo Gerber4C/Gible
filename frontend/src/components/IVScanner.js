@@ -112,6 +112,43 @@ function compactSuits(hand = "") {
   return fields ? fields.slice(1).map((holding) => holding || "—") : ["—", "—", "—", "—"];
 }
 
+const HAND_POINTS = { A: 4, K: 3, Q: 2, J: 1 };
+
+function makeRate(rates) {
+  const failure = rates?.contract_failure;
+  return typeof failure === "number" && Number.isFinite(failure)
+    ? 1 - failure
+    : null;
+}
+
+function handStats(hand = "") {
+  const holdings = compactSuits(hand);
+  const shape = holdings.map((holding) => (
+    holding === "—" ? 0 : holding.length));
+  const hcp = holdings.reduce((sum, holding) => sum + [...holding]
+    .reduce((points, rank) => points + (HAND_POINTS[rank] || 0), 0), 0);
+  return { shape, hcp };
+}
+
+function miniHand(hand, title, tone = "") {
+  const holdings = compactSuits(hand);
+  const stats = handStats(hand);
+  return e("section", { className: `iv-hand iv-mini-hand ${tone}` },
+    e("div", { className: "iv-hand-heading" },
+      e("strong", null, title),
+      e("span", null, `${stats.hcp} HCP · ${stats.shape.join("–")}`)),
+    SUITS.map(([suit, symbol], index) => e("div", {
+      className: `iv-suit iv-suit-${suit.toLowerCase()}`, key: suit,
+    }, e("span", null, symbol), e("b", null, holdings[index]))),
+  );
+}
+
+function bestProcessMake(process = {}) {
+  const values = (process.contracts || []).map((item) => makeRate(item.rates))
+    .filter((value) => value != null);
+  return values.length ? Math.max(...values) : null;
+}
+
 function handCard(seat, caseData) {
   const holdings = compactSuits(caseData.hands[seat]);
   const name = seat === "n" ? "North" : "South";
@@ -201,6 +238,7 @@ function pairDetail(pair, group, thresholds) {
   if (!pair) return e("div", { className: "iv-empty-detail" },
     "Select a sampling cell, then pick one of its N/S pairs to inspect that pair's hands and auction.");
   const rates = pair.rates || {};
+  const make = makeRate(rates);
   const flags = pairFlags(pair, thresholds);
   const alternatives = Object.entries(pair.alternative_game_rates || {})
     .filter(([, rate]) => rate > 0);
@@ -218,6 +256,10 @@ function pairDetail(pair, group, thresholds) {
         `DEAL #${pair.id} · PAIR ${slot}/${group?.actual_pair_count ?? 1}`),
       e("h3", null, title),
       e("p", null, pair.auction || "No calls recorded"),
+      make != null && e("div", {
+        className: `iv-make-badge ${make < 1 - thresholds.set ? "bad" : "good"}`,
+      }, "CONTRACT MAKE ", e("strong", null, pct(make)),
+      e("small", null, `${pair.dds_boards ?? "—"} DDS boards`)),
     ),
     e("div", { className: "iv-hands" }, handCard("n", pair), handCard("s", pair)),
     e("div", { className: "iv-detail-section" },
@@ -304,7 +346,7 @@ function contractCard(item, thresholds) {
       e("span", null, `${String(item.declarer || "").toUpperCase()} declares`),
       e("em", null, `${item.boards ?? 0} boards`)),
     e("div", { className: "iv-contract-rates" },
-      rateMeter("SET", rates.contract_failure, thresholds.set),
+      rateMeter("MAKE", makeRate(rates), 1 - thresholds.set, true),
       rateMeter("LOSE", missed, thresholds.missed),
       rateMeter("WRONG", rates.wrong_game, thresholds.wrong, true)),
     flags.length > 0 && e("div", { className: "iv-contract-flags" },
@@ -314,7 +356,7 @@ function contractCard(item, thresholds) {
   );
 }
 
-function poolTable(title, groups, kind, thresholds) {
+function poolTable(title, groups, kind, thresholds, selectedIndex, onSelect) {
   if (!groups?.length) {
     return e("div", { className: "iv-pool-block" },
       e("h4", null, title),
@@ -335,7 +377,12 @@ function poolTable(title, groups, kind, thresholds) {
         e("tbody", null, groups.map((group, index) => {
           const categories = Object.entries(group.categories || {})
             .filter(([, count]) => count > 0).map(([key]) => key);
-          return e("tr", { key: `${group.north_shape || group.south_shape}-${index}` },
+          return e("tr", {
+            key: `${group.north_shape || group.south_shape}-${index}`,
+            className: `iv-pool-row ${selectedIndex === index ? "selected" : ""}`,
+            onClick: () => onSelect?.(index),
+            title: "Use this shape·band pool as the primary view",
+          },
             e("td", null,
               e("span", { className: "iv-shape-chip" },
                 (group.north_shape || group.south_shape || []).join("–") || "?")),
@@ -374,12 +421,22 @@ function processCard(process, selected, thresholds, onSelect) {
         key: `${item.contract}-${item.declarer}`,
       }, `${item.contract} ${String(item.declarer || "").toUpperCase()}`)),
       (process.contracts || []).length > 4 && e("em", null, "+ more")),
-    categories.length > 0 && e("span", { className: "iv-process-worst" },
-      `worst SET ${pct(processWorstFailure(process))}`),
+    bestProcessMake(process) != null && e("span", {
+      className: "iv-process-worst",
+    }, `best MAKE ${pct(bestProcessMake(process))}`),
   );
 }
 
 function ProcessView({ processes, thresholds, selectedKey, onSelect, search, onSearch }) {
+  const [primarySide, setPrimarySide] = React.useState("north");
+  const [poolIndex, setPoolIndex] = React.useState(0);
+  const [primaryHandIndex, setPrimaryHandIndex] = React.useState(0);
+  const [partnerHandIndex, setPartnerHandIndex] = React.useState(0);
+  React.useEffect(() => {
+    setPoolIndex(0);
+    setPrimaryHandIndex(0);
+    setPartnerHandIndex(0);
+  }, [selectedKey, primarySide]);
   if (!processes.length) {
     return e("div", { className: "iv-inspection" },
       e("div", { className: "iv-list" },
@@ -390,6 +447,23 @@ function ProcessView({ processes, thresholds, selectedKey, onSelect, search, onS
   const selected = processes.find((process) => processKey(process) === selectedKey)
     || processes[0];
   const categories = processCategories(selected, thresholds);
+  const primaryGroups = primarySide === "north"
+    ? (selected.north_groups || []) : (selected.south_groups || []);
+  const activePoolIndex = Math.min(
+    poolIndex, Math.max(0, primaryGroups.length - 1));
+  const activePool = primaryGroups[activePoolIndex];
+  const primaryHands = (primarySide === "north"
+    ? activePool?.north_hands : activePool?.south_hands) || [];
+  const partnerHands = (primarySide === "north"
+    ? activePool?.matched_south_hands : activePool?.matched_north_hands) || [];
+  const activePrimaryIndex = Math.min(
+    primaryHandIndex, Math.max(0, primaryHands.length - 1));
+  const activePartnerIndex = Math.min(
+    partnerHandIndex, Math.max(0, partnerHands.length - 1));
+  const primaryHand = primaryHands[activePrimaryIndex];
+  const partnerHand = partnerHands[activePartnerIndex];
+  const primaryLabel = primarySide === "north" ? "North" : "South";
+  const partnerLabel = primarySide === "north" ? "South" : "North";
   return e("div", { className: "iv-inspection iv-process-inspection" },
     e("div", { className: "iv-list" },
       e("div", { className: "iv-list-tools" },
@@ -420,30 +494,94 @@ function ProcessView({ processes, thresholds, selectedKey, onSelect, search, onS
             e("strong", null, processBoardCount(selected))),
           e("div", null, e("span", null, "Contracts"),
             e("strong", null, (selected.contracts || []).length)),
-          e("div", null, e("span", null, "Worst SET"),
-            e("strong", null, pct(processWorstFailure(selected))))),
+          e("div", null, e("span", null, "Best MAKE"),
+            e("strong", null, bestProcessMake(selected) == null
+              ? "—" : pct(bestProcessMake(selected))),
+            e("small", null, "chosen-contract completion"))),
         categories.length > 0 && e("div", { className: "iv-process-alerts" },
           e("span", { className: "iv-eyebrow" }, "FLAGS"),
           processFlagTags(selected, thresholds)),
         e("section", { className: "iv-detail-section" },
           e("h4", null, "Contract outcomes"),
           e("p", { className: "iv-section-note" },
-            "Rates pool every sampled deal in this process. SET is the chosen-contract failure rate; "
-            + "LOSE is the best missed game/slam availability; WRONG is chosen/best-other."),
+            "Rates pool every sampled deal in this process. MAKE is how often the chosen contract "
+            + "succeeds; LOSE is the best missed game/slam availability; WRONG is chosen/best-other."),
           e("div", { className: "iv-contract-grid" },
             (selected.contracts || []).length
               ? selected.contracts.map((item) => contractCard(item, thresholds))
               : e("p", { className: "iv-empty-list" },
                 "No complete contract pool was recorded for this process."))),
         e("section", { className: "iv-detail-section" },
-          e("h4", null, "Primary hand pools"),
+          e("div", { className: "iv-primary-head" },
+            e("h4", null, "Primary hand pools"),
+            e("div", { className: "iv-primary-toggle", role: "group",
+              "aria-label": "Primary hand perspective" },
+              e("span", { className: "iv-eyebrow" }, "PRIMARY VIEW"),
+              e("button", {
+                type: "button",
+                className: primarySide === "north" ? "active" : "",
+                "aria-pressed": primarySide === "north",
+                onClick: () => setPrimarySide("north"),
+              }, "North"),
+              e("button", {
+                type: "button",
+                className: primarySide === "south" ? "active" : "",
+                "aria-pressed": primarySide === "south",
+                onClick: () => setPrimarySide("south"),
+              }, "South"))),
           e("p", { className: "iv-section-note" },
-            "North and South are bucketed the same way as Cell views, but pooled across every "
-            + "cell that reached this process. Hands are deduplicated; dropped hands still count "
-            + "in the contract rates above."),
+            "Pick a shape·band pool, then inspect the actual stored hands. North and South "
+            + "are bucketed the same way as Cell views, but pooled across every cell that "
+            + "reached this process. Dropped hands still count in the contract rates above."),
           e("div", { className: "iv-process-pools" },
-            poolTable("North primary", selected.north_groups, "north", thresholds),
-            poolTable("South primary", selected.south_groups, "south", thresholds))))));
+            poolTable("North primary", selected.north_groups, "north",
+              thresholds, primarySide === "north" ? activePoolIndex : -1,
+              (index) => {
+                setPrimarySide("north");
+                setPoolIndex(index);
+                setPrimaryHandIndex(0);
+                setPartnerHandIndex(0);
+              }),
+            poolTable("South primary", selected.south_groups, "south",
+              thresholds, primarySide === "south" ? activePoolIndex : -1,
+              (index) => {
+                setPrimarySide("south");
+                setPoolIndex(index);
+                setPrimaryHandIndex(0);
+                setPartnerHandIndex(0);
+              })),
+          activePool && e("div", { className: "iv-hand-inspector" },
+            e("div", { className: "iv-hand-picker" },
+              e("label", null, `${primaryLabel} primary hand`,
+                e("select", {
+                  value: activePrimaryIndex,
+                  disabled: primaryHands.length === 0,
+                  onChange: (event) => {
+                    setPrimaryHandIndex(Number(event.target.value));
+                    setPartnerHandIndex(0);
+                  },
+                }, primaryHands.map((hand, index) => e("option", {
+                  key: `${hand}-${index}`, value: index,
+                }, `#${index + 1} · ${hand}`)))),
+              e("label", null, `Matched ${partnerLabel} hand`,
+                e("select", {
+                  value: activePartnerIndex,
+                  disabled: partnerHands.length === 0,
+                  onChange: (event) => {
+                    setPartnerHandIndex(Number(event.target.value));
+                  },
+                }, partnerHands.map((hand, index) => e("option", {
+                  key: `${hand}-${index}`, value: index,
+                }, `#${index + 1} · ${hand}`)))))),
+            e("div", { className: "iv-hand-pair" },
+              primaryHand
+                ? miniHand(primaryHand, `${primaryLabel} primary`, "primary")
+                : e("p", { className: "iv-empty-list" },
+                  `No stored ${primaryLabel} hand in this pool.`),
+              partnerHand
+                ? miniHand(partnerHand, `${partnerLabel} match`)
+                : e("p", { className: "iv-empty-list" },
+                  `No matched ${partnerLabel} hand in this pool.`))))));
 }
 
 export function IVScanner({ profileId }) {
@@ -463,7 +601,9 @@ export function IVScanner({ profileId }) {
   const [thresholds, setThresholds] = React.useState(DEFAULT_THRESHOLDS);
   const [hcpMin, setHcpMin] = React.useState(0);
   const [hcpMax, setHcpMax] = React.useState(22);
-  const [pairs, setPairs] = React.useState(2);
+  const [northCap, setNorthCap] = React.useState(2);
+  const [southCap, setSouthCap] = React.useState(2);
+  const [linkCaps, setLinkCaps] = React.useState(true);
   const [ewSamples, setEwSamples] = React.useState(10);
   const [seed, setSeed] = React.useState(23);
   const loadedRun = React.useRef(null);
@@ -550,7 +690,13 @@ export function IVScanner({ profileId }) {
       const result = await startScannerRun({
         profile: profileId, seed: Number(seed),
         hcp_min: Number(hcpMin), hcp_max: Number(hcpMax),
-        pairs_per_cell: Number(pairs), ew_samples: Number(ewSamples),
+        // Caps are the stored-hand budget per North/South process pool. The
+        // scan still needs a pair-slot count per cell; the larger cap is the
+        // only value that can fill both pools, so the two settings cannot
+        // contradict each other.
+        pairs_per_cell: Math.max(Number(northCap), Number(southCap)),
+        ew_samples: Number(ewSamples),
+        north_cap: Number(northCap), south_cap: Number(southCap),
       });
       setRun(result.run);
     } catch (failure) {
@@ -645,7 +791,8 @@ export function IVScanner({ profileId }) {
   }, [processSource, selectedProcessKey]);
 
   const running = run?.status === "running" || run?.status === "queued";
-  const planned = (Number(hcpMax) - Number(hcpMin) + 1) * FULL_SCAN_SHAPES * Number(pairs);
+  const plannedPairsPerCell = Math.max(Number(northCap), Number(southCap));
+  const planned = (Number(hcpMax) - Number(hcpMin) + 1) * FULL_SCAN_SHAPES * plannedPairsPerCell;
 
   return e("section", { className: "iv-scanner" },
     e("header", { className: "iv-header" },
@@ -668,8 +815,29 @@ export function IVScanner({ profileId }) {
             onChange: (event) => setHcpMin(event.target.value) })),
           e("label", null, "to", e("input", { type: "number", min: 0, max: 22, value: hcpMax,
             onChange: (event) => setHcpMax(event.target.value) })),
-          e("label", null, "N/S pairs per cell", e("input", { type: "number", min: 1, max: 20, value: pairs,
-            onChange: (event) => setPairs(event.target.value) })),
+          e("label", { className: "iv-cap-field" }, "North cap",
+            e("input", { type: "number", min: 1, max: 20, value: northCap,
+              onChange: (event) => {
+                const next = event.target.value;
+                setNorthCap(next);
+                if (linkCaps) setSouthCap(next);
+              } })),
+          e("label", { className: "iv-cap-field" }, "South cap",
+            e("input", { type: "number", min: 1, max: 20, value: southCap,
+              onChange: (event) => {
+                const next = event.target.value;
+                setSouthCap(next);
+                if (linkCaps) setNorthCap(next);
+              } })),
+          e("label", { className: "iv-cap-link" },
+            e("input", { type: "checkbox", checked: linkCaps,
+              onChange: (event) => {
+                const linked = event.target.checked;
+                setLinkCaps(linked);
+                if (linked) setSouthCap(northCap);
+              } }),
+            e("span", null, "🔗 Link caps"),
+            e("small", null, "both change together")),
           e("label", null, "E/W deals per pair", e("input", { type: "number", min: 1, max: 20, value: ewSamples,
             onChange: (event) => setEwSamples(event.target.value) })),
           e("label", null, "Seed", e("input", { type: "number", min: 0, value: seed,
@@ -814,7 +982,10 @@ export function IVScanner({ profileId }) {
                 },
                   e("span", { className: "iv-case-top" },
                     e("strong", null, `${group.actual_pair_count} NS pair${group.actual_pair_count === 1 ? "" : "s"}`),
-                    e("span", null, `${report?.budget?.ew_samples ?? "—"} EW samples`)),
+                    e("span", null,
+                      `${report?.budget?.ew_samples ?? "—"} EW samples`
+                      + (makeRate(first?.rates) == null ? ""
+                        : ` · MAKE ${pct(makeRate(first.rates))}`))),
                   e("span", { className: "iv-case-tags" },
                     categories.map((key) => e("b", { key, className: `iv-tag iv-tag-${key}` }, CATEGORY[key]?.title || key)),
                     categories.length === 0 && view === "cell-overview" && e("b", {
