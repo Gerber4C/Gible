@@ -13,7 +13,10 @@ from .hand_quality import (inquiry_stopper, minor_game_control_points,
                            shapely_combined_effective_points, shapely_description_proxy)
 from .voidwood import (answer_bids, effective_keycards,
                        is_safe_voidwood_ask, voidwood_jump)
-from .rkcb_continuation import ordinary_response, ordinary_rkcb_frame, useful_voids
+from .rkcb_continuation import (
+    five_spade_role, five_trump_available, lowest_showable_side_king,
+    ordinary_response, ordinary_rkcb_frame, queen_ask_call, useful_voids,
+)
 
 
 def _ordinary_rkcb_pending(ctx, trump):
@@ -1198,6 +1201,11 @@ def _base_namespace(collector: _Collector) -> dict[str, Any]:
         "voidwood_jump": voidwood_jump,
         "ordinary_rkcb_pending": _ordinary_rkcb_pending,
         "ordinary_rkcb_response_call": _ordinary_rkcb_response_call,
+        "ordinary_rkcb_frame": ordinary_rkcb_frame,
+        "ordinary_queen_ask_call": queen_ask_call,
+        "ordinary_five_spade_role": five_spade_role,
+        "ordinary_five_trump_available": five_trump_available,
+        "lowest_showable_side_king": lowest_showable_side_king,
         "zar_total": _zar_total,
         "shapely_effective_points": shapely_effective_points,
         "shapely_combined_effective_points": shapely_combined_effective_points,

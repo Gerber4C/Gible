@@ -7,7 +7,12 @@ from .calls import normalize_call
 from .context import CallCandidate
 from .legality import SIDE_BY_SEAT, is_call_legal, last_contract_state
 from .memory import Purpose, SeatMemory
-from .rkcb_continuation import bid_rank, ordinary_rkcb_frame
+from .rkcb_continuation import (
+    bid_rank, five_spade_role, five_trump_available,
+    lowest_showable_side_king, ordinary_rkcb_frame, queen_ask_call,
+    relay_terminal_call,
+)
+from .rkcb_simulation import compare_rescue_routes
 from .slam_intent import (
     PARTNER_1NT_MIN, PARTNER_DEFAULT_MIN, detect_slam_intent,
 )
@@ -51,7 +56,7 @@ def terminal_pass_candidate(auction, trace) -> CallCandidate | None:
 
 
 def resolve_purpose(auction, trace, memory: SeatMemory, hand=None,
-                    candidates=()) -> PurposeResolution:
+                    candidates=(), profile=None) -> PurposeResolution:
     for purpose in reversed(memory.purposes):
         if purpose.status != 'active' or purpose.owner != auction.actor_to_call:
             continue
@@ -83,7 +88,7 @@ def resolve_purpose(auction, trace, memory: SeatMemory, hand=None,
                                      error=f'Unknown saved purpose: {purpose.kind}')
         if len(auction.calls) < purpose.source_index + 4:
             return PurposeResolution(memory)
-        result = _keycard_slam(auction, trace, purpose, hand)
+        result = _keycard_slam(auction, trace, purpose, hand, profile)
         if result.purpose is not None and result.purpose != purpose:
             memory = memory.replace_purpose(purpose, result.purpose)
         resolved = result.purpose or purpose
@@ -203,13 +208,13 @@ class _StageResult:
     authored_only: bool = False
 
 
-def _keycard_slam(auction, trace, purpose, hand=None) -> _StageResult:
+def _keycard_slam(auction, trace, purpose, hand=None, profile=None) -> _StageResult:
     if purpose.own_keycards is None or purpose.owns_trump_queen is None:
         return _StageResult(error='Keycard purpose lacks the asker\'s saved private count')
     stage = purpose.rkcb_stage or 'await_keycard_answer'
     frame = ordinary_rkcb_frame(trace)
     if stage == 'await_keycard_answer':
-        return _choose_after_answer(auction, trace, purpose, hand, frame)
+        return _choose_after_answer(auction, trace, purpose, hand, frame, profile)
     if stage == 'choose_continuation':
         return _choose_continuation(auction, trace, purpose, hand, frame)
     if stage == 'await_relay_completion':
@@ -219,7 +224,7 @@ def _keycard_slam(auction, trace, purpose, hand=None) -> _StageResult:
     return _StageResult(error=f'Unknown RKCB continuation stage: {stage}')
 
 
-def _choose_after_answer(auction, trace, purpose, hand, frame):
+def _choose_after_answer(auction, trace, purpose, hand, frame, profile=None):
     meaning = _answer_meaning(trace, purpose)
     if not meaning or 'keycard_counts' not in meaning:
         return _StageResult(
@@ -246,7 +251,8 @@ def _choose_after_answer(auction, trace, purpose, hand, frame):
     missing_count = missing.pop()
     game, slam = f'5{purpose.trump}', f'6{purpose.trump}'
     if missing_count >= 2:
-        return _StageResult(game, purpose=_completed(with_stage))
+        return _game_or_rescue(auction, trace, purpose, hand, frame,
+                               with_stage, profile)
     queen_known = (purpose.owns_trump_queen is True
                    or meaning.get('trump_queen') is True)
     if missing_count == 0 and queen_known and purpose.grand_candidate:
@@ -254,14 +260,40 @@ def _choose_after_answer(auction, trace, purpose, hand, frame):
     if missing_count == 0 or queen_known:
         return _StageResult(slam, purpose=_completed(with_stage))
     if meaning.get('trump_queen') is False:
-        return _StageResult(game, purpose=_completed(with_stage))
-    # An unknown queen must be asked when a legal non-trump step remains below
-    # the five-level trump signoff. Its exact call/answers belong to the profile.
-    if _queen_ask_space(auction, game):
-        return _StageResult(
-            error='Trump queen ask has space but no authored continuation',
-            purpose=with_stage)
+        return _game_or_rescue(auction, trace, purpose, hand, frame,
+                               with_stage, profile)
+    ask = queen_ask_call(auction, frame)
+    if ask is not None:
+        return _StageResult(ask, purpose=with_stage, authored_only=True)
+    if not is_call_legal(auction, game):
+        return _game_or_rescue(auction, trace, purpose, hand, frame,
+                               with_stage, profile)
     return _StageResult(slam, purpose=_completed(with_stage))
+
+
+def _game_or_rescue(auction, trace, purpose, hand, frame, with_stage, profile):
+    game = f'5{purpose.trump}'
+    if five_trump_available(auction, purpose.trump):
+        return _StageResult(game, purpose=_completed(with_stage))
+    role = five_spade_role(auction, frame)
+    if role != 'relay':
+        return _StageResult(
+            error='Five of trumps is unavailable and the five-spade relay is unavailable',
+            purpose=with_stage)
+    decision = compare_rescue_routes(
+        profile, auction, trace, hand, purpose.trump, frame)
+    if decision.unavailable or decision.call is None:
+        return _StageResult(
+            error='Rescue relay is unavailable: ' + decision.reason,
+            purpose=with_stage)
+    if decision.call == '5S':
+        return _StageResult(
+            '5S', purpose=replace(with_stage,
+                                  rkcb_stage='await_relay_completion',
+                                  relay_intent='rescue'),
+            authored_only=True)
+    return _StageResult(decision.call, purpose=_completed(with_stage),
+                        authored_only=True)
 
 
 def _choose_continuation(auction, trace, purpose, hand, frame):
@@ -282,6 +314,10 @@ def _choose_continuation(auction, trace, purpose, hand, frame):
     if frame.status == 'relay_pending':
         return _StageResult(
             error='Relay is awaiting partner\'s forced five notrump',
+            purpose=purpose)
+    if frame.continuation_stage == 'queen_ask':
+        return _StageResult(
+            error='QUEEN_ASK_CONTINUATION_UNAUTHORED: the queen-ask answer table is not authored',
             purpose=purpose)
     if frame.continuation_stage == 'counterinvited':
         return _StageResult(
@@ -317,27 +353,16 @@ def _choose_king_or_small_slam(auction, purpose, hand, frame):
     if purpose.relay_intent != 'show_lowest_king':
         return _StageResult(error='Saved keycard relay intent is missing',
                             purpose=purpose)
-    king = _lowest_showable_side_king(
+    king = lowest_showable_side_king(
         hand, purpose.trump, auction, denied=purpose.not_required_kings)
     if king is not None:
         return _StageResult(king, purpose=_completed(purpose))
-    small_slam = f'6{purpose.trump}'
-    if is_call_legal(auction, small_slam):
+    small_slam = relay_terminal_call(auction, hand, purpose.trump)
+    if small_slam is not None:
         return _StageResult(small_slam, purpose=_completed(purpose))
     return _StageResult(
         error='No legal king or small-slam return is available after the relay',
         purpose=purpose)
-
-
-def _lowest_showable_side_king(hand, trump, auction, denied=()):
-    if hand is None:
-        return None
-    calls = [f'6{suit}' for suit in 'CDHS'
-             if suit != trump and suit not in denied
-             and hand.contains_rank(suit, 'K')
-             and is_call_legal(auction, f'6{suit}')
-             and bid_rank(f'6{suit}') < bid_rank(f'6{trump}')]
-    return min(calls, key=bid_rank) if calls else None
 
 
 def _completed(purpose):

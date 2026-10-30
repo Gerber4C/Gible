@@ -82,7 +82,8 @@ def choose_bid(
     generated = generate_candidates(profile, auction, hand, trace,
                                     active_environment, actor_memory)
     generated = _apply_keycard_restrictions(auction, hand, generated, trace)
-    purpose = resolve_purpose(auction, trace, actor_memory, hand, generated)
+    purpose = resolve_purpose(auction, trace, actor_memory, hand, generated,
+                              profile)
     actor_memory = purpose.memory
     if purpose.error:
         trace.warn('Purpose axiom: ' + purpose.error)

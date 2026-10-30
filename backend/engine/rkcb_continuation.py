@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import Any, Iterable
 
 from .cards import Hand
+from .legality import is_call_legal, legal_calls
 
 
 ORDINARY_METHOD = 'rkcb_1430'
@@ -142,3 +143,53 @@ def ordinary_response(hand: Hand, trump: str,
     if not queen:
         return RKCBResponse('5H', (2,), trump_queen=False)
     return RKCBResponse('5S', (2,), trump_queen=True)
+
+
+def queen_ask_call(auction, frame: OrdinaryRKCBFrame | None) -> str | None:
+    """The step above a 5C/5D answer that is not five of trumps."""
+    if frame is None or frame.status != 'answered':
+        return None
+    answer = {'1/4': '5C', '0/3': '5D'}.get(frame.answer_category)
+    if answer is None:
+        return None
+    candidates = [call for call in legal_calls(auction)
+                  if call[0] in '567'
+                  and call != '5' + frame.trump
+                  and bid_rank(answer) < bid_rank(call) < bid_rank('5NT')]
+    return min(candidates, key=bid_rank) if candidates else None
+
+
+def five_spade_role(auction, frame: OrdinaryRKCBFrame | None) -> str:
+    """Return ``queen_ask``, ``relay`` or ``unavailable`` for a 5S call."""
+    if frame is None or frame.status != 'answered':
+        return 'unavailable'
+    if frame.trump == 'S':
+        return 'unavailable'
+    if not is_call_legal(auction, '5S'):
+        return 'unavailable'
+    ask = queen_ask_call(auction, frame)
+    if ask == '5S':
+        return 'queen_ask'
+    return 'relay'
+
+
+def five_trump_available(auction, trump: str) -> bool:
+    return is_call_legal(auction, '5' + trump)
+
+
+def lowest_showable_side_king(hand: Hand | None, trump: str, auction,
+                              denied: Iterable[str] = ()) -> str | None:
+    if hand is None:
+        return None
+    denied = set(denied)
+    calls = [f'6{suit}' for suit in 'CDHS'
+             if suit != trump and suit not in denied
+             and hand.contains_rank(suit, 'K')
+             and is_call_legal(auction, f'6{suit}')
+             and bid_rank(f'6{suit}') < bid_rank(f'6{trump}')]
+    return min(calls, key=bid_rank) if calls else None
+
+
+def relay_terminal_call(auction, hand: Hand | None, trump: str) -> str | None:
+    small_slam = f'6{trump}'
+    return small_slam if is_call_legal(auction, small_slam) else None

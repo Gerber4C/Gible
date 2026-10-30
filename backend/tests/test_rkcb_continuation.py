@@ -1,9 +1,12 @@
 import unittest
 
+from engine.auction import Auction
 from engine.cards import Hand
 from engine.rkcb_continuation import (
-    OrdinaryRKCBFrame, naturally_shown_long_suits, ordinary_response,
-    ordinary_rkcb_frame, public_minimum_length, useful_voids,
+    OrdinaryRKCBFrame, five_spade_role, five_trump_available,
+    lowest_showable_side_king, naturally_shown_long_suits,
+    ordinary_response, ordinary_rkcb_frame, public_minimum_length,
+    queen_ask_call, useful_voids,
 )
 from engine.trace import AuctionTrace, StateRecord
 
@@ -113,6 +116,92 @@ class OrdinaryResponseTests(unittest.TestCase):
         # The caller passes no useful void when partner showed the suit.
         response = ordinary_response(Hand.parse('SA765HKQ9876D432C-'), 'H')
         self.assertEqual(response.call, '5S')  # two keycards with the queen
+
+
+class RelayGeometryTests(unittest.TestCase):
+    def _frame(self, category, trump='H'):
+        trace = AuctionTrace()
+        add_context(trace, method='rkcb_1430', status='answered',
+                    trump_suit=trump, answer_category=category,
+                    keycard_counts=[1, 4] if category == '1/4' else [0, 3])
+        return ordinary_rkcb_frame(trace)
+
+    def test_five_spades_is_the_queen_ask_after_five_diamonds_in_hearts(self):
+        auction = Auction.parse('1NP4CP4HP4NP5DP')
+        frame = self._frame('0/3')
+        self.assertEqual(queen_ask_call(auction, frame), '5S')
+        self.assertEqual(five_spade_role(auction, frame), 'queen_ask')
+
+    def test_five_spades_is_a_relay_after_five_clubs_in_hearts(self):
+        auction = Auction.parse('1NP4CP4HP4NP5CP')
+        frame = self._frame('1/4')
+        self.assertEqual(queen_ask_call(auction, frame), '5D')
+        self.assertEqual(five_spade_role(auction, frame), 'relay')
+
+    def test_relay_is_available_after_five_hearts_when_five_hearts_is_gone(self):
+        auction = Auction.parse('1NP4CP4HP4NP5HP')
+        frame = self._frame('2/no_q')
+        self.assertFalse(five_trump_available(auction, 'H'))
+        self.assertEqual(five_spade_role(auction, frame), 'relay')
+
+    def test_spade_trumps_never_treat_five_spades_as_a_relay(self):
+        auction = Auction.parse('1NP4CP4HP4NP5DP')
+        frame = self._frame('0/3', 'S')
+        self.assertEqual(queen_ask_call(auction, frame), '5H')
+        self.assertEqual(five_spade_role(auction, frame), 'unavailable')
+
+    def test_lowest_showable_side_king_stays_below_six_trumps(self):
+        auction = Auction.parse('1NP4CP4HP4NP5CP5SP5NP')
+        hand = Hand.parse('SA2HKQ976D432CK42')
+        self.assertEqual(lowest_showable_side_king(hand, 'H', auction), '6C')
+        self.assertIsNone(lowest_showable_side_king(
+            hand, 'H', auction, denied=('C',)))
+        self.assertIsNone(lowest_showable_side_king(hand, 'C', auction))
+
+
+class RescueSimulationTests(unittest.TestCase):
+    def test_sampling_chooses_the_relay_when_it_is_not_worse(self):
+        from engine.rkcb_simulation import compare_rescue_routes
+        from engine.trace import AuctionTrace
+
+        auction = Auction.parse('1NP4CP4HP4NP5HP')
+        trace = AuctionTrace()
+        frame = OrdinaryRKCBFrame(trump='H', status='answered',
+                                  answer_category='2/no_q', keycard_counts=(2,))
+        decision = compare_rescue_routes(
+            None, auction, trace, Hand.parse('S32HQ98765D432C32'), 'H',
+            frame, evaluator=lambda *args: '5S')
+        self.assertEqual((decision.call, decision.unavailable), ('5S', False))
+
+    def test_unavailable_comparison_is_typed(self):
+        from engine.dds_adapter import DDSUnavailableError
+        from engine.rkcb_simulation import compare_rescue_routes
+        from engine.trace import AuctionTrace
+
+        auction = Auction.parse('1NP4CP4HP4NP5HP')
+        frame = OrdinaryRKCBFrame(trump='H', status='answered',
+                                  answer_category='2/no_q', keycard_counts=(2,))
+
+        def unavailable(*args):
+            raise DDSUnavailableError('no solver')
+
+        decision = compare_rescue_routes(
+            object(), auction, AuctionTrace(), Hand.parse('S32HQ98765D432C32'),
+            'H', frame, evaluator=unavailable)
+        self.assertTrue(decision.unavailable)
+        self.assertIsNone(decision.call)
+
+    def test_only_legal_route_is_deterministic(self):
+        from engine.rkcb_simulation import compare_rescue_routes
+        from engine.trace import AuctionTrace
+
+        auction = Auction.parse('1NP4CP4HP4NP5SP')
+        frame = OrdinaryRKCBFrame(trump='H', status='answered',
+                                  answer_category='2/q', keycard_counts=(2,))
+        decision = compare_rescue_routes(
+            None, auction, AuctionTrace(), Hand.parse('S32HQ98765D432C32'),
+            'H', frame, evaluator=lambda *args: self.fail('must not sample'))
+        self.assertEqual(decision.call, '6H')
 
 
 if __name__ == '__main__':

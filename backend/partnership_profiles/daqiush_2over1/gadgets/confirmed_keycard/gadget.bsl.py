@@ -6,6 +6,81 @@ def route_intent_not_yet_selected(ctx):
     return False
 
 
+def current_ordinary_frame(ctx, trump):
+    frame = ordinary_rkcb_frame(ctx.trace)
+    if frame is None or frame.trump != trump:
+        return None
+    return frame
+
+
+def ordinary_queen_ask_requires(ctx, trump, category, bid):
+    frame = current_ordinary_frame(ctx, trump)
+    return (frame is not None and frame.status == 'answered'
+            and frame.answer_category == category
+            and frame.continuation_stage is None
+            and ordinary_queen_ask_call(ctx.auction, frame) == bid)
+
+
+def ordinary_relay_requires(ctx, trump):
+    frame = current_ordinary_frame(ctx, trump)
+    return (frame is not None and frame.status == 'answered'
+            and frame.continuation_stage is None
+            and ordinary_five_spade_role(ctx.auction, frame) == 'relay')
+
+
+def ordinary_relay_pending(ctx):
+    frame = ordinary_rkcb_frame(ctx.trace)
+    return frame is not None and frame.status == 'relay_pending'
+
+
+def ordinary_relay_completed(ctx):
+    frame = ordinary_rkcb_frame(ctx.trace)
+    return frame is not None and frame.status == 'relay_completed'
+
+
+def ordinary_relay_completed_for(ctx, trump, status):
+    frame = current_ordinary_frame(ctx, trump)
+    return frame is not None and frame.status == status
+
+
+def last_non_pass_seat(auction):
+    for index in range(len(auction.calls) - 1, -1, -1):
+        if auction.calls[index] not in ('P', 'X', 'R'):
+            return auction.actor_at(index)
+    return None
+
+
+def partner_of(seat):
+    return {'n': 's', 's': 'n', 'e': 'w', 'w': 'e'}[seat]
+
+
+def partner_of_last_bidder(ctx):
+    last = last_non_pass_seat(ctx.auction)
+    return last is not None and ctx.auction.actor_to_call == partner_of(last)
+
+
+def ordinary_relay_pending_for_actor(ctx, trump):
+    return (ordinary_relay_completed_for(ctx, trump, 'relay_pending')
+            and partner_of_last_bidder(ctx))
+
+
+def ordinary_relay_completion_for_actor(ctx, trump):
+    return (ordinary_relay_completed_for(ctx, trump, 'relay_completed')
+            and partner_of_last_bidder(ctx))
+
+
+def carry_answer_state(record, trump):
+    query = {'method': 'rkcb_1430', 'trump_suit': trump}
+    record.answer_category = StateAttribute('keycard_context', 'answer_category', **query)
+    record.keycard_counts = StateAttribute('keycard_context', 'keycard_counts', **query)
+    record.trump_queen = StateAttribute('keycard_context', 'trump_queen', **query)
+    record.useful_void = StateAttribute('keycard_context', 'useful_void', **query)
+    record.useful_void_category = StateAttribute(
+        'keycard_context', 'useful_void_category', **query)
+    record.not_required_kings = StateAttribute(
+        'keycard_context', 'not_required_kings', **query)
+
+
 def ordinary_keycard_answer(ctx, trump, counts, queen):
     if ctx.hand is None or not ctx.state.exists('keycard_context', trump_suit=trump, status='pending'):
         return False
@@ -133,8 +208,8 @@ class ConfirmedKeycard(Gadget):
                 answer = self.call('ordinary_rkcb_' + trump.lower()
                                    + '_answer_' + bid.lower())
                 answer.when = '*'
-                answer.requires = StateExists('keycard_context', method='rkcb_1430',
-                                              trump_suit=trump)
+                answer.requires = lambda ctx, t=trump: (
+                    ordinary_rkcb_pending(ctx, t))
                 answer.bid = bid
                 answer.applies = (lambda ctx, t=trump, b=bid: (
                     ordinary_rkcb_pending(ctx, t)
@@ -177,6 +252,137 @@ class ConfirmedKeycard(Gadget):
                     else:
                         record.useful_void = bid[-1]
                         record.useful_void_category = 'exact'
+
+        # Ordinary-RKCB continuations read the latest public frame. Queen asks
+        # come first; the five-spade relay only exists where that bid is not
+        # structurally the queen ask.
+        queen_asks = {
+            'C': {'1/4': '5D', '0/3': '5H'},
+            'D': {'1/4': '5H', '0/3': '5H'},
+            'H': {'1/4': '5D', '0/3': '5S'},
+            'S': {'1/4': '5D', '0/3': '5H'},
+        }
+        for trump, categories in queen_asks.items():
+            for category, bid in categories.items():
+                qa = self.call('ordinary_rkcb_' + trump.lower()
+                               + '_queen_ask_' + category.replace('/', '_')
+                               + '_' + bid.lower())
+                qa.when = '*'
+                qa.requires = (lambda ctx, t=trump, c=category, b=bid:
+                               ordinary_queen_ask_requires(ctx, t, c, b))
+                qa.bid = bid
+                qa.applies = (lambda ctx, t=trump, c=category, b=bid:
+                              ordinary_queen_ask_requires(ctx, t, c, b))
+                qa.meaning.action = 'rkcb_1430_queen_ask'
+                qa.meaning.nature = ['artificial']
+                qa.meaning.acts = ['inquiry']
+                qa.meaning.target_suit = trump
+                qa.meaning.agreed_suit = trump
+                qa.description = 'Ask for the trump queen from the public 1430 answer.'
+                record = qa.effect('keycard_context')
+                record.method = 'rkcb_1430'
+                record.trump_suit = trump
+                record.status = 'answered'
+                record.continuation_stage = 'queen_ask'
+                carry_answer_state(record, trump)
+
+            relay = self.call('ordinary_rkcb_' + trump.lower()
+                              + '_five_spade_relay')
+            relay.when = '*'
+            relay.requires = (lambda ctx, t=trump:
+                              ordinary_relay_requires(ctx, t))
+            relay.bid = '5S'
+            relay.applies = (lambda ctx, t=trump:
+                             ordinary_relay_requires(ctx, t))
+            relay.meaning.action = 'rkcb_1430_relay_to_five_notrump'
+            relay.meaning.nature = ['artificial']
+            relay.meaning.acts = ['relay']
+            relay.meaning.target_suit = trump
+            relay.meaning.agreed_suit = trump
+            relay.description = ('Relay to five notrump when five of trumps is '
+                                 'unavailable or for a king show.')
+            record = relay.effect('keycard_context')
+            record.method = 'rkcb_1430'
+            record.trump_suit = trump
+            record.status = 'relay_pending'
+            record.continuation_stage = 'relay'
+            carry_answer_state(record, trump)
+
+            forced = self.call('ordinary_rkcb_' + trump.lower()
+                               + '_forced_five_notrump')
+            forced.when = '*'
+            forced.requires = lambda ctx, t=trump: (
+                ordinary_relay_pending_for_actor(ctx, t))
+            forced.bid = '5NT'
+            forced.applies = lambda ctx, t=trump: (
+                ordinary_relay_pending_for_actor(ctx, t))
+            forced.meaning.action = 'rkcb_1430_forced_relay_completion'
+            forced.meaning.nature = ['artificial']
+            forced.meaning.acts = ['relay']
+            forced.meaning.target_suit = trump
+            forced.description = 'Complete the forced five notrump relay.'
+            record = forced.effect('keycard_context')
+            record.method = 'rkcb_1430'
+            record.trump_suit = trump
+            record.status = 'relay_completed'
+            record.continuation_stage = 'relay'
+            carry_answer_state(record, trump)
+
+            for bid, action, acts in (
+                ('P', 'rkcb_1430_relay_pass', ['signoff', 'final_placement']),
+                ('6' + trump, 'rkcb_1430_relay_small_slam',
+                 ['signoff', 'final_placement']),
+            ):
+                finish = self.call('ordinary_rkcb_' + trump.lower()
+                                   + '_relay_after_' + bid.lower())
+                finish.when = '*'
+                finish.requires = lambda ctx, t=trump: (
+                    ordinary_relay_completion_for_actor(ctx, t))
+                finish.bid = bid
+                finish.applies = lambda ctx, t=trump: (
+                    ordinary_relay_completion_for_actor(ctx, t))
+                finish.meaning.action = action
+                finish.meaning.nature = ['natural']
+                finish.meaning.acts = acts
+                finish.meaning.target_suit = trump if bid != 'P' else 'N'
+                finish.meaning.agreed_suit = trump
+                finish.description = ('Place the contract after the forced relay.'
+                                      if bid != 'P' else
+                                      'Pass the forced five notrump relay.')
+                record = finish.effect('keycard_context')
+                record.method = 'rkcb_1430'
+                record.trump_suit = trump
+                record.status = 'completed'
+                record.continuation_stage = 'relay'
+                carry_answer_state(record, trump)
+
+            for suit in 'CDHS':
+                if suit == trump or '6' + suit > '6' + trump:
+                    continue
+                show = self.call('ordinary_rkcb_' + trump.lower()
+                                 + '_relay_show_' + suit.lower() + '_king')
+                show.when = '*'
+                show.requires = lambda ctx, t=trump: (
+                    ordinary_relay_completion_for_actor(ctx, t))
+                show.bid = '6' + suit
+                show.applies = (lambda ctx, t=trump, s=suit: (
+                    ordinary_relay_completion_for_actor(ctx, t)
+                    and ctx.hand is not None
+                    and ctx.hand.contains_rank(s, 'K')))
+                show.meaning.action = 'rkcb_1430_relay_king_show'
+                show.meaning.nature = ['artificial']
+                show.meaning.acts = ['control_showing', 'slam_try']
+                show.meaning.target_suit = trump
+                show.meaning.agreed_suit = trump
+                show.meaning.control_suit = suit
+                show.description = ('Show the ' + suit + ' king after the relay; '
+                                    'this is not a specific king ask.')
+                record = show.effect('keycard_context')
+                record.method = 'rkcb_1430'
+                record.trump_suit = trump
+                record.status = 'answered'
+                record.continuation_stage = 'relay'
+                carry_answer_state(record, trump)
 
         for branch, prefix, trump in asks:
             for bid, counts, queen, explanation in steps:
