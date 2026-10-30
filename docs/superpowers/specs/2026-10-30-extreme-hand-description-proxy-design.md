@@ -39,17 +39,33 @@ Thus an 8-2-2-1 hand never arbitrarily chooses one two-card suit as a second
 long suit. An 8-3-1-1 hand may change Q/J only in the eight-card suit; the
 three-card suit is neither short nor a protected long suit and remains fixed.
 
-The target descriptive shape moves one card from a longest suit to a
-third-longest suit. If suits tie for longest or third place, proxy search
-considers the Cartesian product of every tied donor and receiver, excluding a
-pair that names the same suit, and lets the normal ranking choose the least
-distorted result. For a two-suit hand, both real longest-suit identities remain
-the two protected long suits even when their lengths tie.
+Normalize the descriptive shape iteratively:
 
-The extra card makes a legal thirteen-card evaluation proxy and contributes to
-its K–R score, but its added length is masked during call matching. It must not
-make a new third-suit agreement, transfer, Stayman action, natural suit,
-support promise, or other length-dependent call available.
+1. classify the current shape with the same eight-plus-single and eleven-plus-
+   two-suit definitions;
+2. while it remains extreme, move one card from a current longest suit to a
+   current third-longest suit;
+3. if either rank is tied, branch over the Cartesian product of tied donors and
+   receivers, excluding a pair that names the same suit;
+4. stop a branch as soon as its shape is no longer extreme;
+5. deduplicate identical final shapes and cumulative per-suit move counts, then
+   let normal proxy ranking select the least distorted legal hand.
+
+The operation terminates because every move transfers a card from a strictly
+longer suit to a shorter suit and strictly decreases the sum of squared suit
+lengths. It is shape normalization inside proxy construction, not recursive
+`choose_bid` execution. Representative paths are:
+
+- `10-3-0-0 -> 9-3-1-0 -> 8-3-2-0 -> 7-3-3-0`;
+- `8-3-2-0 -> 7-3-3-0`;
+- `7-4-1-1 -> 6-4-2-1`;
+- `6-5-1-1 -> 5-5-2-1`.
+
+Every moved card makes the final evaluation proxy a legal thirteen-card hand
+and contributes to its K–R score. Receiver-side additions remain masked when
+matching suit-dependent calls. They must not make a new third-suit agreement,
+transfer, Stayman action, natural suit, support promise, or other length-
+dependent call available.
 
 ## Proxy-hand search
 
@@ -109,17 +125,17 @@ The search result contains three explicit immutable objects:
 - **evaluation proxy**: the complete legal synthetic `Hand`, used only to
   establish proxy K–R and proxy HCP;
 - **description view**: a typed `DescribedHandView` used only while evaluating
-  call applicability. It exposes proxy HCP/K–R, reports donor length as real
-  length minus one, reports receiver length as its real length (hiding the
-  added filler), and reports every other real length unchanged. It exposes the
-  actual holding for every suit and an explicit `unexpressed_filler=1` field.
+  call applicability. It exposes proxy HCP/K–R, reports each suit as its real
+  length minus the cumulative number of cards donated by that suit, and hides
+  every receiver-side addition. It exposes the actual holding for every suit,
+  `unexpressed_fillers_by_suit`, and the total `unexpressed_filler_count`.
 
-The description lengths intentionally total twelve plus one unexpressed
-filler. They are not a `Hand` and must never enter card validation or any helper
-that infers one suit as thirteen minus the others. Every route-shape query reads
-all four explicit `length(suit)` values. This makes third-suit masking an
-interface guarantee rather than a candidate filter based on incomplete public
-meanings.
+The description lengths intentionally total thirteen minus the number of
+receiver-side additions, with that many explicit unexpressed fillers. They are
+not a `Hand` and must never enter card validation or any helper that infers one
+suit as thirteen minus the others. Every route-shape query reads all four
+explicit `length(suit)` values. This makes receiver-suit masking an interface
+guarantee rather than a candidate filter based on incomplete public meanings.
 
 During proxy candidate generation, `BridgeContext.hand` is a compatibility
 facade over `DescribedHandView`: `.length()` returns descriptive values, while
@@ -204,6 +220,7 @@ versioned schema:
 
 - trigger class (`eight_plus_single` or `eleven_plus_two_suit`);
 - real and descriptive named shapes;
+- ordered normalization steps and cumulative donor/receiver counts;
 - real K–R, proxy K–R, and absolute difference;
 - changed-card count;
 - preserved and changed queen/jack locations;
@@ -241,7 +258,7 @@ Proxy search may be expensive, so cache it by:
 
 - canonical real hand;
 - trigger class and `protected_qj_suits`;
-- candidate donor/receiver identities for tied lengths;
+- normalized target shape and cumulative donor/receiver identities;
 - suits carrying an explicit public partner maximum of two cards;
 - proxy algorithm version.
 
@@ -274,31 +291,34 @@ Tests must be written before implementation and demonstrate:
 2. a real-hand call always wins over a possible proxy call;
 3. eight-card heart and spade 8-3-2-0 fourteen-HCP examples that currently TD
    select the route obtained from their best seven-card descriptive proxy;
-4. the shared Jacoby/Texas route family recognizes every five-plus length,
+4. 10-3-0-0 normalizes through three finite steps to 7-3-3-0 and invokes only
+   one proxy decision attempt;
+5. the shared Jacoby/Texas route family recognizes every five-plus length,
    preserves established five-, six-, and seven-card decisions, and defers
    eligible extreme lengths to the descriptive attempt;
-5. 6-5, 7-4, and other eleven-plus two-suit hands use the same generic path;
-6. A/K never move;
-7. Q/J changes occur only in `protected_qj_suits`; all Q/J membership is
+6. 6-5, 7-4, and other eleven-plus two-suit hands use the same generic path;
+7. A/K never move;
+8. Q/J changes occur only in `protected_qj_suits`; all Q/J membership is
    frozen in real actor suits of length two or fewer and in suits where partner
    has a public maximum of two;
-8. every selected proxy is a legal thirteen-card hand and has K–R error no
+9. every selected proxy is a legal thirteen-card hand and has K–R error no
    greater than 0.15;
-9. ranking minimizes changed cards, then K–R error, then maximizes preserved
+10. ranking minimizes changed cards, then K–R error, then maximizes preserved
    Q/J locations, and remains deterministic under cache warming;
-10. instrumented applicability reads prove the receiver's increased length is
+11. instrumented applicability reads prove every receiver-side increased
+    length is
     never observable; increasing it from three to four does not unlock
     Stayman, a second-suit bid, support, or any other third-suit route;
-11. real voids, controls, stoppers, keycards, and DDS inputs remain unchanged;
-12. applicability reads proxy aggregate strength only through `ctx.strength`,
+12. real voids, controls, stoppers, keycards, and DDS inputs remain unchanged;
+13. applicability reads proxy aggregate strength only through `ctx.strength`,
     while suit quality and holding-specific evidence remain actual;
-13. a failed real attempt leaves private memory and trace unchanged; the
+14. a failed real attempt leaves private memory and trace unchanged; the
     selected proxy purpose commits once and uses the real hand next turn;
-14. proxy search can rescue an authored later-auction route, proving the
+15. proxy search can rescue an authored later-auction route, proving the
     implementation is not tied to `1NT-Pass`;
-15. no legal DP result, illegal projection, and ambiguity each produce the
+16. no legal DP result, illegal projection, and ambiguity each produce the
     specified TD diagnostic;
-16. existing backend tests remain green.
+17. existing backend tests remain green.
 
 Shape-boundary fixtures include 8-2-2-1 and 8-3-1-1 single-suit hands as well
 as tied 6-6-1-0 two-suit donor choices.
