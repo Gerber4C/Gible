@@ -2126,3 +2126,42 @@ textarea {
 @media (max-width: 900px) {
   .iv-hand-picker, .iv-hand-pair { grid-template-columns: 1fr; }
 }
+
+.iv-run-row .iv-stop-button {
+  border: 1px solid #c97474;
+  background: #fff4f2;
+  color: #a1423b;
+}
+.iv-run-row .iv-stop-button:disabled { opacity: .45; }
+.iv-run-row .iv-complete-button {
+  border: 1px solid #7fa38e;
+  background: #f0f7f2;
+  color: #2b5c45;
+}
+.iv-run-row .iv-complete-button:disabled { opacity: .45; }
+
+.iv-completion-note {
+  margin: 8px 0 0;
+  padding: 7px 10px;
+  border: 1px solid #c7ddcf;
+  border-radius: 5px;
+  background: #f3faf5;
+  color: #2b5c45;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.iv-report-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: end; }
+.iv-report-actions button {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid #c6d7cc;
+  border-radius: 5px;
+  background: #fff;
+  color: #2b5c45;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.iv-report-actions button.danger { border-color: #d7a6a0; color: #a1423b; background: #fff8f6; }
+.iv-report-actions button:disabled { opacity: .45; cursor: not-allowed; }

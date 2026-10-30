@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .block_report_viewer import render_html
+from .coverage_extend import complete_report
 from .coverage_scan import COVERAGE_SHAPES, scan_coverage
 from .loader import load_profile
 from .outcome_metrics import (
@@ -511,6 +512,36 @@ def list_reports(root: Path = REPORT_ROOT) -> list[dict]:
     return sorted(results, key=lambda item: item['modified_at'], reverse=True)
 
 
+def copy_report(report_id: str, root: Path = REPORT_ROOT) -> dict:
+    """Duplicate a stored report under a new id, including its HTML viewer."""
+    source = _report_path(report_id, root)
+    if not source.is_file():
+        raise FileNotFoundError(report_id)
+    raw = json.loads(source.read_text(encoding='utf-8'))
+    base = source.stem + '-copy'
+    target = root / f'{base}.json'
+    suffix = 2
+    while target.exists():
+        target = root / f'{base}-{suffix}.json'
+        suffix += 1
+    target.write_text(json.dumps(raw, ensure_ascii=False) + chr(10),
+                      encoding='utf-8')
+    target.with_suffix('.html').write_text(render_html(raw), encoding='utf-8')
+    return {'id': target.name, 'source': source.name}
+
+
+def delete_report(report_id: str, root: Path = REPORT_ROOT) -> dict:
+    """Delete a stored report and its generated HTML viewer."""
+    path = _report_path(report_id, root)
+    if not path.is_file():
+        raise FileNotFoundError(report_id)
+    html = path.with_suffix('.html')
+    path.unlink()
+    if html.is_file():
+        html.unlink()
+    return {'id': report_id, 'deleted': True}
+
+
 class ScannerJobs:
     """One local background scan at a time; results persist as report files."""
 
@@ -518,6 +549,7 @@ class ScannerJobs:
         self.root = root
         self._lock = threading.Lock()
         self._current: dict | None = None
+        self._stop_event: threading.Event | None = None
 
     def status(self) -> dict | None:
         with self._lock:
@@ -530,18 +562,131 @@ class ScannerJobs:
             if self._current and self._current['status'] in ('queued', 'running'):
                 raise ValueError('A scanner run is already in progress')
             job_id = uuid.uuid4().hex[:12]
-            self._current = {'id': job_id, 'status': 'queued',
+            self._stop_event = threading.Event()
+            self._current = {'id': job_id, 'status': 'queued', 'mode': 'scan',
                              'profile': options['profile'],
                              'planned_pairs': options['planned_pairs'],
                              'completed_pairs': 0, 'dds_boards': 0,
                              'report_id': None, 'snapshot_pairs': 0,
-                             'error': None}
+                             'stop_requested': False, 'error': None}
             snapshot = dict(self._current)
-        threading.Thread(target=self._run, args=(job_id, options, profile),
+        threading.Thread(target=self._run,
+                         args=(job_id, options, profile, self._stop_event),
                          daemon=True, name='iv-scanner').start()
         return snapshot
 
-    def _run(self, job_id: str, options: dict, profile) -> None:
+    def stop(self) -> dict | None:
+        with self._lock:
+            if (self._current is None
+                    or self._current.get('status') not in
+                    ('queued', 'running', 'stopping')):
+                return dict(self._current) if self._current else None
+            if self._stop_event is not None:
+                self._stop_event.set()
+            self._current.update(
+                stop_requested=True,
+                status=('queued' if self._current.get('status') == 'queued'
+                        else 'stopping'))
+            return dict(self._current)
+
+    def complete(self, report_id: str, request: dict | None = None) -> dict:
+        request = request or {}
+        path = _report_path(report_id, self.root)
+        if not path.is_file():
+            raise FileNotFoundError(report_id)
+        source = json.loads(path.read_text(encoding='utf-8'))
+        profile_id = request.get('profile') or (source.get('profile') or {}).get('id')
+        if not isinstance(profile_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]+', profile_id):
+            raise ValueError('Invalid profile id')
+        budget = source.get('budget') or {}
+        options = {
+            'north_cap': request.get('north_cap', budget.get('north_cap', NORTH_CAP)),
+            'south_cap': request.get('south_cap', budget.get('south_cap', SOUTH_CAP)),
+            'ew_samples': request.get('ew_samples', budget.get('ew_samples', 10)),
+            'seed': request.get('seed', source.get('seed', 23)),
+            'max_attempts_per_bucket': request.get(
+                'max_attempts_per_bucket', 80),
+        }
+        for key, lower in (('north_cap', 0), ('south_cap', 0),
+                           ('ew_samples', 1), ('max_attempts_per_bucket', 1)):
+            value = options[key]
+            if isinstance(value, bool) or not isinstance(value, int) or value < lower:
+                raise ValueError(f'{key} must be an integer >= {lower}')
+        if options['ew_samples'] > 20:
+            raise ValueError('ew_samples must be an integer from 1 to 20')
+        profile = load_profile(profile_id)
+        with self._lock:
+            if self._current and self._current['status'] in (
+                    'queued', 'running', 'stopping'):
+                raise ValueError('A scanner run is already in progress')
+            job_id = uuid.uuid4().hex[:12]
+            self._stop_event = None
+            self._current = {
+                'id': job_id, 'status': 'queued', 'mode': 'complete',
+                'profile': profile_id,
+                'planned_pairs': (source.get('summary') or {}).get('pairs', 0),
+                'completed_pairs': 0, 'dds_boards': 0,
+                'report_id': report_id,
+                'snapshot_pairs': (source.get('summary') or {}).get('pairs', 0),
+                'stop_requested': False, 'error': None,
+            }
+            snapshot = dict(self._current)
+        threading.Thread(
+            target=self._run_complete,
+            args=(job_id, report_id, path, profile, options),
+            daemon=True, name='iv-scanner-complete').start()
+        return snapshot
+
+    def _run_complete(self, job_id: str, report_id: str, path: Path,
+                      profile, options: dict) -> None:
+        def progress(summary: dict, total: int) -> None:
+            with self._lock:
+                if self._current and self._current['id'] == job_id:
+                    pairs = summary.get('pairs', 0)
+                    self._current.update(
+                        status='running',
+                        completed_pairs=pairs,
+                        planned_pairs=max(total, pairs),
+                        dds_boards=summary.get('dds_boards', 0))
+
+        def snapshot(report: dict) -> None:
+            temporary = path.with_name(path.name + '.tmp')
+            temporary.write_text(
+                json.dumps(report, ensure_ascii=False) + chr(10),
+                encoding='utf-8')
+            temporary.replace(path)
+            with self._lock:
+                if self._current and self._current['id'] == job_id:
+                    self._current.update(
+                        report_id=path.name,
+                        snapshot_pairs=(report.get('summary') or {}).get(
+                            'pairs', 0))
+
+        try:
+            source = json.loads(path.read_text(encoding='utf-8'))
+            report = complete_report(
+                source, profile,
+                north_cap=options['north_cap'],
+                south_cap=options['south_cap'],
+                ew_samples=options['ew_samples'],
+                seed=options['seed'],
+                max_attempts_per_bucket=options['max_attempts_per_bucket'],
+                progress=progress, snapshot=snapshot)
+            snapshot(report)
+            path.with_suffix('.html').write_text(
+                render_html(report), encoding='utf-8')
+            with self._lock:
+                self._current.update(
+                    status='completed',
+                    report_id=path.name,
+                    completed_pairs=(report.get('summary') or {}).get('pairs', 0),
+                    dds_boards=(report.get('summary') or {}).get('dds_boards', 0))
+        except Exception as exc:
+            with self._lock:
+                self._current.update(status='failed', error=str(exc))
+
+    def _run(self, job_id: str, options: dict, profile,
+             stop_event: threading.Event) -> None:
         def progress(summary: dict, total: int) -> None:
             with self._lock:
                 if self._current and self._current['id'] == job_id:
@@ -579,14 +724,17 @@ class ScannerJobs:
                 south_cap=options.get('south_cap', SOUTH_CAP),
                 progress=progress,
                 snapshot=snapshot,
-                snapshot_every=options.get('snapshot_every', 20))
+                snapshot_every=options.get('snapshot_every', 20),
+                stop=stop_event.is_set)
             snapshot(report)
             html_path.write_text(render_html(report), encoding='utf-8')
+            stopped = stop_event.is_set()
             with self._lock:
-                self._current.update(status='completed',
-                                     report_id=json_path.name,
-                                     completed_pairs=report['summary']['pairs'],
-                                     dds_boards=report['summary']['dds_boards'])
+                self._current.update(
+                    status='stopped' if stopped else 'completed',
+                    report_id=json_path.name,
+                    completed_pairs=report['summary']['pairs'],
+                    dds_boards=report['summary']['dds_boards'])
         except Exception as exc:
             with self._lock:
                 self._current.update(status='failed', error=str(exc))

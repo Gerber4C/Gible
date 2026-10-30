@@ -377,6 +377,7 @@ def scan_coverage(
     progress: Callable[[dict, int], None] | None = None,
     snapshot: Callable[[dict], None] | None = None,
     snapshot_every: int = 25,
+    stop: Callable[[], bool] | None = None,
 ) -> dict:
     """Cover the complete Daqiush 1NT opener space and South quota cells."""
     if pairs_per_cell < 1 or ew_samples < 1 or min_class_boards < 1 or min_class_pairs < 1:
@@ -452,6 +453,8 @@ def scan_coverage(
     }
 
     for trial, (cell, stratum, slot) in enumerate(schedule, 1):
+        if stop is not None and stop():
+            break
         hcp = cell['target_hcp']
         shape_index = cell['base_shape_index']
         base_shape = tuple(cell['base_shape'])

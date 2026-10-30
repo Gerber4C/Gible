@@ -7,7 +7,9 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from app import bid, contract_analysis, route_analysis, simulate, system_notes, training_deal
 from engine.axiom_validation import AxiomDefinitionError
-from engine.iv_scanner import ScannerJobs, list_reports, read_report
+from engine.iv_scanner import (
+    ScannerJobs, copy_report, delete_report, list_reports, read_report,
+)
 
 
 BACKEND_DIR = Path(__file__).resolve().parent
@@ -90,6 +92,25 @@ class GibleRequestHandler(BaseHTTPRequestHandler):
             if parsed.path == '/api/scanner/runs':
                 self._send_json({'run': SCANNER_JOBS.start(payload)}, status=202)
                 return
+            if parsed.path == '/api/scanner/runs/stop':
+                self._send_json({'run': SCANNER_JOBS.stop()})
+                return
+            if (parsed.path.startswith('/api/scanner/reports/')
+                    and parsed.path.endswith('/complete')):
+                report_id = unquote(parsed.path[
+                    len('/api/scanner/reports/'):-len('/complete')])
+                self._send_json(
+                    {'run': SCANNER_JOBS.complete(report_id, payload)},
+                    status=202)
+                return
+            if (parsed.path.startswith('/api/scanner/reports/')
+                    and parsed.path.endswith('/copy')):
+                report_id = unquote(parsed.path[
+                    len('/api/scanner/reports/'):-len('/copy')])
+                if self._scanner_report_active(report_id):
+                    raise ValueError('Report is in use by a scanner run')
+                self._send_json({'report': copy_report(report_id)}, status=201)
+                return
             if parsed.path.startswith("/api/profiles/") and parsed.path.endswith("/file"):
                 profile_id = _path_part(parsed.path, 2)
                 self._send_json(_write_profile_file(profile_id, payload))
@@ -106,6 +127,13 @@ class GibleRequestHandler(BaseHTTPRequestHandler):
     def do_DELETE(self) -> None:
         parsed = urlparse(self.path)
         try:
+            if parsed.path.startswith('/api/scanner/reports/'):
+                report_id = unquote(parsed.path[
+                    len('/api/scanner/reports/'):])
+                if self._scanner_report_active(report_id):
+                    raise ValueError('Report is in use by a scanner run')
+                self._send_json(delete_report(report_id))
+                return
             if parsed.path.startswith("/api/profiles/") and parsed.path.endswith("/file"):
                 profile_id = _path_part(parsed.path, 2)
                 query = parse_qs(parsed.query)
@@ -115,6 +143,11 @@ class GibleRequestHandler(BaseHTTPRequestHandler):
             self._send_json({"error": "not_found", "path": parsed.path}, status=404)
         except Exception as exc:
             self._send_json({"error": exc.__class__.__name__, "message": str(exc)}, status=500)
+
+    def _scanner_report_active(self, report_id: str) -> bool:
+        run = SCANNER_JOBS.status() or {}
+        return (run.get('status') in ('queued', 'running', 'stopping')
+                and run.get('report_id') == report_id)
 
     def _read_json_body(self) -> dict:
         length = int(self.headers.get("Content-Length", "0"))

@@ -1,6 +1,8 @@
 import { React, e } from "../ui/react.js";
 import {
+  completeScannerReport, copyScannerReport, deleteScannerReport,
   listScannerReports, readScannerReport, scannerRunStatus, startScannerRun,
+  stopScannerRun,
 } from "../api/gibleApi.js";
 import {
   DEFAULT_THRESHOLDS, filterProcessGroups, filterScannerGroups,
@@ -685,6 +687,65 @@ export function IVScanner({ profileId }) {
     return () => { active = false; window.clearInterval(timer); };
   }, [profileId]);
 
+  async function stopScan() {
+    setError("");
+    try {
+      const result = await stopScannerRun();
+      setRun(result.run);
+    } catch (failure) {
+      setError(failure.message);
+    }
+  }
+
+  async function completeReport() {
+    if (!reportId) return;
+    setError("");
+    manualReport.current = true;
+    loadedRun.current = null;
+    try {
+      const result = await completeScannerReport(reportId, {
+        north_cap: Number(northCap), south_cap: Number(southCap),
+        ew_samples: Number(ewSamples), seed: Number(seed),
+      });
+      setRun(result.run);
+    } catch (failure) {
+      setError(failure.message);
+    }
+  }
+
+  async function copyReport() {
+    if (!reportId) return;
+    if (!window.confirm(`Copy report ${reportId}?`)) return;
+    setError("");
+    try {
+      const result = await copyScannerReport(reportId);
+      const copiedId = result.report?.id;
+      await refreshReports(copiedId);
+      if (copiedId) setReportId(copiedId);
+      setCategory("all");
+      setSearch("");
+    } catch (failure) {
+      setError(failure.message);
+    }
+  }
+
+  async function deleteReport() {
+    if (!reportId) return;
+    if (!window.confirm(`Delete report ${reportId}?`)) return;
+    if (!window.confirm(
+      "This is the second confirmation. Delete the report and its HTML viewer permanently?")) return;
+    setError("");
+    try {
+      await deleteScannerReport(reportId);
+      setSelectedGroupId(null);
+      setSelectedPairId(null);
+      setSelectedProcessKey(null);
+      await refreshReports();
+    } catch (failure) {
+      setError(failure.message);
+    }
+  }
+
   async function startScan() {
     setError("");
     manualReport.current = false;
@@ -793,7 +854,7 @@ export function IVScanner({ profileId }) {
     setSelectedProcessKey(keys[0] || null);
   }, [processSource, selectedProcessKey]);
 
-  const running = run?.status === "running" || run?.status === "queued";
+  const running = ["running", "queued", "stopping"].includes(run?.status);
   const plannedPairsPerCell = Math.max(Number(northCap), Number(southCap));
   const planned = (Number(hcpMax) - Number(hcpMin) + 1) * FULL_SCAN_SHAPES * plannedPairsPerCell;
 
@@ -849,12 +910,25 @@ export function IVScanner({ profileId }) {
         e("div", { className: "iv-run-row" },
           e("button", { className: "primary", onClick: startScan, disabled: running },
             running ? "Scan running…" : "Start scan"),
+          e("button", {
+            className: "iv-stop-button", onClick: stopScan,
+            disabled: !running || run?.mode === "complete" || run?.stop_requested,
+          }, run?.stop_requested ? "Stopping…" : "Stop scan"),
+          e("button", {
+            className: "iv-complete-button", onClick: completeReport,
+            disabled: running || !reportId,
+            title: "Re-bid every stored hand, update changed processes, then fill N/S caps",
+          }, "Complete report"),
           e("span", null, `North 1NT · all ${FULL_SCAN_SHAPES} South shapes · opponents pass · DDS evaluates completed auctions`),
         ),
         run && e("div", { className: `iv-progress iv-progress-${run.status}`, role: "status" },
           e("div", null,
-            e("strong", null, run.status === "completed" ? "Scan complete" :
-              run.status === "failed" ? "Scan failed" : "Scanning deals"),
+            e("strong", null, run.status === "completed"
+              ? (run.mode === "complete" ? "Report complete" : "Scan complete")
+              : run.status === "stopped" ? "Scan stopped"
+              : run.status === "failed" ? (run.mode === "complete"
+                ? "Report completion failed" : "Scan failed")
+              : run.mode === "complete" ? "Completing report" : "Scanning deals"),
             e("span", null, `${run.completed_pairs}/${run.planned_pairs} pairs · ${run.dds_boards} DDS boards`),
           ),
           e("div", { className: "iv-progress-track" },
@@ -872,11 +946,27 @@ export function IVScanner({ profileId }) {
             reports.map((item) => e("option", { key: item.id, value: item.id },
               `${item.id} · ${item.summary?.pairs ?? 0} pairs`)),
           )),
+          e("div", { className: "iv-report-actions" },
+            e("button", {
+              type: "button", onClick: copyReport,
+              disabled: running || !reportId,
+              title: "Duplicate this report and its HTML viewer",
+            }, "Copy report"),
+            e("button", {
+              type: "button", className: "danger", onClick: deleteReport,
+              disabled: running || !reportId,
+              title: "Delete this report after two confirmations",
+            }, "Delete report")),
         ),
         report && e("div", { className: "iv-summary-line" },
           `${report.summary?.pairs ?? 0} N/S pairs · ${report.summary?.dds_boards ?? 0} DDS boards · `,
           `${report.summary?.overflow ?? 0} overflow hands (weighted, not stored) · `,
           `${report.summary?.unassessed ?? 0} completed cases without enough comparable boards`),
+        report?.completion && e("p", { className: "iv-completion-note" },
+          `Completed report · ${report.completion.rebidded_pairs ?? 0} hands re-bid · `
+          + `${report.completion.changed_pairs ?? 0} process changes · `
+          + `${report.completion.added_pairs ?? 0} hands added · `
+          + `${report.completion.remaining_deficits?.length ?? 0} cap deficits remain`),
         report && e("div", { className: "iv-thresholds", role: "group",
           "aria-label": "Alarm thresholds" },
           e("div", { className: "iv-thresholds-head" },

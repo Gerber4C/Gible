@@ -56,6 +56,24 @@ export async function startScannerRun(payload) {
   return postJson("/api/scanner/runs", payload);
 }
 
+export async function stopScannerRun() {
+  return postJson("/api/scanner/runs/stop", {});
+}
+
+export async function completeScannerReport(reportId, payload) {
+  return postJson(
+    `/api/scanner/reports/${encodeURIComponent(reportId)}/complete`, payload);
+}
+
+export async function copyScannerReport(reportId) {
+  return postJson(
+    `/api/scanner/reports/${encodeURIComponent(reportId)}/copy`, {});
+}
+
+export async function deleteScannerReport(reportId) {
+  return deleteJson(`/api/scanner/reports/${encodeURIComponent(reportId)}`);
+}
+
 async function getJson(path) {
   return requestJson("GET", path);
 }

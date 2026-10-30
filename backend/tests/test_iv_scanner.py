@@ -3,7 +3,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from engine.iv_scanner import list_reports, project_report, read_report, scan_options
+from engine.iv_scanner import (
+    copy_report, delete_report, list_reports, project_report, read_report,
+    scan_options,
+)
 from engine.outcome_metrics import RULE_ID
 
 
@@ -348,7 +351,7 @@ class IVScannerTests(unittest.TestCase):
 
         def fake_scan(profile, *, seed, hcp_targets, shapes, pairs_per_cell,
                       ew_samples, north_cap, south_cap, progress, snapshot,
-                      snapshot_every):
+                      snapshot_every, stop=None):
             report = {
                 'schema_version': 2,
                 'profile': {'id': 'daqiush_2over1', 'name': 'x', 'version': '1'},
@@ -392,6 +395,103 @@ class IVScannerTests(unittest.TestCase):
         groups = blocked['north_groups'] + blocked['south_groups']
         self.assertTrue(any(group['categories'].get('block')
                             for group in groups))
+
+    def test_scanner_job_can_be_stopped(self):
+        import time
+        from unittest.mock import patch
+        from engine.iv_scanner import ScannerJobs
+
+        def fake_scan(profile, *, seed, hcp_targets, shapes, pairs_per_cell,
+                      ew_samples, north_cap, south_cap, progress, snapshot,
+                      snapshot_every, stop=None):
+            report = {
+                'schema_version': 2,
+                'profile': {'id': 'daqiush_2over1', 'name': 'x', 'version': '1'},
+                'seed': seed, 'filters': {}, 'coverage': {},
+                'budget': {'pairs_per_cell': pairs_per_cell,
+                           'ew_samples': ew_samples},
+                'summary': {'pairs': 0, 'complete': 0, 'blocked': 0,
+                            'limit': 0, 'dds_boards': 0, 'suspicious': 0,
+                            'unassessed': 0},
+                'cases': [], 'complete_cases': [], 'limit_cases': [],
+            }
+            for _ in range(500):
+                if stop is not None and stop():
+                    break
+                time.sleep(0.005)
+            snapshot(report)
+            return report
+
+        with tempfile.TemporaryDirectory() as directory:
+            jobs = ScannerJobs(root=Path(directory))
+            with patch('engine.iv_scanner.scan_coverage', side_effect=fake_scan),                     patch('engine.iv_scanner.render_html',
+                          return_value='<html></html>'):
+                jobs.start({'profile': 'daqiush_2over1', 'seed': 1,
+                            'hcp_min': 0, 'hcp_max': 0,
+                            'pairs_per_cell': 1, 'ew_samples': 1})
+                for _ in range(200):
+                    if (jobs.status() or {}).get('status') == 'running':
+                        break
+                    time.sleep(0.01)
+                jobs.stop()
+                for _ in range(300):
+                    status = jobs.status() or {}
+                    if status.get('status') == 'stopped':
+                        break
+                    time.sleep(0.01)
+            self.assertEqual(status.get('status'), 'stopped')
+
+    def test_complete_report_rebids_existing_hands(self):
+        from engine.coverage_extend import complete_report
+        from engine.loader import load_profile
+
+        hands = {'n': 'SAKQ2HK32DQJ2C432', 's': 'S5432HAQ4DK43C654',
+                 'e': 'SJTH765D765CT9876', 'w': 'S9876HJ98DAT8CQJ8'}
+        case = {
+            'id': 1, 'trial': 1, 'dealer': 'n', 'vulnerability': 'none',
+            'hands': hands, 'north_hcp': 15, 'south_hcp': 11,
+            'north_kr': 15.0, 'south_kr': 12.0,
+            'north_shape': [4, 3, 3, 3], 'south_shape': [4, 3, 3, 3],
+            'calls': ['1N', 'P'], 'auction': '1NP',
+            'coverage_cell': {'target_hcp': 11, 'base_shape_index': 0,
+                              'base_shape': [4, 3, 3, 3], 'pair_slot': 0},
+        }
+        report = {
+            'schema_version': 2, 'profile': {'id': 'daqiush_2over1'},
+            'budget': {'ew_samples': 1, 'north_cap': 1, 'south_cap': 1},
+            'summary': {'pairs': 1}, 'coverage': {},
+            'cases': [], 'complete_cases': [case], 'limit_cases': [],
+        }
+
+        def table(deal):
+            return {strain: {seat: 13 for seat in 'ns'}
+                    for strain in 'SHDCNT'}
+
+        updated = complete_report(
+            report, load_profile('daqiush_2over1'), ew_samples=1,
+            seed=1, max_attempts_per_bucket=1, solve_table=table)
+        self.assertEqual(updated['completion']['rebidded_pairs'], 1)
+        self.assertIn('completion', updated)
+        self.assertEqual(
+            updated['completion']['north_cap'], 1)
+
+    def test_copy_and_delete_report_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'iv-scan-test.json'
+            report = self.sample_report()
+            report['block_points'] = []
+            report['suspicious_cases'] = []
+            source.write_text(json.dumps(report), encoding='utf-8')
+            copied = copy_report(source.name, root)
+            target = root / copied['id']
+            self.assertTrue(target.is_file())
+            self.assertTrue(target.with_suffix('.html').is_file())
+            self.assertEqual(json.loads(target.read_text())['schema_version'], 2)
+            deleted = delete_report(copied['id'], root)
+            self.assertTrue(deleted['deleted'])
+            self.assertFalse(target.exists())
+            self.assertFalse(target.with_suffix('.html').exists())
 
 
 if __name__ == '__main__':

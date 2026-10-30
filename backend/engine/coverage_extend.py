@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Callable, Mapping
 
 from .auction import Auction
+from .cards import Hand
 from .coverage_scan import (
     _contract,
     _history,
@@ -39,6 +40,7 @@ from .opener_coverage import (
 )
 from .outcome_metrics import (
     RULE_ID, assess_auction_groups, case_cell_key, case_process_key,
+    north_bucket_key, south_bucket_key,
 )
 from .selector import choose_bid
 from .simulator import simulate_auction
@@ -1074,6 +1076,326 @@ def main(argv: list[str] | None = None) -> int:
           f"{len(extension['skipped_cells'])} cells skipped{detail}. "
           f"Report: {args.output}; viewer: {html_path}")
     return 0
+
+
+def complete_report(
+    report: Mapping,
+    profile,
+    *,
+    north_cap: int | None = None,
+    south_cap: int | None = None,
+    ew_samples: int | None = None,
+    seed: int = 41,
+    solve_table: Callable = calculate_available_table,
+    max_attempts_per_bucket: int = 80,
+    progress: Callable[[dict, int], None] | None = None,
+    snapshot: Callable[[dict], None] | None = None,
+    snapshot_every: int = 25,
+) -> dict:
+    """Re-bid every stored hand, update its process, then fill N/S caps."""
+    if report.get('schema_version') != 2:
+        raise ValueError('source must be a coverage report (schema version 2)')
+    budget = report.get('budget') or {}
+    if north_cap is None:
+        north_cap = budget.get('north_cap', 20)
+    if south_cap is None:
+        south_cap = budget.get('south_cap', 20)
+    if ew_samples is None:
+        ew_samples = budget.get('ew_samples', 10)
+    if not isinstance(north_cap, int) or isinstance(north_cap, bool) or north_cap < 0:
+        raise ValueError('north_cap must be a non-negative integer')
+    if not isinstance(south_cap, int) or isinstance(south_cap, bool) or south_cap < 0:
+        raise ValueError('south_cap must be a non-negative integer')
+    if not isinstance(ew_samples, int) or isinstance(ew_samples, bool) or not 1 <= ew_samples <= 20:
+        raise ValueError('ew_samples must be an integer from 1 to 20')
+    if not isinstance(max_attempts_per_bucket, int) or max_attempts_per_bucket < 1:
+        raise ValueError('max_attempts_per_bucket must be a positive integer')
+
+    updated = json.loads(json.dumps(report))
+    rng = random.Random(seed)
+    all_cases = []
+    for key in ('cases', 'complete_cases', 'limit_cases'):
+        items = updated.get(key, [])
+        if not isinstance(items, list):
+            raise ValueError(f'{key} must be a list')
+        all_cases.extend(case for case in items if isinstance(case, Mapping))
+    ids = [case.get('id') for case in all_cases
+           if isinstance(case.get('id'), int)
+           and not isinstance(case.get('id'), bool)]
+    next_id = (max(ids) + 1) if ids else 1
+
+    rebidded = 0
+    changed = 0
+    for case in all_cases:
+        if not _case_has_hands(case):
+            continue
+        old_calls = tuple(case.get('calls') or ())
+        _rebid_case(case, profile, ew_samples, rng, solve_table)
+        rebidded += 1
+        if tuple(case.get('calls') or ()) != old_calls:
+            changed += 1
+        if progress is not None:
+            progress({'pairs': rebidded, 'dds_boards': 0,
+                      'changed_pairs': changed, 'added_pairs': 0},
+                     len(all_cases))
+    _rebuild_collections(updated, all_cases)
+
+    counts = {}
+    for case in all_cases:
+        _register_hands(counts, case)
+    initial_deficits = _cap_deficits(counts, north_cap, south_cap)
+    added = 0
+    attempts = 0
+    max_attempts = max(200, sum(item[3] for item in initial_deficits)
+                       * max_attempts_per_bucket)
+    while attempts < max_attempts:
+        deficits = _cap_deficits(counts, north_cap, south_cap)
+        if not deficits:
+            break
+        progressed = False
+        cells_cache = _cases_by_cell(all_cases)
+        for process, side, bucket, _missing in deficits:
+            if attempts >= max_attempts:
+                break
+            representatives = [
+                case for case in all_cases
+                if _case_has_hands(case) and case_process_key(case) == process
+                and ((north_bucket_key(case) == bucket) if side == 'n'
+                     else (south_bucket_key(case) == bucket))]
+            if not representatives:
+                continue
+            representative = min(representatives, key=_case_key)
+            cell_key = case_cell_key(representative)
+            members = [(case, _case_status(case))
+                       for case in cells_cache.get(cell_key, [])]
+            spec = _cell_spec(members)
+            if spec is None:
+                continue
+            allocate_slot = _slot_allocator(members)
+            accepted = 0
+            for _ in range(max_attempts_per_bucket):
+                if attempts >= max_attempts:
+                    break
+                attempts += 1
+                hands = _sample_extra_hands(rng, profile, spec, members)
+                if hands is None:
+                    continue
+                simulation = simulate_auction(
+                    profile, {'n': hands['n'], 's': hands['s']},
+                    dealer='n', vulnerability='none',
+                    environment={'dealer': 'n', 'vulnerability': 'none',
+                                 'scoring': 'IMP'}, max_calls=80,
+                )
+                if not simulation.calls or simulation.calls[0] != '1N':
+                    continue
+                if tuple(str(call) for call in simulation.calls) != process:
+                    continue
+                slot = allocate_slot() if allocate_slot is not None else None
+                case = _new_case(
+                    next_id, hands, simulation,
+                    cell_meta=spec.get('coverage_cell')
+                    or representative.get('coverage_cell'),
+                    pair_slot=slot)
+                if side == 'n' and north_bucket_key(case) != bucket:
+                    continue
+                if side == 's' and south_bucket_key(case) != bucket:
+                    continue
+                status = _attach_case_result(
+                    case, simulation, ew_samples, rng, solve_table)
+                next_id += 1
+                added += 1
+                accepted += 1
+                all_cases.append(case)
+                _append_case(updated, case, status)
+                _register_hands(counts, case)
+                progressed = True
+                if progress is not None:
+                    progress({'pairs': len(all_cases), 'dds_boards': 0,
+                              'changed_pairs': changed,
+                              'added_pairs': added},
+                             len(all_cases))
+                if snapshot is not None and added % snapshot_every == 0:
+                    _refresh_report_views(updated)
+                    snapshot(updated)
+                break
+            if accepted:
+                break
+        if not progressed:
+            break
+
+    _rebuild_collections(updated, all_cases)
+    _refresh_report_views(updated)
+    updated['budget'] = {
+        **budget, 'north_cap': north_cap, 'south_cap': south_cap,
+        'ew_samples': ew_samples,
+    }
+    remaining = [
+        {'process': list(process), 'side': side, 'bucket': list(bucket),
+         'missing': missing}
+        for process, side, bucket, missing in
+        _cap_deficits(counts, north_cap, south_cap)
+    ]
+    updated['completion'] = {
+        'kind': 'report_completion',
+        'rebidded_pairs': rebidded, 'changed_pairs': changed,
+        'added_pairs': added, 'attempted_pairs': attempts,
+        'north_cap': north_cap, 'south_cap': south_cap,
+        'remaining_deficits': remaining,
+    }
+    if snapshot is not None:
+        snapshot(updated)
+    if progress is not None:
+        progress({'pairs': len(all_cases), 'dds_boards': 0,
+                  'changed_pairs': changed, 'added_pairs': added},
+                 len(all_cases))
+    return updated
+
+
+def _case_has_hands(case: Mapping) -> bool:
+    hands = case.get('hands')
+    if not isinstance(hands, Mapping):
+        return False
+    for seat in ('n', 's'):
+        compact = hands.get(seat)
+        if not isinstance(compact, str) or not compact:
+            return False
+        try:
+            Hand.parse(compact)
+        except (TypeError, ValueError):
+            return False
+    return True
+
+
+def _case_status(case: Mapping) -> str:
+    if case.get('status') == 'limit':
+        return 'limit'
+    if case.get('blocked'):
+        return 'blocked'
+    return 'complete'
+
+
+def _rebuild_collections(report: Mapping, all_cases) -> None:
+    collections = {'blocked': [], 'complete': [], 'limit': []}
+    for case in all_cases:
+        collections[_case_status(case)].append(case)
+    report['cases'] = collections['blocked']
+    report['complete_cases'] = collections['complete']
+    report['limit_cases'] = collections['limit']
+
+
+def _append_case(report: Mapping, case: Mapping, status: str) -> None:
+    key = {'blocked': 'cases', 'complete': 'complete_cases',
+           'limit': 'limit_cases'}[status]
+    report.setdefault(key, []).append(case)
+
+
+def _rebid_case(case, profile, ew_samples, rng, solve_table) -> str:
+    hands = case.get('hands') or {}
+    north = Hand.parse(hands['n'])
+    south = Hand.parse(hands['s'])
+    dealer = case.get('dealer', 'n')
+    vulnerability = case.get('vulnerability', 'none')
+    simulation = simulate_auction(
+        profile, {'n': north, 's': south},
+        dealer=dealer, vulnerability=vulnerability,
+        environment={'dealer': dealer, 'vulnerability': vulnerability,
+                     'scoring': 'IMP'}, max_calls=80,
+    )
+    case['calls'] = list(simulation.calls)
+    case['auction'] = simulation.compact_sequence()
+    case['history'] = _history(simulation)
+    return _attach_case_result(case, simulation, ew_samples, rng, solve_table)
+
+
+def _attach_case_result(case, simulation, ew_samples, rng, solve_table) -> str:
+    case.pop('analysis', None)
+    if simulation.status == 'blocked':
+        case.pop('status', None)
+        case.pop('contract', None)
+        case.pop('declarer', None)
+        case.pop('dds_tables', None)
+        case.update(blocked=simulation.blocked, review_status='unreviewed')
+        return 'blocked'
+    if simulation.status == 'complete':
+        contract, declarer = _contract(simulation.calls)
+        case.pop('blocked', None)
+        case.pop('status', None)
+        case.update(contract=contract, declarer=declarer)
+        _ensure_dds(case, ew_samples, rng, solve_table)
+        return 'complete'
+    case.pop('blocked', None)
+    case.pop('contract', None)
+    case.pop('declarer', None)
+    case.pop('dds_tables', None)
+    case['status'] = 'limit'
+    return 'limit'
+
+
+def _ensure_dds(case, ew_samples, rng, solve_table) -> None:
+    hands = case.get('hands') or {}
+    north = Hand.parse(hands['n'])
+    south = Hand.parse(hands['s'])
+    tables = list(case.get('dds_tables') or ())
+    while len(tables) < ew_samples:
+        index = len(tables)
+        if index == 0:
+            deal = {seat: (north if seat == 'n' else south
+                           if seat == 's' else Hand.parse(hands[seat]))
+                    for seat in 'nsew'}
+        else:
+            deal = complete_opponents(rng, north, south)
+        tables.append(solve_table(deal))
+    case['dds_tables'] = tables[:ew_samples]
+
+
+def _register_hands(counts, case) -> None:
+    if not _case_has_hands(case):
+        return
+    hands = case['hands']
+    process = case_process_key(case)
+    counts.setdefault((process, 'n', north_bucket_key(case)), set()).add(
+        hands['n'])
+    counts.setdefault((process, 's', south_bucket_key(case)), set()).add(
+        hands['s'])
+
+
+def _cap_deficits(counts, north_cap, south_cap):
+    deficits = []
+    for (process, side, bucket), hands in counts.items():
+        cap = north_cap if side == 'n' else south_cap
+        if cap and len(hands) < cap:
+            deficits.append((process, side, bucket, cap - len(hands)))
+    deficits.sort(key=lambda item: (-item[3], item[0], item[1], item[2]))
+    return deficits
+
+
+def _cases_by_cell(cases):
+    grouped = {}
+    for case in cases:
+        grouped.setdefault(case_cell_key(case), []).append(case)
+    return grouped
+
+
+def _sample_extra_hands(rng, profile, spec, members):
+    try:
+        if spec['explicit']:
+            assessment = _opening_assessment(profile)
+            if assessment is None:
+                return None
+            return _sample_explicit(rng, spec, members, [], assessment)
+        return sample_partnership(
+            rng, spec['south_hcp'], spec['south_shape'],
+            opener_eligible=_opener_eligible(profile),
+            opener_shape=spec['north_shape'],
+            opener_hcp=spec['north_hcp'], reference=spec['reference'])
+    except (JointConstraintError, RuntimeError, ValueError):
+        return None
+
+
+def _refresh_report_views(report) -> None:
+    _refresh_analysis(report)
+    _refresh_block_points(report)
+    _refresh_north_summary(report)
 
 
 if __name__ == '__main__':
