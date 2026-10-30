@@ -1,4 +1,5 @@
 import { React, e } from "../ui/react.js";
+import { callClass } from "../lib/bridge.js";
 import {
   completeScannerReport, copyScannerReport, deleteScannerReport,
   listScannerReports, readScannerReport, scannerRunStatus, startScannerRun,
@@ -187,7 +188,7 @@ function auctionTile(tile, index) {
       "aria-label": `TD at ${seat}`, title: `TD · ${seat} to call`,
     }, "TD");
   }
-  return e("span", { key: index }, tile.call);
+  return e("span", { key: index, className: `iv-call ${callClass(tile.call)}` }, tile.call);
 }
 
 function warningDetail(flag, pair, thresholds) {
@@ -429,6 +430,8 @@ function processCard(process, selected, thresholds, onSelect) {
     bestProcessMake(process) != null && e("span", {
       className: "iv-process-worst",
     }, `best MAKE ${pct(bestProcessMake(process))}`),
+    process.overflow > 0 && e("span", { className: "iv-process-overflow" },
+      `+${process.overflow} overflowed`),
   );
 }
 
@@ -502,9 +505,19 @@ function ProcessView({ processes, thresholds, selectedKey, onSelect, search, onS
   if (!processes.length) {
     return e("div", { className: "iv-inspection" },
       e("div", { className: "iv-list" },
+        e("div", { className: "iv-list-tools" },
+          e("span", null, "0 process·groups"),
+          e("span", { className: "iv-process-list-note" },
+            "one row = one fixed public auction process"),
+          e("input", {
+            type: "search", placeholder: "Find auction, contract, shape",
+            value: search,
+            "aria-label": "Search process groups",
+            onChange: (event) => onSearch(event.target.value),
+          })),
         e("p", { className: "iv-empty-list" },
           "No process groups match the current filters and thresholds. "
-          + "Run a scan or switch to Process Overview.")));
+          + "Clear the search or switch to Process Overview.")));
   }
   const selected = processes.find((process) => processKey(process) === selectedKey)
     || processes[0];
@@ -543,13 +556,15 @@ function ProcessView({ processes, thresholds, selectedKey, onSelect, search, onS
           e("span", { className: "iv-eyebrow" },
             "PROCESS · SAME FOR EVERY HAND IN THIS BUCKET"),
           e("span", null, `${selected.cases ?? 0} N/S pairs · `
-            + `${processBoardCount(selected)} DDS boards`)),
+            + `${processBoardCount(selected)} DDS boards`
+            + (selected.overflow > 0
+              ? ` · +${selected.overflow} overflowed` : ""))),
         e("div", { className: "iv-process-call-rows" },
           rows.map((row, rowIndex) => e("div", {
             className: "iv-process-call-row", key: rowIndex,
           }, row.map((tile, index) => e("div", {
             key: index,
-            className: `iv-process-call ${tile.td ? "td" : ""}`,
+            className: `iv-process-call ${tile.td ? "td" : callClass(tile.call)}`,
           }, e("span", null, tile.seat),
           e("strong", null, tile.td ? "TD" : tile.call)))))),
       e("div", { className: "iv-process-workbench" },
@@ -586,7 +601,9 @@ function ProcessView({ processes, thresholds, selectedKey, onSelect, search, onS
                 `${(item.shape || []).join("–") || "?"} · `
                 + `${item.hcp ?? "?"} HCP · ${item.kr ?? "?"} KR`),
               e("small", null, `${item.partner_count ?? 0} partner hands · `
-                + `${item.boards ?? 0} boards`))))),
+                + `${item.boards ?? 0} boards`
+                + (item.overflow > 0
+                  ? ` · +${item.overflow} overflowed` : "")))))),
         e("section", { className: "iv-primary-inspect" },
           e("div", { className: "iv-primary-inspect-head" },
             e("h3", null, primary

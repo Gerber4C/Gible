@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .block_report_viewer import render_html
-from .coverage_extend import complete_report
+from .coverage_extend import complete_report, match_process_partners
 from .coverage_scan import COVERAGE_SHAPES, scan_coverage
 from .loader import load_profile
 from .outcome_metrics import (
@@ -195,7 +195,9 @@ SOUTH_CAP = 20
 def project_by_process(report: dict, *, analyses=None,
                        overflow_cases: list | None = None,
                        north_cap: int = NORTH_CAP,
-                       south_cap: int = SOUTH_CAP) -> list[dict]:
+                       south_cap: int = SOUTH_CAP,
+                       process_overflow=None,
+                       hand_overflow=None) -> list[dict]:
     """Group cases by bidding process with North/South primary pools.
 
     One process is one group across all sampling cells.  Each side keeps a
@@ -303,14 +305,16 @@ def project_by_process(report: dict, *, analyses=None,
             'south_groups': [_finish(group, 'south_hands',
                                      'matched_north_hands', south_cap)
                              for group in south_groups.values()],
-            'primary_hands': _primary_hand_groups(members),
+            'primary_hands': _primary_hand_groups(
+                members, process, hand_overflow or {}),
+            'overflow': (process_overflow or {}).get(process, 0),
         })
     result.sort(key=lambda item: (-item['cases'], item.get('auction') or ''))
     return result
 
 
 
-def _primary_hand_groups(members):
+def _primary_hand_groups(members, process, hand_overflow):
     """Aggregate weighted metrics per Process x Primary Hand."""
     groups = {'n': {}, 's': {}}
     for case in members:
@@ -351,6 +355,7 @@ def _primary_hand_groups(members):
                 'boards': metric['boards'],
                 'partner_count': len(partners),
                 'partners': partners,
+                'overflow': hand_overflow.get((process, side, hand), 0),
                 'metrics': metric,
             })
         rows.sort(key=lambda row: (-(row['hcp'] or 0), row['hand']))
@@ -423,6 +428,30 @@ def _best_same_level(contract, boards):
         if best is None or rate > best['make']:
             best = {'contract': candidate, 'make': rate}
     return best
+
+
+def _overflow_by_process(report):
+    result = {}
+    for item in report.get('partner_overflow') or ():
+        if not isinstance(item, Mapping):
+            continue
+        process = tuple(item.get('process') or ())
+        result[process] = result.get(process, 0) + int(item.get('count') or 0)
+    return result
+
+
+def _overflow_by_hand(report):
+    result = {}
+    for item in report.get('partner_overflow') or ():
+        if not isinstance(item, Mapping):
+            continue
+        process = tuple(item.get('process') or ())
+        side = item.get('side')
+        hand = item.get('hand')
+        if side in ('n', 's') and isinstance(hand, str):
+            key = (process, side, hand)
+            result[key] = result.get(key, 0) + int(item.get('count') or 0)
+    return result
 
 def project_report(report: dict, report_id: str, *,
                    include_pairs: bool = True) -> dict:
@@ -582,7 +611,9 @@ def project_report(report: dict, report_id: str, *,
         'counts': counts, 'groups': groups,
         'process_groups': (project_by_process(
             report, analyses=analyses, overflow_cases=report.get('overflow_cases'),
-            north_cap=north_cap, south_cap=south_cap) if include_pairs else []),
+            north_cap=north_cap, south_cap=south_cap,
+            process_overflow=_overflow_by_process(report),
+            hand_overflow=_overflow_by_hand(report)) if include_pairs else []),
         'method_note': report.get('method_note'),
     })
 
@@ -842,6 +873,20 @@ class ScannerJobs:
                 snapshot=snapshot,
                 snapshot_every=options.get('snapshot_every', 20),
                 stop=stop_event.is_set)
+            if options.get('north_cap', NORTH_CAP) > 1 or options.get(
+                    'south_cap', SOUTH_CAP) > 1:
+                for _round in range(2):
+                    report = match_process_partners(
+                        report, profile,
+                        north_cap=options.get('north_cap', NORTH_CAP),
+                        south_cap=options.get('south_cap', SOUTH_CAP),
+                        ew_samples=options['ew_samples'],
+                        seed=options['seed'] + _round,
+                        progress=lambda summary, total: progress(
+                            {'pairs': summary.get('pairs', 0),
+                             'dds_boards': summary.get('dds_boards', 0)}, total),
+                        snapshot=snapshot,
+                        snapshot_every=options.get('snapshot_every', 20))
             snapshot(report)
             html_path.write_text(render_html(report), encoding='utf-8')
             stopped = stop_event.is_set()

@@ -2356,3 +2356,82 @@ textarea {
   .iv-process-call-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .iv-primary-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* Auction call strain colors. Keep the call label centered in every view. */
+.auction-call-card.suit-clubs,
+.iv-auction-row span.suit-clubs,
+.iv-process-call.suit-clubs {
+  background: #dff3e3;
+  color: #1f3b2a;
+  border-color: #a9cfb4;
+}
+.auction-call-card.suit-diamonds,
+.iv-auction-row span.suit-diamonds,
+.iv-process-call.suit-diamonds {
+  background: #fbeccb;
+  color: #4d3818;
+  border-color: #dfc27b;
+}
+.auction-call-card.suit-hearts,
+.iv-auction-row span.suit-hearts,
+.iv-process-call.suit-hearts {
+  background: #f9dede;
+  color: #572424;
+  border-color: #dfa9a9;
+}
+.auction-call-card.suit-spades,
+.iv-auction-row span.suit-spades,
+.iv-process-call.suit-spades {
+  background: #e8e8e8;
+  color: #30343a;
+  border-color: #c4c7cc;
+}
+.auction-call-card.strain-notrump,
+.iv-auction-row span.strain-notrump,
+.iv-process-call.strain-notrump {
+  background: #f8dfe9;
+  color: #54213a;
+  border-color: #dda8bf;
+}
+.auction-call-card.call-double,
+.iv-auction-row span.call-double,
+.iv-process-call.call-double {
+  background: #ef9a9a;
+  color: #4e1616;
+  border-color: #c76d6d;
+}
+.auction-call-card.call-redouble,
+.iv-auction-row span.call-redouble,
+.iv-process-call.call-redouble {
+  background: #cfe3fa;
+  color: #1f3f66;
+  border-color: #8fb8df;
+}
+.iv-auction-row span,
+.iv-process-call,
+.iv-process-call strong {
+  text-align: center;
+}
+.iv-process-call { justify-items: center; }
+
+/* C and Pass use each other's previous palette. */
+.auction-call-card.suit-clubs,
+.iv-auction-row span.suit-clubs,
+.iv-process-call.suit-clubs {
+  background: #138047;
+  color: #fff;
+  border-color: #0d6136;
+}
+.auction-call-card.call-pass,
+.iv-auction-row span.call-pass,
+.iv-process-call.call-pass {
+  background: #dff3e3;
+  color: #1f3b2a;
+  border-color: #a9cfb4;
+}
+
+.iv-process-overflow {
+  color: #a1423b;
+  font-size: 10px;
+  font-weight: 900;
+}

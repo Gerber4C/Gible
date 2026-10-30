@@ -3,6 +3,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from engine.coverage_extend import _repair_partner_low_cards
+from engine.cards import Hand
 from engine.iv_scanner import (
     copy_report, delete_report, list_reports, project_report, read_report,
     scan_options,
@@ -517,6 +519,38 @@ class IVScannerTests(unittest.TestCase):
         self.assertIsNone(primary['metrics']['best_other'])
         self.assertEqual(primary['partners'][0]['status'], 'blocked')
         self.assertEqual(primary['partners'][0]['td']['seat'], 's')
+
+    def test_partner_repair_only_rewrites_conflicting_low_cards(self):
+        north = Hand.parse('SAKQJHT98D765C432')
+        south = Hand.parse('S7654H654D432C432')
+        repaired = _repair_partner_low_cards(north, 'S7654H654D432C432')
+        self.assertIsNotNone(repaired)
+        self.assertEqual(repaired.length('S'), south.length('S'))
+        self.assertEqual(repaired.length('H'), south.length('H'))
+        self.assertEqual(repaired.length('D'), south.length('D'))
+        self.assertEqual(repaired.length('C'), south.length('C'))
+        self.assertEqual(sorted(repaired.holding('C')), ['5', '6', '7'])
+        self.assertEqual(repaired.holding('S'), south.holding('S'))
+        self.assertIsNone(_repair_partner_low_cards(
+            north, 'SAKQ2HK32DQJ2C432'))
+
+    def test_partner_overflow_is_exposed_per_process_and_hand(self):
+        report = self.sample_report()
+        process = ('1N', 'P', '3N', 'P', 'P', 'P')
+        north_hand = 'SAKQJH432D432C1'
+        report['partner_overflow'] = [{
+            'process': list(process), 'side': 'n',
+            'hand': north_hand, 'count': 3,
+        }]
+        projected = project_report(report, 'sample.json')
+        group = next(
+            item for item in projected['process_groups']
+            if tuple(item['process']) == process)
+        self.assertGreaterEqual(group['overflow'], 3)
+        primary = next(
+            row for row in group['primary_hands']['n']
+            if row['hand'] == north_hand)
+        self.assertEqual(primary['overflow'], 3)
 
 
 if __name__ == '__main__':

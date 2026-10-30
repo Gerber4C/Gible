@@ -19,9 +19,12 @@ from typing import Callable, Mapping
 from .auction import Auction
 from .cards import Hand
 from .coverage_scan import (
+    DECK,
     _contract,
+    _hand_from_cards,
     _history,
     _opening_assessment,
+    _sample_hand,
     complete_opponents,
     hand_kr,
     hand_shape,
@@ -1250,6 +1253,303 @@ def complete_report(
                  len(all_cases))
     return updated
 
+
+
+LOW_RANKS = frozenset('234567')
+
+
+def match_process_partners(
+    report: Mapping,
+    profile,
+    *,
+    north_cap: int = 20,
+    south_cap: int = 20,
+    ew_samples: int | None = None,
+    seed: int = 41,
+    max_attempts_per_hand: int = 20,
+    solve_table: Callable = calculate_available_table,
+    progress: Callable[[dict, int], None] | None = None,
+    snapshot: Callable[[dict], None] | None = None,
+    snapshot_every: int = 10,
+) -> dict:
+    """Cross-pair stored North and South hands inside each process.
+
+    A pair is accepted only after its replayed auction still belongs to the
+    same process. Low-card conflicts (2-7) in the South hand are repaired for
+    the DDS deal; higher-card conflicts are not invented. Pairs beyond a
+    hand's partner cap are counted as overflow without DDS evidence.
+    """
+    if report.get('schema_version') != 2:
+        raise ValueError('source must be a coverage report (schema version 2)')
+    budget = report.get('budget') or {}
+    if ew_samples is None:
+        ew_samples = budget.get('ew_samples', 10)
+    updated = json.loads(json.dumps(report))
+    cases = []
+    for key in ('cases', 'complete_cases', 'limit_cases'):
+        for case in updated.get(key, []):
+            if isinstance(case, Mapping):
+                cases.append(case)
+    by_process = {}
+    for case in cases:
+        if _case_has_hands(case):
+            by_process.setdefault(case_process_key(case), []).append(case)
+    rng = random.Random(seed)
+    next_id = max((case.get('id') for case in cases
+                   if isinstance(case.get('id'), int)), default=0) + 1
+    overflow = {}
+    for item in report.get('partner_overflow') or ():
+        if isinstance(item, Mapping) and item.get('side') in ('n', 's'):
+            key = (tuple(item.get('process') or ()), item['side'],
+                   item.get('hand'))
+            overflow[key] = overflow.get(key, 0) + int(item.get('count') or 0)
+    prior = report.get('partner_matching') or {}
+    added = int(prior.get('added_pairs') or 0)
+    attempts = 0
+    for process, members in sorted(by_process.items()):
+        norths = []
+        souths = []
+        partners = {}
+        for case in members:
+            hands = case.get('hands') or {}
+            north_key = hands.get('n')
+            south_key = hands.get('s')
+            if north_key not in norths:
+                norths.append(north_key)
+            if south_key not in souths:
+                souths.append(south_key)
+            partners.setdefault(north_key, set()).add(south_key)
+            partners.setdefault(south_key, set()).add(north_key)
+        norths = norths[:north_cap]
+        souths = souths[:south_cap]
+        attempt_cap = max(attempts + max_attempts_per_hand * max(1, len(norths)),
+                          attempts + 200)
+        for north_key in norths:
+            if attempts >= attempt_cap:
+                break
+            north = Hand.parse(north_key)
+            for south_key in souths:
+                if south_key in partners.get(north_key, set()):
+                    continue
+                if len(partners.get(north_key, set())) >= south_cap:
+                    overflow[(process, 'n', north_key)] = (
+                        overflow.get((process, 'n', north_key), 0) + 1)
+                    continue
+                if len(partners.get(south_key, set())) >= north_cap:
+                    overflow[(process, 's', south_key)] = (
+                        overflow.get((process, 's', south_key), 0) + 1)
+                    continue
+                if attempts >= attempt_cap:
+                    break
+                attempts += 1
+                representative = next(
+                    case for case in members
+                    if (case.get('hands') or {}).get('n') == north_key)
+                mutated = _repair_partner_low_cards(north, south_key)
+                if mutated is None:
+                    mutated = _sample_disjoint_south(
+                        rng, north, representative)
+                if mutated is None:
+                    continue
+                mutated_key = _compact(mutated)
+                if mutated_key in partners.get(north_key, set()):
+                    continue
+                try:
+                    simulation = simulate_auction(
+                        profile, {'n': north, 's': mutated}, dealer='n',
+                        vulnerability='none',
+                        environment={'dealer': 'n',
+                                     'vulnerability': 'none',
+                                     'scoring': 'IMP'}, max_calls=80)
+                except (RuntimeError, ValueError):
+                    continue
+                if (not simulation.calls
+                        or tuple(str(call) for call in simulation.calls)
+                        != process):
+                    continue
+                meta = representative.get('coverage_cell')
+                slot = None
+                if isinstance(meta, Mapping):
+                    used = {case.get('coverage_cell', {}).get('pair_slot')
+                            for case in members
+                            if isinstance(case.get('coverage_cell'), Mapping)}
+                    slot = 0
+                    while slot in used:
+                        slot += 1
+                    meta = {**meta, 'pair_slot': slot}
+                deal = complete_opponents(rng, north, mutated)
+                case = _new_case(next_id, deal, simulation,
+                                 cell_meta=meta, pair_slot=slot)
+                next_id += 1
+                added += 1
+                status = _attach_case_result(
+                    case, simulation, ew_samples, rng, solve_table)
+                _append_case(updated, case, status)
+                partners.setdefault(north_key, set()).add(mutated_key)
+                partners.setdefault(mutated_key, set()).add(north_key)
+                if mutated_key not in souths:
+                    if len(souths) >= south_cap:
+                        overflow[(process, 'n', north_key)] = (
+                            overflow.get((process, 'n', north_key), 0) + 1)
+                    else:
+                        souths.append(mutated_key)
+                if progress is not None:
+                    progress({'pairs': len(cases) + added,
+                              'dds_boards': 0, 'added_pairs': added},
+                             len(cases) + added)
+                if snapshot is not None and added % snapshot_every == 0:
+                    _refresh_report_views(updated)
+                    snapshot(updated)
+        for south_key in souths:
+            if attempts >= attempt_cap:
+                break
+            south = Hand.parse(south_key)
+            while (len(partners.get(south_key, set())) < north_cap
+                   and attempts < attempt_cap):
+                attempts += 1
+                representative = next(
+                    case for case in members
+                    if (case.get('hands') or {}).get('s') == south_key)
+                north = _sample_disjoint_north(
+                    rng, south, representative, profile)
+                if north is None:
+                    continue
+                north_key = _compact(north)
+                if north_key in partners.get(south_key, set()):
+                    continue
+                try:
+                    simulation = simulate_auction(
+                        profile, {'n': north, 's': south}, dealer='n',
+                        vulnerability='none',
+                        environment={'dealer': 'n',
+                                     'vulnerability': 'none',
+                                     'scoring': 'IMP'}, max_calls=80)
+                except (RuntimeError, ValueError):
+                    continue
+                if (not simulation.calls
+                        or tuple(str(call) for call in simulation.calls)
+                        != process):
+                    continue
+                meta = representative.get('coverage_cell')
+                slot = None
+                if isinstance(meta, Mapping):
+                    used = {case.get('coverage_cell', {}).get('pair_slot')
+                            for case in members
+                            if isinstance(case.get('coverage_cell'), Mapping)}
+                    slot = 0
+                    while slot in used:
+                        slot += 1
+                    meta = {**meta, 'pair_slot': slot}
+                deal = complete_opponents(rng, north, south)
+                case = _new_case(next_id, deal, simulation,
+                                 cell_meta=meta, pair_slot=slot)
+                next_id += 1
+                added += 1
+                status = _attach_case_result(
+                    case, simulation, ew_samples, rng, solve_table)
+                _append_case(updated, case, status)
+                partners.setdefault(south_key, set()).add(north_key)
+                partners.setdefault(north_key, set()).add(south_key)
+                if north_key not in norths:
+                    if len(norths) >= north_cap:
+                        overflow[(process, 's', south_key)] = (
+                            overflow.get((process, 's', south_key), 0) + 1)
+                    else:
+                        norths.append(north_key)
+                if progress is not None:
+                    progress({'pairs': len(cases) + added,
+                              'dds_boards': 0, 'added_pairs': added},
+                             len(cases) + added)
+                if snapshot is not None and added % snapshot_every == 0:
+                    _refresh_report_views(updated)
+                    snapshot(updated)
+    _refresh_report_views(updated)
+    updated['budget'] = {**budget, 'north_cap': north_cap,
+                         'south_cap': south_cap, 'ew_samples': ew_samples}
+    updated['partner_matching'] = {
+        'kind': 'process_partner_matching', 'added_pairs': added,
+        'attempted_pairs': attempts, 'north_cap': north_cap,
+        'south_cap': south_cap,
+    }
+    updated['partner_overflow'] = [
+        {'process': list(process), 'side': side, 'hand': hand, 'count': count}
+        for (process, side, hand), count in sorted(overflow.items(),
+                                                   key=lambda item: item[0])
+    ]
+    if snapshot is not None:
+        snapshot(updated)
+    return updated
+
+
+
+
+def _sample_disjoint_north(rng, south: Hand, representative: Mapping, profile):
+    shape = representative.get('north_shape')
+    if not isinstance(shape, (list, tuple)) or len(shape) != 4:
+        return None
+    used = {(suit, rank) for suit in 'SHDC'
+            for rank in south.holding(suit)}
+    remaining = tuple(card for card in DECK if card not in used)
+    eligible = _opener_eligible(profile)
+    for _ in range(2000):
+        hcp = rng.choice((14, 15, 16, 17, 18))
+        cards = _sample_hand(rng, remaining, tuple(shape), hcp)
+        if cards is None:
+            continue
+        hand = _hand_from_cards(cards)
+        if not 14 <= hand.hcp <= 18 or not eligible(hand):
+            continue
+        reference = representative.get('north_kr')
+        if isinstance(reference, (int, float)) and abs(hand_kr(hand) - reference) > 2:
+            continue
+        return hand
+    return None
+
+def _sample_disjoint_south(rng, north: Hand, representative: Mapping):
+    shape = representative.get('south_shape')
+    hcp = representative.get('south_hcp')
+    if not isinstance(shape, (list, tuple)) or len(shape) != 4:
+        return None
+    if not isinstance(hcp, int) or isinstance(hcp, bool):
+        return None
+    used = {(suit, rank) for suit in 'SHDC'
+            for rank in north.holding(suit)}
+    remaining = tuple(card for card in DECK if card not in used)
+    for _ in range(2000):
+        cards = _sample_hand(rng, remaining, tuple(shape), hcp)
+        if cards is None:
+            continue
+        hand = _hand_from_cards(cards)
+        reference = representative.get('south_kr')
+        if isinstance(reference, (int, float)) and abs(hand_kr(hand) - reference) > 2:
+            continue
+        return hand
+    return None
+
+def _repair_partner_low_cards(north: Hand, south_key: str):
+    """Return South with only its 2-7 conflicts against North replaced."""
+    south = Hand.parse(south_key)
+    holdings = {suit: list(south.holding(suit)) for suit in 'SHDC'}
+    north_holdings = {suit: set(north.holding(suit)) for suit in 'SHDC'}
+    for suit in 'SHDC':
+        overlap = [rank for rank in holdings[suit]
+                   if rank in north_holdings[suit]]
+        if any(rank not in LOW_RANKS for rank in overlap):
+            return None
+        for rank in overlap:
+            holdings[suit].remove(rank)
+            replacement = next(
+                (candidate for candidate in '234567'
+                 if candidate not in north_holdings[suit]
+                 and candidate not in holdings[suit]), None)
+            if replacement is None:
+                return None
+            holdings[suit].append(replacement)
+    return Hand.from_dict({
+        'spades': ''.join(holdings['S']),
+        'hearts': ''.join(holdings['H']),
+        'diamonds': ''.join(holdings['D']),
+        'clubs': ''.join(holdings['C'])})
 
 def _case_has_hands(case: Mapping) -> bool:
     hands = case.get('hands')
