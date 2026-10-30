@@ -97,6 +97,16 @@ def king_in(ctx, suit, void):
 STATE_ASKS = ('4S', '5C', '5D', '5H', '5S', '6C', '6D', '6H', '6S')
 
 
+def public_voidwood_requires(ctx, trump):
+    """Public gate for a Voidwood ask.
+
+    A pending ordinary keycard frame means the same bid belongs to the
+    ordinary-RKCB answer set; Voidwood must not compete for it in replay.
+    """
+    return (ctx.state.exists('agreed_suit', suit=trump)
+            and not ctx.state.exists('keycard_context', method='rkcb_1430'))
+
+
 def state_voidwood_ask(ctx, trump, void, ask):
     """The generic confirmed-trump Voidwood gate."""
     if ctx.hand is None or ctx.hand.length(void) != 0:
@@ -267,7 +277,7 @@ class Voidwood(Gadget):
 
             call = self.call('voidwood_' + trump.lower() + '_void_' + void.lower())
             call.when = prefix
-            call.requires = StateExists('agreed_suit', suit=trump)
+            call.requires = lambda ctx, t=trump: public_voidwood_requires(ctx, t)
             call.bid = ask
             call.applies = (lambda ctx, t=trump, v=void: voidwood_ask_eligible(ctx, t, v))
             call.meaning.action = 'voidwood_ask'
@@ -494,7 +504,7 @@ class Voidwood(Gadget):
                                      + '_void_' + void.lower() + '_'
                                      + ask.lower())
                     call.when = '*'
-                    call.requires = StateExists('agreed_suit', suit=trump)
+                    call.requires = lambda ctx, t=trump: public_voidwood_requires(ctx, t)
                     call.bid = ask
                     call.applies = (lambda ctx, t=trump, v=void, a=ask:
                                     state_voidwood_ask(ctx, t, v, a))
