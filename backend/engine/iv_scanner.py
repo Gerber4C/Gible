@@ -361,7 +361,41 @@ def _primary_hand_groups(members, process, hand_overflow, ew_samples):
                 'boards': metric['boards'] + (hand_overflow.get(
                     (process, side, hand), 0) * ew_samples),
                 'metrics': metric,
+                'cases': list(item['cases']),
             })
+        # A hand within 0.1 K-R of an existing hand with the same shape and
+        # HCP is not a separate Primary Hand: it only contributes as a
+        # partner (and its weight is merged into the representative).
+        rows.sort(key=lambda row: (
+            -(row['hcp'] or 0), tuple(row['shape'] or ()), row['kr'] or 0))
+        merged = []
+        for row in rows:
+            representative = next(
+                (item for item in merged
+                 if item['hcp'] == row['hcp']
+                 and tuple(item['shape']) == tuple(row['shape'])
+                 and item['kr'] is not None and row['kr'] is not None
+                 and abs(item['kr'] - row['kr']) <= 0.1 + 1e-9),
+                None)
+            if representative is None:
+                merged.append(row)
+                continue
+            representative['cases'].extend(row['cases'])
+            representative['overflow'] += row['overflow']
+            representative['overflow_boards'] += row['overflow_boards']
+            by_hand = {item['hand']: item for item in
+                       representative['partners']}
+            for partner in row['partners']:
+                by_hand.setdefault(partner['hand'], partner)
+            representative['partners'] = list(by_hand.values())
+        rows = merged
+        for row in rows:
+            row['metrics'] = _primary_metrics(row['cases'])
+            row['boards'] = (row['metrics']['boards']
+                             + row['overflow_boards'])
+            row['partner_count'] = len(row['partners'])
+            row['partners'].sort(key=lambda value: value['hand'])
+            row.pop('cases', None)
         rows.sort(key=lambda row: (-(row['hcp'] or 0), row['hand']))
         for index, row in enumerate(rows, 1):
             row['label'] = ('N' if side == 'n' else 'S') + f'-{index:03d}'

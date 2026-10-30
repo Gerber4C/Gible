@@ -13,6 +13,7 @@ import random
 import argparse
 import time
 from collections import Counter
+from types import SimpleNamespace
 from functools import cache
 from pathlib import Path
 from types import SimpleNamespace
@@ -464,6 +465,14 @@ def scan_coverage(
     online_overflow = {}
     online_overflow_entries = []
     online_next_id = [len(schedule) + 1]
+    online_counts = {}
+    online_case_limit = max(8, 2 * max(north_cap, south_cap))
+
+    def _online_simulation(process, status):
+        def compact_sequence():
+            return ''.join(str(call) for call in process)
+        return SimpleNamespace(calls=tuple(process), status=status,
+                               call_records=[], compact_sequence=compact_sequence)
 
     def _online_meta(pool, side, hand, case):
         if side == 'n':
@@ -477,6 +486,10 @@ def scan_coverage(
         pool['meta'][(side, hand)] = (shape, hcp, kr)
 
     def _online_make_case(deal_hands, simulation, source_case):
+        process = tuple(str(call) for call in simulation.calls)
+        if online_counts.get(process, 0) >= online_case_limit:
+            return None
+        online_counts[process] = online_counts.get(process, 0) + 1
         case = {
             'id': online_next_id[0], 'trial': online_next_id[0],
             'stratum': 'coverage', 'dealer': 'n', 'vulnerability': 'none',
@@ -513,6 +526,8 @@ def scan_coverage(
         else:
             case['status'] = 'limit'
             limit_cases.append(case)
+        if progress is not None:
+            progress(summary.copy(), len(schedule))
         return case
 
     def _online_overflow(process, side, hand, pool):
@@ -537,32 +552,26 @@ def scan_coverage(
         north = Hand.parse(north_key)
         mutated = _repair_partner_low_cards(north, south_key)
         if mutated is None:
-            from .coverage_extend import _sample_disjoint_south
-            mutated = _sample_disjoint_south(rng, north, source_case)
-        if mutated is None:
             return
         mutated_key = _compact(mutated)
         if mutated_key == north_key or mutated_key in pool['partners'].get(
                 north_key, set()):
             return
-        try:
-            simulation = simulate_auction(
-                profile, {'n': north, 's': mutated}, dealer='n',
-                vulnerability='none',
-                environment={'dealer': 'n', 'vulnerability': 'none',
-                             'scoring': 'IMP'}, max_calls=80)
-        except (RuntimeError, ValueError):
+        if mutated_key not in pool['s'] and len(pool['s']) >= south_cap:
             return
-        if (not simulation.calls
-                or tuple(str(call) for call in simulation.calls) != process):
+        if pool.get('status') != 'complete':
             return
+        # The pair is already inside this process; skip a second bidding run
+        # for the online match. Post-scan matching re-bids and verifies.
+        simulation = _online_simulation(process, 'complete')
         deal = complete_opponents(rng, north, mutated)
         case = _online_make_case(deal, simulation, source_case)
+        if case is None:
+            return
         pool['partners'].setdefault(north_key, set()).add(mutated_key)
         pool['partners'].setdefault(mutated_key, set()).add(north_key)
         pool['s'].add(mutated_key)
         _online_meta(pool, 's', mutated_key, case)
-        _online_register(case)
 
     def _online_try_pair_south(process, north_key, south_key, source_case):
         """Fill the South hand's partner cap by fixing South and mutating North."""
@@ -580,31 +589,24 @@ def scan_coverage(
         south = Hand.parse(south_key)
         mutated = _repair_partner_low_cards(south, north_key)
         if mutated is None:
-            mutated = _sample_disjoint_north(rng, south, source_case, profile)
-        if mutated is None:
             return
         mutated_key = _compact(mutated)
         if mutated_key == south_key or mutated_key in pool['partners'].get(
                 south_key, set()):
             return
-        try:
-            simulation = simulate_auction(
-                profile, {'n': mutated, 's': south}, dealer='n',
-                vulnerability='none',
-                environment={'dealer': 'n', 'vulnerability': 'none',
-                             'scoring': 'IMP'}, max_calls=80)
-        except (RuntimeError, ValueError):
+        if mutated_key not in pool['n'] and len(pool['n']) >= north_cap:
             return
-        if (not simulation.calls
-                or tuple(str(call) for call in simulation.calls) != process):
+        if pool.get('status') != 'complete':
             return
+        simulation = _online_simulation(process, 'complete')
         deal = complete_opponents(rng, mutated, south)
         case = _online_make_case(deal, simulation, source_case)
+        if case is None:
+            return
         pool['partners'].setdefault(south_key, set()).add(mutated_key)
         pool['partners'].setdefault(mutated_key, set()).add(south_key)
         pool['n'].add(mutated_key)
         _online_meta(pool, 'n', mutated_key, case)
-        _online_register(case)
 
     def _online_register(case):
         hands = case.get('hands') or {}
@@ -614,7 +616,10 @@ def scan_coverage(
             return
         process = case_process_key(case)
         pool = online_pools.setdefault(process, {
-            'n': set(), 's': set(), 'partners': {}, 'meta': {}})
+            'n': set(), 's': set(), 'partners': {}, 'meta': {},
+            'status': ('blocked' if case.get('blocked')
+                       else 'limit' if case.get('status') == 'limit'
+                       else 'complete')})
         pool['n'].add(north_key)
         pool['s'].add(south_key)
         _online_meta(pool, 'n', north_key, case)

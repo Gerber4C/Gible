@@ -1507,7 +1507,7 @@ def _sample_disjoint_north(rng, south: Hand, representative: Mapping, profile):
             for rank in south.holding(suit)}
     remaining = tuple(card for card in DECK if card not in used)
     eligible = _opener_eligible(profile)
-    for _ in range(200):
+    for _ in range(20):
         hcp = rng.choice((14, 15, 16, 17, 18))
         cards = _sample_hand(rng, remaining, tuple(shape), hcp)
         if cards is None:
@@ -1531,7 +1531,7 @@ def _sample_disjoint_south(rng, north: Hand, representative: Mapping):
     used = {(suit, rank) for suit in SUITS
             for rank in north.holding(suit)}
     remaining = tuple(card for card in DECK if card not in used)
-    for _ in range(200):
+    for _ in range(20):
         cards = _sample_hand(rng, remaining, tuple(shape), hcp)
         if cards is None:
             continue
