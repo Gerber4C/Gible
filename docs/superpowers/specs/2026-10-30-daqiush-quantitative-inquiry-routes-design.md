@@ -42,8 +42,9 @@ Rejected alternatives:
 
 A good 16–17 HCP responder uses 3C when either condition holds:
 
-1. responder has no four-card major and no five-card minor; this includes
-   3-3-3-4, 2-3-4-4, and 3-2-4-4; or
+1. `max(H,S) <= 3` and `max(C,D) <= 4`; this includes 3-3-3-4,
+   2-3-4-4, and 3-2-4-4, while explicitly excluding every 5M, 5m, and 6m
+   hand; or
 2. responder is 4M-3-3-3.
 
 These hands must be admitted to the existing five-card-major inquiry instead of
@@ -67,7 +68,12 @@ After `1NT-Pass-3C-Pass-3M-Pass`:
 
 The fit-showing call must outrank/suppress the existing simple 4M game placement
 for this good-16–17 family. Other five-major-inquiry hand families retain their
-current meanings and priorities.
+current meanings and priorities. This specification supersedes the earlier
+“leave 3S-4H unimplemented” restriction in `docs/15_daqiush_slam.md` only for
+this exact good-16–17/three-card-support family. After the fit-showing call, the
+agreed-major state and existing cue/keycard derivation may continue the auction;
+if those mechanisms produce no unique supported call, the auction must TD rather
+than invent a continuation.
 
 ## 2C Stayman Family
 
@@ -95,7 +101,19 @@ family.
 This implementation deliberately enumerates the agreed continuation rather than
 generalizing all quantitative auctions.
 
-### Meaning of 5C
+### Exact auction scope
+
+The continuation in this section is authored only after these three prefixes:
+
+- `1NT-Pass-2C-Pass-2D-Pass-4NT-Pass`;
+- `1NT-Pass-2C-Pass-2H-Pass-4NT-Pass`;
+- `1NT-Pass-3C-Pass-3D-Pass-4NT-Pass`.
+
+It must not manufacture 5C after any other quantitative 4NT. Those auctions
+remain governed by their existing authored calls or TD until the deferred general
+redesign is approved.
+
+### Meaning and selection of 5C
 
 After a quantitative 4NT, opener's 5C means:
 
@@ -104,13 +122,22 @@ After a quantitative 4NT, opener's 5C means:
   immediately;
 - responder must answer aces and does not yet try to identify opener's feature.
 
-The hidden feature is not restricted to four spades. In the covered Stayman
-route it can include:
+The hidden feature is not restricted to four spades. In the covered prefixes it
+can include:
 
-- four spades;
-- a five-card club or diamond suit;
-- five hearts;
+- exactly four spades when that holding was not already shown;
+- at least five clubs or diamonds when that length was not already shown;
+- at least five hearts after the 2H reply;
 - any other feature must remain unsupported until explicitly authored.
+
+For each exact prefix, the implementation enumerates only the legal feature
+calls above and asks the existing public-information simulation selector to
+compare the associated six-level strain against the notrump alternatives. If
+multiple features are present, the selector chooses the candidate with the best
+expected result; an exact tie uses the existing stable call-order tie break. If
+simulation is unavailable, times out, or cannot distinguish a supported choice,
+the bidder retains an already-authored deterministic quantitative action when
+one exists; otherwise it TDs. It must not guess which feature to show.
 
 The ace responses use the agreed steps:
 
@@ -120,8 +147,11 @@ The ace responses use the agreed steps:
 
 ### Missing two aces
 
-Opener combines responder's answer with opener's own aces. If the partnership is
-missing two aces, opener stops below slam:
+Only the four aces are counted; a trump king or any other keycard is irrelevant
+to this quantitative ace check. Opener combines responder's answer with opener's
+own aces and the physically possible public deal completions. “Missing two aces”
+means **missing at least two**. If every compatible interpretation is missing at
+least two aces, opener stops below slam:
 
 - 5NT is the ordinary notrump stop;
 - with the revealed spade fit, opener may stop in 5S;
@@ -130,18 +160,39 @@ missing two aces, opener stops below slam:
 
 No six-level descriptive call is made in this branch.
 
+When the 1/4 or 0/3 response remains genuinely ambiguous after accounting for
+opener's own hand, the selector samples only deals compatible with the public
+auction and the response category. Continue to slam only when the selected
+policy determines that the partnership is not missing two aces; otherwise take
+the appropriate five-level stop. If sampling fails and the category permits both
+outcomes, TD rather than using responder's private cards.
+
 ### Not missing two aces
 
-If the partnership is not missing two aces, opener is committed to a small slam
-and naturally describes the previously hidden feature at the six level. Covered
-calls include 6C, 6D, 6H, and 6S as the hand requires. In particular, a five-card
-heart suit can be shown by 6H.
+If the selected ace interpretation says the partnership is not missing two aces,
+opener is committed to a small slam and naturally describes the previously
+hidden feature at the six level. The feature-to-call map is explicit:
+
+- five or more clubs -> 6C;
+- five or more diamonds -> 6D;
+- five or more hearts -> 6H;
+- the unshown four-card spade fit -> 6S.
+
+If opener has multiple qualifying features, use the same public-information
+simulation ranking and stable tie break that selected 5C. In particular, a
+five-card heart suit can be shown by 6H.
 
 These six-level calls are natural strain descriptions and final placements for
 this bounded slice. Once opener has made one, the partnership cannot return to a
 five-level contract. Responder now knows which feature motivated 5C and the
 ordinary purpose/final-contract rule supplies Pass unless a separately authored
 correction exists.
+
+The five-level stop is also deterministic: when the known spade fit was the
+selected strain, stop in 5S (bid 5S after a 5D/5H answer, or Pass over the
+artificial 5S answer); otherwise stop in 5NT. If simulation cannot select the
+spade strain, use 5NT or TD according to the existing deterministic-then-TD
+fallback and never inspect responder's private hand.
 
 ## Simulation Boundary
 
@@ -178,10 +229,18 @@ Add focused bidder tests proving:
 7. the same hand follows the existing fit route over 2S;
 8. the 2H-4NT public meaning guarantees four spades and excludes 4M-3-3-3;
 9. 5C is not explained as four spades only;
-10. all three ace answers are selected correctly;
-11. missing-two-aces cases stop in 5NT or, with the known fit, 5S/Pass;
-12. non-missing-two-aces cases naturally place 6C, 6D, 6H, or 6S;
-13. existing five-major inquiry, Stayman, quantitative, RKCB, and final-contract
+10. 5C is authored only after the three enumerated prefixes;
+11. all three ace answers are selected correctly and count ordinary aces only;
+12. partnership ace totals from zero through four take the correct branch,
+    including ambiguous 1/4 and 0/3 categories without private-hand leakage;
+13. missing-at-least-two-aces cases stop deterministically in 5NT or, with the
+    selected known fit, 5S/Pass;
+14. non-missing-two-aces cases naturally place 6C, 6D, 6H, or 6S;
+15. hands with multiple eligible hidden features use simulation and stable
+    tie-breaking, while unsupported/simulation-failure cases follow the stated
+    fallback or TD;
+16. 5M, 5m, and 6m boundary hands do not enter the new 3C family;
+17. existing five-major inquiry, Stayman, quantitative, RKCB, and final-contract
     regression tests continue to pass.
 
 ## Deferred Quantitative Redesign

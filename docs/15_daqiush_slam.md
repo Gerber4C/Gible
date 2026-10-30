@@ -18,6 +18,13 @@ and subsequent continuations are not specified completely. Replay preserves an
 unset trump state and selector requests at this point block instead of
 inventing a keycard or control-bidding route.
 
+Bounded exception approved 2026-10-30: the good-16–17 inquiry family defined in
+[`2026-10-30-daqiush-quantitative-inquiry-routes-design.md`](superpowers/specs/2026-10-30-daqiush-quantitative-inquiry-routes-design.md)
+now supplies the missing public trigger. For that family only, three-card support
+uses the lowest legal other-major call (`3H–3S` or `3S–4H`) and immediately
+agrees opener's shown five-card major. All other `1NT–3C–3M` hands retain the
+restriction above unless separately authored.
+
 ## 1. Authoring structure
 
 | Module | Owner-supplied behavior to represent | Important context / pending decisions |
