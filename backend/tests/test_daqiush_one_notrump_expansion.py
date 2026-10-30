@@ -169,5 +169,22 @@ class DaqiushOneNotrumpExpansionTests(unittest.TestCase):
             self.bid('1NP2NTP3DP4NP', 'SAK2HK43DAKQJ3C82'), '5D')
 
 
+    def test_strong_notrump_ladder_after_routes(self):
+        # 22+ places 7NT at the first response, without Stayman.
+        self.assertEqual(self.bid('1NP', 'SAKQJHKQJDAKQJC32'), '7N')
+        # 20-21 Stayman first, then 5NT; the 15-HCP opener declines to 6NT.
+        self.assertEqual(self.bid('1NP', 'SAQT9HKQ74DAKQC32'), '2C')
+        self.assertEqual(self.bid('1NP2CP2DP', 'SAQT9HKQ74DAKQC32'), '5N')
+        self.assertEqual(
+            self.bid('1NP2CP2DP5NTP', 'SAT2HJ8DAQ4CKJ542'), '6N')
+        # 20-21 with a five-card major transfers first, then 5NT.
+        self.assertEqual(self.bid('1NP', 'SAQJ76HKQ4DAKQC32'), '2H')
+        self.assertEqual(self.bid('1NP2HP2SP', 'SAQJ76HKQ4DAKQC32'), '5N')
+        # After Stayman, a shown major fit keeps the suit route; no 5NT.
+        self.assertEqual(
+            self.bid('1NP2CP2HP', 'SAQT9HKQ7DAKQ2C43'), '5N')
+        self.assertNotEqual(
+            self.bid('1NP2CP2HP', 'SAQT9HKQ74DAKQC32'), '5N')
+
 if __name__ == '__main__':
     unittest.main()

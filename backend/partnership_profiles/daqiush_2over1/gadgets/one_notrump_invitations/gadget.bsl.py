@@ -128,8 +128,8 @@ def both_four_major_invite(ctx):
 def game_stayman(ctx):
     if ctx.hand is None or not (ctx.hand.hcp >= 10 or strong_nine(ctx)):
         return False
-    if direct_notrump_power(ctx) is not None:
-        return False
+    if direct_notrump_power(ctx) == '7NT':
+        return False  # 22+ (or a good 21) places 7NT without Stayman.
     hearts, spades = ctx.hand.length('H'), ctx.hand.length('S')
     if sorted(ctx.hand.length(s) for s in 'SHDC') == [3, 3, 3, 4]:
         return False  # These game hands seek a five-four fit via 3C.
@@ -503,11 +503,14 @@ class OneNotrumpInvitations(Gadget):
     author = Author('Daqiush')
 
     def build(self):
+        self.evaluator('strong_notrump_power', direct_notrump_power)
         for contract in ('5NT', '6NT', '7NT'):
             power = self.call('strong_notrump_' + contract.lower())
             power.when = '1NP'
             power.bid = contract
-            power.applies = lambda ctx, c=contract: direct_notrump_power(ctx) == c
+            power.applies = (lambda ctx, c=contract: (
+                direct_notrump_power(ctx) == c
+                and not (c == '5NT' and game_stayman(ctx))))
             power.meaning.action = 'strong_notrump_placement'
             power.meaning.nature = ['natural']
             power.meaning.acts = ['invite'] if contract == '5NT' else ['signoff', 'final_placement']
@@ -529,13 +532,60 @@ class OneNotrumpInvitations(Gadget):
             five_minor.meaning.purpose_completed = True
             five_minor.description = 'Eight-card minor, or qualifying strong seven-card minor: place 5m directly.'
 
+        nt_route_prefixes = (
+            '1NP2CP2DP', '1NP2CP2HP', '1NP2CP2SP',
+            '1NP2DP2HP', '1NP2HP2SP',
+            '1NP2DP2SP', '1NP2DP2NP', '1NP2DP3CP', '1NP2DP3HP',
+            '1NP2HP2NP', '1NP2HP3CP', '1NP2HP3DP',
+            '1NP3CP3DP', '1NP3CP3HP', '1NP3CP3SP',
+        )
+        for prefix in nt_route_prefixes:
+            for contract in ('5NT', '6NT', '7NT'):
+                call = self.call('strong_notrump_' + contract.lower() + '_'
+                                 + prefix.lower())
+                call.when = prefix
+                call.bid = contract
+                call.applies = (lambda ctx, c=contract, p=prefix: (
+                    direct_notrump_power(ctx) == c
+                    and not (c == '5NT'
+                             and named_evaluator(ctx, 'flat_five_major_any'))
+                    and not (c == '5NT'
+                             and p in ('1NP2CP2HP', '1NP2CP2SP')
+                             and ctx.hand.length(p[-2]) >= 4)))
+                call.meaning.action = 'strong_notrump_placement'
+                call.meaning.nature = ['natural']
+                call.meaning.acts = (['invite', 'slam_try'] if contract == '5NT'
+                                     else ['signoff', 'final_placement'])
+                call.meaning.target_suit = 'N'
+                if contract != '5NT':
+                    call.meaning.purpose_completed = True
+                call.description = ('Strong notrump ladder after the route: '
+                                    + contract + ' from the 20-21+ range.')
+
         for contract, accepts in (('6NT', False), ('7NT', True)):
             answer = self.call('strong_notrump_five_nt_' + contract.lower())
             answer.when = '1NP5NTP'
             answer.bid = contract
             # Quantitative 5NT invites the top half of the 15-17 range, so
             # 16 HCP accepts (the owner's 50% rule); 15 declines.
-            answer.applies = lambda ctx, high=accepts: ctx.hand is not None and (ctx.hand.hcp >= 16) == high
+            for prefix in nt_route_prefixes:
+                route_answer = self.call('strong_notrump_five_nt_' + contract.lower()
+                                         + '_after_' + prefix.lower())
+                route_answer.when = prefix + '5NTP'
+                route_answer.bid = contract
+                route_answer.applies = (lambda ctx, high=accepts: (
+                    ctx.hand is not None and (ctx.hand.hcp >= 16) == high))
+                route_answer.meaning.action = ('grand_slam_invitation_'
+                                               + ('accept' if accepts else 'reject'))
+                route_answer.meaning.nature = ['natural']
+                route_answer.meaning.acts = ([('accept' if accepts else 'reject'),
+                                              'final_placement'])
+                route_answer.meaning.target_suit = 'N'
+                route_answer.meaning.purpose_completed = True
+                route_answer.description = ('Answer the 5NT grand-slam invitation '
+                                            'by the 1NT opening limit.')
+            answer.applies = lambda ctx, high=accepts: (ctx.hand is not None
+                                                        and (ctx.hand.hcp >= 16) == high)
             answer.meaning.action = 'grand_slam_invitation_' + ('accept' if accepts else 'reject')
             answer.meaning.nature = ['natural']
             answer.meaning.acts = [('accept' if accepts else 'reject'), 'final_placement']

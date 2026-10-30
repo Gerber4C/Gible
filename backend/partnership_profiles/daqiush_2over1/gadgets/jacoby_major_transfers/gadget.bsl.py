@@ -25,6 +25,8 @@ def weak_major_transfer_suit(ctx):
 def starts_jacoby(ctx, trump):
     if ctx.hand is None:
         return False
+    if named_evaluator(ctx, 'strong_notrump_power') == '7NT':
+        return False  # 22+ places 7NT directly, without a transfer.
     selected_weak_major = weak_major_transfer_suit(ctx)
     if selected_weak_major is not None:
         return trump == selected_weak_major
@@ -278,6 +280,8 @@ class JacobyMajorTransfers(Gadget):
     author = Author('Daqiush')
 
     def build(self):
+        self.evaluator('flat_five_major_any', lambda ctx: (
+            flat_five_major(ctx, 'H') or flat_five_major(ctx, 'S')))
         self.evaluator('shapely_second_minor_strength_H',
                        lambda ctx: shapely_second_minor_strength(ctx, 'H'))
         self.evaluator('shapely_second_minor_strength_S',

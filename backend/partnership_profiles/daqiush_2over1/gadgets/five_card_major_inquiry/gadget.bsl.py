@@ -4,6 +4,8 @@
 def inquiry_hand(ctx):
     if ctx.hand is None:
         return False
+    if named_evaluator(ctx, 'strong_notrump_power') == '7NT':
+        return False  # 22+ places 7NT directly, without the 3C inquiry.
     majors = [ctx.hand.length(s) for s in 'HS']
     ordinary = (max(majors) == 3 and min(majors) >= 2
                 and max(ctx.hand.length(s) for s in 'CD') < 6
@@ -20,7 +22,8 @@ def inquiry_hand(ctx):
                    and ctx.hand.hcp >= 8)
     flat_game = (sorted(ctx.hand.length(s) for s in 'SHDC') == [3, 3, 3, 4]
                  and max(majors) == 4 and 10 <= ctx.hand.hcp <= 17)
-    return (((ordinary or shortage) and 10 <= ctx.hand.hcp <= 15)
+    return (((ordinary and 10 <= ctx.hand.hcp <= 21)
+             or (shortage and 10 <= ctx.hand.hcp <= 15))
             or good_minor_5422(ctx) or solid_clubs or flat_game)
 
 
