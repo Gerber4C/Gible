@@ -15,6 +15,8 @@ class ConfirmedTrumpPrefixes(Gadget):
     def build(self):
         stages = (
             ('minor_stayman_diamonds', '1NP2CP2DP4CP4DP', '4H', 'shows_four_diamonds', 'D'),
+            ('minor_stayman_diamonds_h', '1NP2CP2HP4CP4DP', '4H', 'shows_four_diamonds', 'D'),
+            ('minor_stayman_diamonds_s', '1NP2CP2SP4CP4DP', '4H', 'shows_four_diamonds', 'D'),
             ('natural_hearts_after_diamond_fit', '1NP2DP2HP3DP3SP', '4H', 'natural_suit', 'H'),
         )
         for id, prefix, bid, action, target in stages:
@@ -36,6 +38,10 @@ class ConfirmedTrumpPrefixes(Gadget):
         for id, prefix, suit in (
             ('minor_stayman_club_fit', '1NP2CP2DP4CP4DP', 'C'),
             ('minor_stayman_diamond_fit', '1NP2CP2DP4CP4DP4HP', 'D'),
+            ('minor_stayman_club_fit_h', '1NP2CP2HP4CP4DP', 'C'),
+            ('minor_stayman_diamond_fit_h', '1NP2CP2HP4CP4DP4HP', 'D'),
+            ('minor_stayman_club_fit_s', '1NP2CP2SP4CP4DP', 'C'),
+            ('minor_stayman_diamond_fit_s', '1NP2CP2SP4CP4DP4HP', 'D'),
         ):
             call = self.call(id)
             call.when = prefix

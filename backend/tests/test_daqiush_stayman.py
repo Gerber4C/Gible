@@ -177,5 +177,23 @@ class DaqiushStaymanTests(unittest.TestCase):
         self.assertEqual(result.calls, ('1N', 'P', '4C', 'P', '4H', 'P', 'P', 'P'))
 
 
+    def test_four_four_four_one_asks_minors_after_any_stayman_answer(self):
+        # 2D denial: the 21-count 4-4-4-1 now asks minors instead of 3NT.
+        self.assertEqual(
+            self.bid('1NP2CP2DP', 'SKQ98HAKQ3DKT82CA'), '4C')
+        # 2H: singleton heart, no fit -> 4C; four hearts -> major-fit route.
+        self.assertEqual(
+            self.bid('1NP2CP2HP', 'SKQ98H8DAKQ3CKT82'), '4C')
+        self.assertNotEqual(
+            self.bid('1NP2CP2HP', 'S8HKQ98DAKQ3CKT82'), '4C')
+        # 2S: one spade, no fit -> 4C; four spades -> major-fit route.
+        self.assertEqual(
+            self.bid('1NP2CP2SP', 'S8HKQ98DAKQ3CKT82'), '4C')
+        self.assertNotEqual(
+            self.bid('1NP2CP2SP', 'SKQ98H8DAKQ3CKT82'), '4C')
+        # The answer scheme is unchanged.
+        self.assertEqual(
+            self.bid('1NP2CP2DP4CP', 'SAT2HJ8DAQ4CKJ542'), '4D')
+
 if __name__ == '__main__':
     unittest.main()

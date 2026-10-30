@@ -272,6 +272,17 @@ def minor_stayman_probe(ctx):
             and max(ctx.hand.length(s) for s in 'HS') <= 3)
 
 
+def four_four_four_one(ctx, answer):
+    """Any 4441 without a shown major fit asks the four-card minor with 4C."""
+    if ctx.hand is None:
+        return False
+    if sorted(ctx.hand.length(s) for s in 'SHDC') != [1, 4, 4, 4]:
+        return False
+    if answer in ('2H', '2S'):
+        return ctx.hand.length(answer[-1]) != 4
+    return True
+
+
 def minor_slam_probe(ctx):
     club_length = 0 if ctx.hand is None else ctx.hand.length('C')
     diamond_length = 0 if ctx.hand is None else ctx.hand.length('D')
@@ -684,6 +695,7 @@ class OneNotrumpInvitations(Gadget):
             for bid, applies, action in (
                 ('3NT', lambda ctx, a=answer: game_stayman(ctx)
                  and (a == '2D' or ctx.hand.length(a[-1]) < 4)
+                 and not four_four_four_one(ctx, a)
                  and not any(strong_minor_with_other_major(ctx, a, m) for m in 'CD'),
                  'game_notrump'),
                 ('4H', lambda ctx, a=answer: a == '2H' and game_stayman(ctx)
@@ -1011,34 +1023,42 @@ class OneNotrumpInvitations(Gadget):
             cue.description = ('The 3S support sets spades; 4D shows diamond control. '
                                'Without it, 4H continues the spade slam try without promising heart control.')
 
-        low_minor = self.call('four_minor_stayman')
-        low_minor.when = '1NP2CP2DP'
-        low_minor.bid = '4C'
-        low_minor.applies = minor_stayman_probe
-        low_minor.meaning.action = 'minor_stayman'
-        low_minor.meaning.nature = ['artificial']
-        low_minor.meaning.acts = ['inquiry', 'slam_try']
-        low_minor.description = 'Ask about opener’s four-card minors after the major denial.'
+        for answer_prefix, answer_key in (
+                ('1NP2CP2DP', '2D'),
+                ('1NP2CP2HP', '2H'),
+                ('1NP2CP2SP', '2S')):
+            low_minor = self.call('four_minor_stayman_' + answer_key.lower())
+            low_minor.when = answer_prefix
+            low_minor.bid = '4C'
+            low_minor.applies = (lambda ctx, a=answer_key: (
+                minor_stayman_probe(ctx) or four_four_four_one(ctx, a)))
+            low_minor.meaning.action = 'minor_stayman'
+            low_minor.meaning.nature = ['artificial']
+            low_minor.meaning.acts = ['inquiry', 'slam_try']
+            low_minor.description = ('Ask about opener’s four-card minors; a four-four-'
+                                     'four-one without a major fit also starts here.')
 
-        for answer, applies, suit in (
-            ('4D', lambda ctx: ctx.hand is not None and ctx.hand.length('C') >= 4, 'C'),
-            ('4H', lambda ctx: ctx.hand is not None and ctx.hand.length('C') < 4
-             and ctx.hand.length('D') >= 4, 'D'),
-            ('4NT', lambda ctx: ctx.hand is not None and ctx.hand.length('C') < 4
-             and ctx.hand.length('D') < 4, None),
-        ):
-            answer_call = self.call('four_minor_stayman_answer_' + answer.lower())
-            answer_call.when = '1NP2CP2DP4CP'
-            answer_call.bid = answer
-            answer_call.applies = applies
-            answer_call.meaning.action = 'minor_stayman_response'
-            answer_call.meaning.nature = ['artificial']
-            answer_call.meaning.acts = ['descriptive']
-            if suit:
-                answer_call.meaning.target_suit = suit
-                answer_call.meaning.agreed_suit = suit
-                answer_call.effect('agreed_suit').suit = suit
-            answer_call.description = '4D shows four clubs; 4H shows four diamonds without four clubs.'
+            for answer, applies, suit in (
+                ('4D', lambda ctx: ctx.hand is not None and ctx.hand.length('C') >= 4, 'C'),
+                ('4H', lambda ctx: ctx.hand is not None and ctx.hand.length('C') < 4
+                 and ctx.hand.length('D') >= 4, 'D'),
+                ('4NT', lambda ctx: ctx.hand is not None and ctx.hand.length('C') < 4
+                 and ctx.hand.length('D') < 4, None),
+            ):
+                answer_call = self.call('four_minor_stayman_' + answer_key.lower()
+                                        + '_answer_' + answer.lower())
+                answer_call.when = answer_prefix + '4CP'
+                answer_call.bid = answer
+                answer_call.applies = applies
+                answer_call.meaning.action = 'minor_stayman_response'
+                answer_call.meaning.nature = ['artificial']
+                answer_call.meaning.acts = ['descriptive']
+                if suit:
+                    answer_call.meaning.target_suit = suit
+                    answer_call.meaning.agreed_suit = suit
+                    answer_call.effect('agreed_suit').suit = suit
+                answer_call.description = ('4D shows four clubs; 4H shows four diamonds '
+                                           'without four clubs.')
 
         spade = self.call('stayman_heart_reply_spade_invite')
         spade.when = '1NP2CP2HP'
