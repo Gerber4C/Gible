@@ -47,13 +47,14 @@ observes these constraints:
 
 1. Every ace and king remains in its real suit.
 2. In the two real longest suits, queen/jack membership may independently be
-   retained, removed, or added. Moving a queen or jack is represented by its
-   removal from one long suit and addition to the other. Outside those two
-   suits, real queen/jack membership is fixed.
-3. A queen or jack is never added to a real actor suit of length two or fewer,
-   nor to a suit that the auction publicly marks as partner's short suit.
-   Removal from a protected long suit remains legal; this is intentionally not
-   the same as adding an honor to a known bad location.
+   retained, removed, or added unless the suit is frozen by public partner-
+   shortage evidence. Moving a queen or jack is represented by its removal
+   from one long suit and addition to the other. Outside those two suits, real
+   queen/jack membership is fixed.
+3. A queen or jack is never added to a real actor suit of length two or fewer.
+   Public partner-shortage evidence means an explicit public maximum length of
+   two cards in that suit. Such a suit freezes its real Q/J membership: proxy
+   search may neither add, remove, nor move a Q/J there.
 4. After fixing A/K/Q/J membership, choose T-through-2 cards to fill each
    target suit length. A suit cannot contain duplicate ranks, and the proxy
    contains thirteen distinct cards.
@@ -109,14 +110,26 @@ interface guarantee rather than a candidate filter based on incomplete public
 meanings.
 
 During proxy candidate generation, `BridgeContext.hand` is a compatibility
-facade over `DescribedHandView`: `.length()` and `.hcp` return descriptive
-values, while `.holding()` and raw-card access return the actual hand. The
-context also exposes `actual_hand`, `description`, and `proxy_evaluation`
-explicitly. `hand_quality` reports proxy K–R/HCP deltas but marks them as
-descriptive. Any helper classified as control-sensitive receives
-`actual_hand`; this includes shortages, controls, stoppers, keycards, cue
-eligibility, and simulation. An implementation audit must move such helpers to
-the explicit actual-hand interface before proxy retry is enabled.
+facade over `DescribedHandView`: `.length()` returns descriptive values, while
+`.holding()` and raw-card access return the actual hand. The context also
+exposes `actual_hand`, `description`, and `proxy_evaluation` explicitly.
+
+Aggregate strength has one authoritative interface, `ctx.strength`, containing
+`hcp`, `kr_points`, and `kr_delta`. It reads proxy aggregate values during a
+descriptive attempt and real values otherwise. Applicability code must not
+recompute HCP or K–R from holdings. Before enabling proxy retry, audit and move
+every aggregate-strength predicate to this interface. The compatibility
+facade's `.hcp` delegates to `ctx.strength.hcp` only for existing predicates
+during migration.
+
+Suit-specific quality and every holding-specific predicate use the actual
+hand. Synthetic Q/J positions prove that the descriptive aggregate strength is
+plausible; they never become suit-quality evidence. `ctx.hand_quality` remains
+the actual quality record, while `ctx.strength` is the only descriptive
+aggregate. Any helper classified as control-sensitive receives `actual_hand`;
+this includes shortages, controls, stoppers, keycards, cue eligibility, and
+simulation. An implementation audit must move such helpers to the explicit
+actual-hand interface before proxy retry is enabled.
 
 The engine must expose the distinction explicitly; it must not temporarily
 replace a global hand and hope every caller restores it. `DescribedHandView`
@@ -174,8 +187,8 @@ without adding another extreme-shape clause to each gadget.
 
 ## State and explanation
 
-The selected decision records a serializable `DescriptiveProxyEvidence`
-object with a versioned schema:
+The selected decision records a serializable `ProxyDiagnostic` object with a
+versioned schema:
 
 - trigger class (`eight_plus_single` or `eleven_plus_two_suit`);
 - real and descriptive named shapes;
@@ -186,17 +199,23 @@ object with a versioned schema:
 - selected call and originating authored rule;
 - reason the real-hand pass reached TD.
 
-This is the sole proxy object accepted outside candidate generation. Its type
-does not expose synthetic holdings, synthetic controls, or a `Hand` interface.
-Universal axioms receive it only through an optional
-`alternative_description` parameter whose allowed fields are descriptive HCP,
-K–R, donor suit, and four description lengths. Code review and tests enforce
-that control-sensitive axiom functions have no such parameter.
+`ProxyDiagnostic` is for explanations, traces, IV Scanner, and TD reports. It
+is never passed to axioms or call applicability. Candidate generation also
+projects a separate immutable `DescriptiveProxyEvidence` containing only
+descriptive HCP, K–R, donor suit, and four description lengths. It does not
+expose synthetic holdings, changed Q/J locations, synthetic controls, or a
+`Hand` interface.
 
-The object is diagnostic provenance, not partnership knowledge. It must not be
-added to public auction facts. The user-facing explanation says that the call
-was selected by describing the extreme hand as the recorded proxy. IV Scanner
-and TD reports include the same provenance when a proxy was tried.
+Universal axioms receive only `DescriptiveProxyEvidence` through an optional
+`alternative_description` parameter. Code review and tests enforce that
+control-sensitive axiom functions have no such parameter. The two types cannot
+be substituted for one another.
+
+`ProxyDiagnostic` is diagnostic provenance, not partnership knowledge. Neither
+proxy type is added to public auction facts. The user-facing explanation says
+that the call was selected by describing the extreme hand as the recorded
+proxy. IV Scanner and TD reports include the same provenance when a proxy was
+tried.
 
 Private purposes created by the selected authored call are retained because
 they describe the chosen route. The successful proxy attempt's proposed
@@ -210,15 +229,15 @@ Proxy search may be expensive, so cache it by:
 
 - canonical real hand;
 - real longest-suit identities;
-- publicly known partner short suits;
+- suits carrying an explicit public partner maximum of two cards;
 - proxy algorithm version.
 
-The cache stores ranked search results, not a bidding decision. Publicly known
-partner-short suits affect only legal Q/J destinations and are therefore part
-of the key. Tied donor/receiver choices are stored in objective order. The same
-proxy may be reused at another compatible auction, while the call is always
-solved against the current auction and profile. Cache state cannot change the
-result for a fixed hand and auction.
+The cache stores ranked search results, not a bidding decision. Public partner-
+short suits freeze Q/J membership and are therefore part of the key. Tied
+donor/receiver choices are stored in objective order. The same proxy may be
+reused at another compatible auction, while the call is always solved against
+the current auction and profile. Cache state cannot change the result for a
+fixed hand and auction.
 
 ## Failure behavior
 
@@ -248,7 +267,8 @@ Tests must be written before implementation and demonstrate:
 5. 6-5, 7-4, and other eleven-plus two-suit hands use the same generic path;
 6. A/K never move;
 7. Q/J changes occur only in the two real longest suits; no Q/J is added to a
-   real actor-short or public partner-short suit, while removal remains legal;
+   real actor-short suit, and all Q/J membership is frozen in a suit where the
+   partner has a public maximum of two cards;
 8. every selected proxy is a legal thirteen-card hand and has K–R error no
    greater than 0.15;
 9. ranking minimizes changed cards, then K–R error, then maximizes preserved
@@ -257,13 +277,15 @@ Tests must be written before implementation and demonstrate:
     never observable; increasing it from three to four does not unlock
     Stayman, a second-suit bid, support, or any other third-suit route;
 11. real voids, controls, stoppers, keycards, and DDS inputs remain unchanged;
-12. a failed real attempt leaves private memory and trace unchanged; the
+12. applicability reads proxy aggregate strength only through `ctx.strength`,
+    while suit quality and holding-specific evidence remain actual;
+13. a failed real attempt leaves private memory and trace unchanged; the
     selected proxy purpose commits once and uses the real hand next turn;
-13. proxy search can rescue an authored later-auction route, proving the
+14. proxy search can rescue an authored later-auction route, proving the
     implementation is not tied to `1NT-Pass`;
-14. no legal DP result, illegal projection, and ambiguity each produce the
+15. no legal DP result, illegal projection, and ambiguity each produce the
     specified TD diagnostic;
-15. existing backend tests remain green.
+16. existing backend tests remain green.
 
 ## Non-goals
 
