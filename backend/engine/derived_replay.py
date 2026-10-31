@@ -53,6 +53,35 @@ def derive_historical_call(profile, auction, call, trace) -> HistoricalDerivatio
             )
             return _nfrkcb_historical(call, 'nfrkcb_answer', meaning,
                                       effects, evidence)
+    shortage = _minor_shortage_context(trace)
+    if shortage == 'H' and call == '4S':
+        return HistoricalDerivation(
+            call, rule='derive_shortage_club_support',
+            public_meaning={
+                'nature_labels': ['artificial'],
+                'call_act_types': ['support', 'slam_try'],
+                'action_type': 'derived_shortage_club_support',
+                'target_suit': 'C',
+                'agreed_suit': 'C',
+            },
+            effects=({'key': 'agreed_suit', 'suit': 'C'},),
+            evidence=evidence)
+    if shortage == 'H' and call == '4N':
+        return HistoricalDerivation(
+            call, rule='derive_shortage_diamond_keycard',
+            public_meaning={
+                'nature_labels': ['artificial'],
+                'call_act_types': ['inquiry', 'keycard_asking'],
+                'action_type': 'rkcb_1430',
+                'target_suit': 'D',
+                'agreed_suit': 'D',
+            },
+            effects=(
+                {'key': 'agreed_suit', 'suit': 'D'},
+                {'key': 'keycard_context', 'method': 'rkcb_1430',
+                 'trump_suit': 'D', 'ask_call': '4N', 'status': 'pending'},
+            ),
+            evidence=evidence)
     reserved = reserved_calls(profile, auction, trace)
     if call in reserved:
         return HistoricalDerivation(call, conflict={
@@ -110,6 +139,23 @@ def _nfrkcb_offer(trace):
         if (record.key == 'nfrkcb'
                 and record.attribute('method') == 'nfrkcb_offer'):
             return record
+    return None
+
+
+def _minor_shortage_context(trace):
+    has_two_minor = any(
+        (entry.get('public_meaning', {}) or {}).get('action_type')
+        == 'two_minor_game_force'
+        for entry in trace.applied_meanings)
+    if not has_two_minor:
+        return None
+    for entry in reversed(trace.applied_meanings):
+        if entry.get('call') in ('P', 'X', 'R'):
+            continue
+        meaning = entry.get('public_meaning', {}) or {}
+        if meaning.get('action_type') == 'minor_shortage_slam_try':
+            return meaning.get('shortage_suit')
+        return None
     return None
 
 

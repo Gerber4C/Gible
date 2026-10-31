@@ -164,8 +164,28 @@ def exclusion_slam_available(ctx, trump):
                     if suit != trump))
 
 
+def preferred_second_minor(ctx):
+    """Better of two four-card-plus minors; a tie goes to diamonds."""
+    if ctx.hand is None:
+        return None
+
+    def quality(suit):
+        return (
+            ctx.hand.length(suit),
+            minor_game_control_points(
+                ctx.hand, suit, partner_long_suits=('C', 'D')),
+            ctx.hand.honor_count(suit, ('A', 'K', 'Q')),
+            ctx.hand_quality['suit_evaluations'][suit]['twentieths'],
+        )
+
+    return 'D' if quality('D') >= quality('C') else 'C'
+
+
 def second_minor_game_force(ctx, trump, minor):
     if ctx.hand is None or ctx.hand.length(trump) < 5 or ctx.hand.length(minor) < 4:
+        return False
+    if (ctx.hand.length('C') >= 4 and ctx.hand.length('D') >= 4
+            and preferred_second_minor(ctx) != minor):
         return False
     if (exclusion_slam_available(ctx, trump)
             and ctx.hand.length(trump) >= 6):
@@ -772,6 +792,25 @@ class JacobyMajorTransfers(Gadget):
                 limited_game.meaning.purpose_completed = True
                 limited_game.effect('agreed_suit').suit = trump
                 limited_game.description = 'No cue is available: play the major game.'
+
+                direct_ask = self.call('jacoby_' + trump.lower() + '_'
+                                       + minor.lower() + '_serious_direct_keycard')
+                direct_ask.when = support_prefix + serious_bid + 'P'
+                direct_ask.bid = '4NT'
+                direct_ask.applies = (lambda ctx, t=trump:
+                                      ctx.hand is not None
+                                      and absolute_maximum(ctx, t))
+                direct_ask.meaning.action = 'rkcb_1430'
+                direct_ask.meaning.nature = ['artificial']
+                direct_ask.meaning.acts = ['inquiry', 'keycard_asking']
+                direct_ask.meaning.target_suit = trump
+                direct_ask.meaning.agreed_suit = trump
+                direct_ask.effect('agreed_suit').suit = trump
+                context = direct_ask.effect('keycard_context')
+                context.trump_suit = trump
+                context.ask_call = '4N'
+                context.method = 'rkcb_1430'
+                context.status = 'pending'
 
                 for cue_index in range(len(cues)):
                     cue_bid, cue_suit = cues[cue_index]

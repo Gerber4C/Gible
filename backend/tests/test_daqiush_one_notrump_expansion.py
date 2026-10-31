@@ -83,6 +83,27 @@ class DaqiushOneNotrumpExpansionTests(unittest.TestCase):
         self.assertEqual(
             self.bid('1NP3DP3SP4NTP', 'SAK2HK3DAQJ3CKQ82'), '5C')
 
+    def test_derived_shortage_choice_supports_clubs_or_asks_diamond_keycards(self):
+        clubs = choose_bid(
+            self.profile, Auction.parse('1NP3DP3NP4HP'),
+            Hand.parse('SK9HAK5DT64CAT654'))
+        self.assertEqual(clubs.call, '4S')
+        self.assertEqual(clubs.selected_candidate.source_kind,
+                         'derived_semantics')
+        self.assertEqual(
+            clubs.selected_candidate.public_meaning['action_type'],
+            'derived_shortage_club_support')
+
+        diamonds = choose_bid(
+            self.profile, Auction.parse('1NP3DP3NP4HP'),
+            Hand.parse('SK9HAK5DAT654CT64'))
+        self.assertEqual(diamonds.call, '4N')
+        self.assertEqual(
+            diamonds.selected_candidate.public_meaning['action_type'],
+            'rkcb_1430')
+        self.assertEqual(
+            diamonds.selected_candidate.public_meaning['target_suit'], 'D')
+
     def test_minor_two_suiter_uses_partner_stopper_after_three_hearts(self):
         responder = 'SQTH9DAK543CQJ876'
         self.assertEqual(self.bid('1NP', responder), '3D')

@@ -58,6 +58,14 @@ class DaqiushJacobyTests(unittest.TestCase):
             spades.selected_candidate.public_meaning['action_type'],
             'jacoby_five_invitation_accept_other')
 
+    def test_second_minor_prefers_quality_and_ties_to_diamonds(self):
+        self.assertEqual(
+            self.bid('1NP2DP2HP', 'S-HA9763DAQ42CKQT7'), '3D')
+        self.assertEqual(
+            self.bid('1NP2DP2HP', 'S-HA9763DKQT7CAQ42'), '3C')
+        self.assertEqual(
+            self.bid('1NP2DP2HP', 'S-HA9763DAQ32CAQ32'), '3D')
+
     def test_six_minor_five_major_invite_uses_description_proxy(self):
         self.assertEqual(self.bid('1NP2DP2HP', 'S3HKQJ76D4CQ98765'), '3H')
 
@@ -86,6 +94,22 @@ class DaqiushJacobyTests(unittest.TestCase):
             with self.subTest(auction=auction):
                 self.assertEqual(
                     self.bid(auction, 'SA62HAQJT72DJ7CJ4'), '4N')
+
+    def test_extremely_maximum_partner_can_bid_four_notrump_over_serious(self):
+        self.assertEqual(
+            self.bid('1NP2DP2HP3CP3HP3SP', 'SA76HKQ32DAK76C97'), '4N')
+        self.assertEqual(
+            self.bid('1NP2HP2SP3CP3SP3NTP', 'SKQ32HAK7DA76C976'), '4N')
+
+    def test_extreme_maximum_keycard_useful_void_and_grand_invite(self):
+        north = 'SKQ32HAK7DA76C976'
+        south = 'SQJT76HK32D-CAKJ54'
+        self.assertEqual(
+            self.bid('1NP2HP2SP3CP3SP3NTP', north), '4N')
+        self.assertEqual(
+            self.bid('1NP2HP2SP3CP3SP3NTP4NTP', south), '6D')
+        self.assertEqual(
+            self.bid('1NP2HP2SP3CP3SP3NTP4NTP6DP', north), '6H')
 
     def test_three_level_support_cues_do_not_require_control(self):
         # A sole cue is available without control.

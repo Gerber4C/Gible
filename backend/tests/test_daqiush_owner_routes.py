@@ -131,7 +131,7 @@ class OwnerRouteTests(unittest.TestCase):
         # Partner's first cue is forced and carries no extra-strength promise.
         decision = choose_bid(self.profile,
                               Auction.parse('1NP2SP3CP3NTP'),
-                              Hand.parse('SAK5HKQ4DAKQ76C32'))
+                              Hand.parse('SAK5HQJ4DKQ76CJ32'))
         self.assertEqual(decision.call, '4D')
         self.assertEqual(
             decision.selected_candidate.public_meaning['action_type'],
@@ -141,10 +141,14 @@ class OwnerRouteTests(unittest.TestCase):
 
         # No side control: return to the minor game, not four clubs.
         self.assertEqual(
-            self.bid('1NP2SP3CP3NTP', 'SQJHQJ3DQJ4CAKQJ5'), '5C')
+            self.bid('1NP2SP3CP3NTP', 'SQJ2HQJDJ32CAKQ54'), '5C')
         # Cues may cross four of the agreed minor; game remains five.
         self.assertEqual(
-            self.bid('1NP2SP3CP3NTP', 'SAKQHQJ4DQJ76CQ32'), '4S')
+            self.bid('1NP2SP3CP3NTP', 'SAKQHQ2DQJ32CQ432'), '4S')
+
+        # A maximum partner may ask keycards before any cue.
+        self.assertEqual(
+            self.bid('1NP2SP3CP3NTP', 'SAK5HKQ4DQJ765CQ2'), '4N')
 
         # After the forced cue, an eligible serious hand asks keycards.
         self.assertEqual(
@@ -171,7 +175,7 @@ class OwnerRouteTests(unittest.TestCase):
         # A skipped side suit plus no control in the serious hand confirms a
         # missing control, so the ladder stops in game instead of asking.
         self.assertEqual(
-            self.bid('1NP2SP3CP3NTP', 'SAKQHKQD7654CAJT9'), '4H')
+            self.bid('1NP2SP3CP3NTP', 'SQJ2HAK2D765CAQ32'), '4H')
         self.assertEqual(
             self.bid('1NP2SP3CP3NTP4HP', 'SQJHQJDQJ2CAKQJxx'), '5C')
 
@@ -179,14 +183,14 @@ class OwnerRouteTests(unittest.TestCase):
         serious = 'SQJHQJDAKQJxxCQJx'
         self.assertEqual(self.bid('1NP2NTP3DP', serious), '3N')
         self.assertEqual(
-            self.bid('1NP2NTP3DP3NTP', 'SAK5HKQ4DQ765CA32'), '4C')
+            self.bid('1NP2NTP3DP3NTP', 'SAK5HQJ4DQ76CAT32'), '4C')
         self.assertEqual(
-            self.bid('1NP2NTP3DP3NTP', 'SQJHQJ3CQJ4DAKQJT'), '5D')
+            self.bid('1NP2NTP3DP3NTP', 'SQJ2HQJCJ32DAKQ98'), '5D')
         self.assertEqual(
             self.bid('1NP2NTP3DP3NTP4CP', serious), '4N')
         self.assertEqual(
             self.bid('1NP2NTP3DP3NTP4CP5DP',
-                     'SAK5HKQ4DQ765CA32'), 'P')
+                     'SAK5HQJ4DQ76CAT32'), 'P')
 
     def test_voidwood_two_keycard_answer_offers_king_ask_and_placement(self):
         south = 'S-HKQJT864DK85CAK8'

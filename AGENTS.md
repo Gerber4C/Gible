@@ -14,3 +14,10 @@ Do not default to game-only placement or suppress slam routes merely because
 the owner used the word “逼局”. A game-forcing auction may continue with cues,
 keycard asks, and slam placement unless the owner explicitly says “止叫”,
 “只打局”, or otherwise limits the hand to game.
+
+### Missing continuations
+
+When the owner supplies an auction or call as the starting point, first check
+whether its continuations are defined. If any continuation is missing or
+ambiguous, **ask the owner before implementing**. Do not invent, guess, or
+silently author a continuation. This is a repository-level requirement.

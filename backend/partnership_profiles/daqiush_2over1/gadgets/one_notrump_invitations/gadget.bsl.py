@@ -1566,6 +1566,24 @@ class OneNotrumpInvitations(Gadget):
                     serious_prefix = prefix + '3NTP'
                     game_minor = '5' + suit
 
+                    direct_ask = self.call('transfer_' + suit.lower()
+                                           + '_serious_direct_keycard')
+                    direct_ask.when = serious_prefix
+                    direct_ask.bid = '4NT'
+                    direct_ask.applies = (lambda ctx: ctx.hand is not None
+                                          and ctx.hand.hcp >= 17)
+                    direct_ask.meaning.action = 'rkcb_1430'
+                    direct_ask.meaning.nature = ['artificial']
+                    direct_ask.meaning.acts = ['inquiry', 'keycard_asking']
+                    direct_ask.meaning.target_suit = suit
+                    direct_ask.meaning.agreed_suit = suit
+                    direct_ask.effect('agreed_suit').suit = suit
+                    context = direct_ask.effect('keycard_context')
+                    context.trump_suit = suit
+                    context.ask_call = '4N'
+                    context.method = 'rkcb_1430'
+                    context.status = 'pending'
+
                     # Low-limit four of the minor is forcing.  Its side-suit
                     # continuations are derived generically, not authored
                     # call by call.
