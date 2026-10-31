@@ -144,6 +144,17 @@ def choose_bid(
                            private_memory=actor_memory)
     if nfrkcb is not None:
         candidates = (nfrkcb,)
+    last_meaning = next(
+        (entry for entry in reversed(trace.applied_meanings)
+         if entry.get('call') not in ('P', 'X', 'R')), None)
+    if (last_meaning is not None
+            and (last_meaning.get('public_meaning') or {}).get('action_type')
+            == 'minor_slam_stopper_notrump'):
+        keycard_continuation = next(
+            (candidate for candidate in candidates if candidate.call == '4NT'),
+            None)
+        if keycard_continuation is not None:
+            candidates = (keycard_continuation,)
     keycard_stop_rules = {
         'derive_keycard_five_of_trump_stop',
         'derive_keycard_small_slam_placement',

@@ -201,6 +201,23 @@ class DaqiushOneNotrumpExpansionTests(unittest.TestCase):
             'two_suit_keycard_grand_correction',
         ])
 
+    def test_two_minor_stopper_3nt_is_a_suggestion_not_a_forced_signoff(self):
+        auction = '1NP3DP3HP3NTP'
+        self.assertEqual(self.bid(auction, 'SA2HKQ3DKQJ4CKJ32'), '4N')
+        self.assertEqual(self.bid(auction, 'SA2HKQ3DQJ54CKJ32'), 'P')
+
+    def test_minor_slam_stopper_3nt_is_a_suggestion_not_a_forced_signoff(self):
+        auction = '1NP2SP3CP3HP3NTP'
+        # 17 HCP with eight clubs: the cue bidder may not be passed out in 3NT.
+        self.assertEqual(
+            self.bid(auction, 'SAQHK4D3CAKJT9764'), '6C')
+        # 17 HCP with seven clubs: play the five-level game.
+        self.assertEqual(
+            self.bid(auction, 'SAQHK4D43CAKJT965'), '5C')
+        # No extra strength: accepting 3NT is still allowed.
+        self.assertEqual(
+            self.bid(auction, 'S83H32D32CAKQJ986'), 'P')
+
     def test_minor_two_suiter_uses_partner_stopper_after_three_hearts(self):
         responder = 'SQTH9DAK543CQJ876'
         self.assertEqual(self.bid('1NP', responder), '3D')

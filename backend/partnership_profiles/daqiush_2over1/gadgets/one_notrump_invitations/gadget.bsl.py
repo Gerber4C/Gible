@@ -1807,11 +1807,87 @@ class OneNotrumpInvitations(Gadget):
                             and ctx.hand.hcp <= 16))
                         stopper.meaning.action = 'minor_slam_stopper_notrump'
                         stopper.meaning.nature = ['natural']
-                        stopper.meaning.acts = ['signoff', 'final_placement']
+                        stopper.meaning.acts = ['signoff']
                         stopper.meaning.target_suit = 'N'
-                        stopper.meaning.purpose_completed = True
+                        stopper.meaning.purpose_completed = False
                         stopper.description = ('Stoppers in the remaining ask suits and no '
-                                               'slam strength: play 3NT.')
+                                               'slam strength in this hand: suggest 3NT. '
+                                               'Partner may pass or continue with extra strength.')
+
+                        after_stopper = after_cue + '3NTP'
+                        stopper_pass = self.call(
+                            'transfer_' + suit.lower() + '_stopper_pass_after_'
+                            + cue_bid.lower())
+                        stopper_pass.when = after_stopper
+                        stopper_pass.bid = 'P'
+                        stopper_pass.applies = (lambda ctx: (
+                            ctx.hand is not None and ctx.hand.hcp <= 16))
+                        stopper_pass.meaning.action = 'minor_slam_stopper_pass'
+                        stopper_pass.meaning.nature = ['natural']
+                        stopper_pass.meaning.acts = ['signoff', 'final_placement']
+                        stopper_pass.meaning.target_suit = 'N'
+                        stopper_pass.meaning.purpose_completed = True
+                        stopper_pass.description = (
+                            'Accept the suggested 3NT with no extra strength.')
+
+                        stopper_keycard = self.call(
+                            'transfer_' + suit.lower() + '_stopper_keycard_after_'
+                            + cue_bid.lower())
+                        stopper_keycard.when = after_stopper
+                        stopper_keycard.bid = '4NT'
+                        stopper_keycard.applies = (
+                            lambda ctx, s=suit: (
+                                ctx.hand is not None and ctx.hand.hcp >= 17
+                                and ctx.hand.length(s) == 6))
+                        stopper_keycard.meaning.action = 'rkcb_1430'
+                        stopper_keycard.meaning.nature = ['artificial']
+                        stopper_keycard.meaning.acts = ['inquiry', 'keycard_asking']
+                        stopper_keycard.meaning.target_suit = suit
+                        stopper_keycard.meaning.agreed_suit = suit
+                        stopper_keycard.effect('agreed_suit').suit = suit
+                        context = stopper_keycard.effect('keycard_context')
+                        context.trump_suit = suit
+                        context.ask_call = '4N'
+                        context.method = 'rkcb_1430'
+                        context.status = 'pending'
+                        stopper_keycard.description = (
+                            'With extra strength, ask keycards after the suggested 3NT.')
+
+                        stopper_five = self.call(
+                            'transfer_' + suit.lower() + '_stopper_five_after_'
+                            + cue_bid.lower())
+                        stopper_five.when = after_stopper
+                        stopper_five.bid = '5' + suit
+                        stopper_five.applies = (
+                            lambda ctx, s=suit: (
+                                ctx.hand is not None and ctx.hand.hcp >= 17
+                                and 6 <= ctx.hand.length(s) < 8))
+                        stopper_five.meaning.action = 'minor_slam_stopper_five'
+                        stopper_five.meaning.nature = ['natural']
+                        stopper_five.meaning.acts = ['signoff', 'final_placement']
+                        stopper_five.meaning.target_suit = suit
+                        stopper_five.meaning.agreed_suit = suit
+                        stopper_five.meaning.purpose_completed = True
+                        stopper_five.description = (
+                            'With seven-card support and extra strength, play five of the minor.')
+
+                        stopper_six = self.call(
+                            'transfer_' + suit.lower() + '_stopper_six_after_'
+                            + cue_bid.lower())
+                        stopper_six.when = after_stopper
+                        stopper_six.bid = '6' + suit
+                        stopper_six.applies = (
+                            lambda ctx, s=suit: (
+                                ctx.hand is not None and ctx.hand.hcp >= 17
+                                and ctx.hand.length(s) >= 8))
+                        stopper_six.meaning.action = 'minor_slam_stopper_six'
+                        stopper_six.meaning.nature = ['natural']
+                        stopper_six.meaning.acts = ['signoff', 'final_placement']
+                        stopper_six.meaning.target_suit = suit
+                        stopper_six.meaning.agreed_suit = suit
+                        stopper_six.meaning.purpose_completed = True
+                        stopper_six.description = (
+                            'With eight-card support and extra strength, play six of the minor.')
 
                     minimum = self.call('transfer_' + suit.lower() + '_minimum_after_'
                                         + cue_bid.lower())

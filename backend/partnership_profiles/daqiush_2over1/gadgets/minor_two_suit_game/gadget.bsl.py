@@ -154,10 +154,38 @@ class MinorTwoSuitGame(Gadget):
                 placement.applies = lambda ctx, s=other: exact_minor_two_suit_game(ctx) and major_stopper(ctx, s)
                 placement.meaning.action = 'two_minor_three_notrump'
                 placement.meaning.nature = ['natural']
-                placement.meaning.acts = ['signoff', 'final_placement']
+                placement.meaning.acts = ['signoff']
                 placement.meaning.target_suit = 'N'
-                placement.meaning.purpose_completed = True
-                placement.description = 'The responder has the other major stopper, so play 3NT.'
+                placement.meaning.purpose_completed = False
+                placement.description = ('The responder has the other major stopper: '
+                                         'suggest 3NT. Opener may pass or continue '
+                                         'with extra strength.')
+
+                after_stopper = '1NP3DP' + answer + 'P3NTP'
+                accept_3nt = self.call('two_minor_accept_3nt_' + answer.lower())
+                accept_3nt.when = after_stopper
+                accept_3nt.bid = 'P'
+                accept_3nt.applies = (lambda ctx: (
+                    ctx.hand is not None and ctx.hand.hcp <= 16))
+                accept_3nt.meaning.action = 'two_minor_three_notrump_pass'
+                accept_3nt.meaning.nature = ['natural']
+                accept_3nt.meaning.acts = ['signoff', 'final_placement']
+                accept_3nt.meaning.target_suit = 'N'
+                accept_3nt.meaning.purpose_completed = True
+                accept_3nt.description = 'Accept the suggested 3NT with no extra strength.'
+
+                continue_3nt = self.call('two_minor_4nt_after_' + answer.lower() + '_3nt')
+                continue_3nt.when = after_stopper
+                continue_3nt.bid = '4NT'
+                continue_3nt.applies = (lambda ctx: (
+                    ctx.hand is not None and ctx.hand.hcp >= 17))
+                continue_3nt.meaning.action = 'minor_game_choice'
+                continue_3nt.meaning.nature = ['artificial']
+                continue_3nt.meaning.acts = ['inquiry', 'game_forcing']
+                continue_3nt.meaning.forcing = 'game_forcing'
+                continue_3nt.meaning.target_suit = 'N'
+                continue_3nt.description = ('With extra strength, ask partner to choose '
+                                            'the minor game instead of passing 3NT.')
 
         # After opener's stopper reply, responder can stop in 3NT (only after
         # the both-stoppers 3NT), choose a minor game with 4NT, show a
