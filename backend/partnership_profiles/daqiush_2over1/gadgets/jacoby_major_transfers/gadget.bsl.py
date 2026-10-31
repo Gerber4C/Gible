@@ -167,7 +167,8 @@ def exclusion_slam_available(ctx, trump):
 def second_minor_game_force(ctx, trump, minor):
     if ctx.hand is None or ctx.hand.length(trump) < 5 or ctx.hand.length(minor) < 4:
         return False
-    if exclusion_slam_available(ctx, trump):
+    if (exclusion_slam_available(ctx, trump)
+            and ctx.hand.length(trump) >= 6):
         return False
     if ctx.hand.length('H' if trump == 'S' else 'S') > 3:
         return False

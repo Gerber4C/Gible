@@ -100,6 +100,12 @@ class DaqiushJacobyTests(unittest.TestCase):
         self.assertEqual(
             self.bid('1NP2DP2HP3CP', 'SQJ2HQJDAK54CQJ32'), '3D')
 
+    def test_five_card_major_with_side_void_uses_natural_second_minor(self):
+        self.assertEqual(
+            self.bid('1NP2HP2SP', 'SA9542HAK6D-CAKQ94'), '3C')
+        self.assertEqual(
+            self.bid('1NP2DP2HP', 'S-HA9542DAKQ94CAK6'), '3D')
+
     def test_diamond_fit_support_cue_offers_four_heart_and_denial_choices(self):
         north = 'SAK9HQ9DK754CA973'
         south = 'S4HAKJT53DQJT8CQ5'
