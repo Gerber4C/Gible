@@ -52,7 +52,7 @@ def derive_candidates(profile, auction, trace, evidence: DerivedEvidence,
                       reserved: frozenset[str] = frozenset(), hand=None
                       ) -> DerivationResult:
     from . import (derived_cue, derived_fit_calls, derived_four_notrump,
-                   derived_minor_shortage)
+                   derived_keycard_placement, derived_minor_shortage)
     from .derived_terminals import derive_six_notrump, derive_terminal_pass
 
     candidates = []
@@ -62,13 +62,14 @@ def derive_candidates(profile, auction, trace, evidence: DerivedEvidence,
         derived_fit_calls.derive,
         derived_cue.derive,
         derived_minor_shortage.derive,
+        derived_keycard_placement.derive,
         derive_six_notrump,
         derive_terminal_pass,
     )
     allowed = set(legal_calls(auction)) - set(reserved)
     for family in families:
-        if family in (derived_minor_shortage.derive, derive_six_notrump,
-                      derive_terminal_pass):
+        if family in (derived_minor_shortage.derive,
+                                    derive_six_notrump, derive_terminal_pass):
             result = family(profile, auction, trace, evidence, allowed, hand)
         else:
             result = family(profile, auction, trace, evidence, allowed)

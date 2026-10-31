@@ -111,6 +111,13 @@ class DaqiushJacobyTests(unittest.TestCase):
         self.assertEqual(
             self.bid('1NP2HP2SP3CP3SP3NTP4NTP6DP', north), '6H')
 
+    def test_keycard_answer_places_six_spades_and_partner_passes(self):
+        south = 'SAKT76HA2D5CKQJ32'
+        north = 'SQ9843HKQ5DA97CA9'
+        auction = '1NP2HP2SP3CP3SP3NTP4CP4NTP5SP'
+        self.assertEqual(self.bid(auction, south), '6S')
+        self.assertEqual(self.bid(auction + '6SP', north), 'P')
+
     def test_three_level_support_cues_do_not_require_control(self):
         # A sole cue is available without control.
         self.assertEqual(
