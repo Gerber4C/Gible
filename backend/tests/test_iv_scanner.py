@@ -538,6 +538,27 @@ class IVScannerTests(unittest.TestCase):
         self.assertIsNone(_repair_partner_low_cards(
             north, 'SAKQ2HK32DQJ2C432'))
 
+    def test_merged_partner_examples_stay_disjoint_from_primary(self):
+        from engine.iv_scanner import _hand_cards, _primary_hand_groups
+        process = ('1N', 'P', '3N', 'P', 'P', 'P')
+        primary = 'SAKQHJT9D8765C4'
+        partner = 'S7654H6543D432C32'
+        other_primary = 'SQJT9H8765DAKQC4'
+        overlapping_partner = 'SAKQHJT9D8765C3'
+        cases = [
+            {'hands': {'n': primary, 's': partner},
+             'north_hcp': 16, 'north_kr': 16.0,
+             'north_shape': [4, 4, 4, 1]},
+            {'hands': {'n': other_primary, 's': overlapping_partner},
+             'north_hcp': 16, 'north_kr': 16.0,
+             'north_shape': [4, 4, 4, 1]},
+        ]
+        rows = _primary_hand_groups(cases, process, {}, 0)['n']
+        row = next(item for item in rows if item['hand'] == primary)
+        primary_cards = _hand_cards(primary)
+        for instance in row['partners']:
+            self.assertFalse(primary_cards & _hand_cards(instance['hand']))
+
     def test_partner_overflow_is_exposed_per_process_and_hand(self):
         report = self.sample_report()
         process = ('1N', 'P', '3N', 'P', 'P', 'P')

@@ -317,6 +317,18 @@ def project_by_process(report: dict, *, analyses=None,
 
 
 
+def _hand_cards(text):
+    if not isinstance(text, str) or not text:
+        return None
+    try:
+        from .cards import Hand
+        hand = Hand.parse(text, validate_count=False)
+    except (TypeError, ValueError):
+        return None
+    return {(suit, rank) for suit in 'SHDC'
+            for rank in hand.holding(suit)}
+
+
 def _primary_hand_groups(members, process, hand_overflow, ew_samples):
     """Aggregate weighted metrics per Process x Primary Hand."""
     groups = {'n': {}, 's': {}}
@@ -392,7 +404,15 @@ def _primary_hand_groups(members, process, hand_overflow, ew_samples):
             representative['overflow_boards'] += row['overflow_boards']
             by_hand = {item['hand']: item for item in
                        representative['partners']}
+            representative_cards = _hand_cards(representative['hand'])
             for partner in row['partners']:
+                partner_cards = _hand_cards(partner['hand'])
+                if (representative_cards and partner_cards
+                        and representative_cards & partner_cards):
+                    # The merged row belongs to a different primary hand.
+                    # Its partner is not a legal partner for the representative
+                    # and must not be displayed beside it.
+                    continue
                 by_hand.setdefault(partner['hand'], partner)
             representative['partners'] = list(by_hand.values())
         rows = merged

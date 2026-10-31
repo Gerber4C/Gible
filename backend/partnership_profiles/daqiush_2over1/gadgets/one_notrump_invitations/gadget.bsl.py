@@ -1138,27 +1138,29 @@ class OneNotrumpInvitations(Gadget):
                 support_bid = '3D' if answer != '2D' and minor == 'C' else '3H'
                 # After 2H-3C, 3S is natural spades, 3H shows the fifth
                 # heart, and 3D is the artificial club support.
-                for bid, applies, action, target in (
+                for bid, applies, action, target, required_answer in (
                     ('3D', lambda ctx, a=answer, m=minor: a == '2D' and m == 'C'
-                     and ctx.hand.length('D') >= 5, 'natural_diamonds', 'D'),
+                     and ctx.hand.length('D') >= 5, 'natural_diamonds', 'D', '2D'),
                     ('3S', lambda ctx, a=answer: a == '2H'
-                     and ctx.hand.length('S') >= 4, 'natural_spades', 'S'),
+                     and ctx.hand.length('S') >= 4, 'natural_spades', 'S', '2H'),
                     ('3S', lambda ctx, a=answer: a == '2S'
-                     and ctx.hand.length('S') >= 5, 'natural_spades', 'S'),
+                     and ctx.hand.length('S') >= 5, 'natural_spades', 'S', '2S'),
                     ('3S', lambda ctx, a=answer, m=minor: a == '2D'
                      and ctx.hand.length(m) >= 3
                      and minor_control(ctx, 'S'),
-                     'minor_support_control', minor),
+                     'minor_support_control', minor, '2D'),
                     ('3H', lambda ctx, a=answer, m=minor: a == '2H' and m == 'C'
                      and not (a == '2H' and ctx.hand.length('S') >= 4)
-                     and ctx.hand.length('H') >= 5, 'natural_hearts', 'H'),
+                     and ctx.hand.length('H') >= 5, 'natural_hearts', 'H', '2H'),
                     (support_bid, lambda ctx, a=answer, m=minor: ctx.hand.length(m) >= 3
                      and not (a == '2D' and m == 'C' and ctx.hand.length('D') >= 5)
-                     and not (a == '2H' and ctx.hand.length('S') >= 4), 'minor_support', minor),
+                     and not (a == '2H' and ctx.hand.length('S') >= 4), 'minor_support', minor, None),
                     ('3NT', lambda ctx, a=answer, m=minor: ctx.hand.length(m) < 3
                      and not (a == '2D' and m == 'C' and ctx.hand.length('D') >= 5)
-                     and not (a == '2H' and ctx.hand.length('S') >= 4), 'natural_notrump', 'N'),
+                     and not (a == '2H' and ctx.hand.length('S') >= 4), 'natural_notrump', 'N', None),
                 ):
+                    if required_answer is not None and answer != required_answer:
+                        continue
                     if (bid == '3D' and action == 'natural_diamonds'
                             and not (answer == '2D' and minor == 'C')):
                         continue
