@@ -53,7 +53,67 @@ def derive_historical_call(profile, auction, call, trace) -> HistoricalDerivatio
             )
             return _nfrkcb_historical(call, 'nfrkcb_answer', meaning,
                                       effects, evidence)
+    two_suit = _two_suit_keycard_pending(trace)
+    if two_suit and call in ('5C', '5D', '5H', '5S', '5N', '6C'):
+        category = {
+            '5C': '14', '5D': '036', '5H': '25_none',
+            '5S': '25_low', '5N': '25_high', '6C': '25_both',
+        }[call]
+        counts = {
+            '5C': (1, 4), '5D': (0, 3, 6), '5H': (2, 5),
+            '5S': (2, 5), '5N': (2, 5), '6C': (2, 5),
+        }[call]
+        return HistoricalDerivation(
+            call, rule='derive_two_suit_keycard_answer',
+            public_meaning={
+                'nature_labels': ['artificial'],
+                'call_act_types': ['descriptive', 'keycard_answer'],
+                'action_type': 'two_suit_keycard_answer',
+                'target_suit': 'C',
+                'keycard_counts': list(counts),
+                'queen_category': {
+                    '5H': 'none', '5S': 'low', '5N': 'high',
+                    '6C': 'both',
+                }.get(call),
+            },
+            effects=(
+                {'key': 'two_suit_keycard', 'status': 'answered',
+                 'method': 'two_suit_keycard', 'answer_call': call,
+                 'category': category},
+            ),
+            evidence=evidence)
+    if (_two_suit_keycard_answered(trace)
+            and call in ('6C', '6D', '6N', '7C', '7D')):
+        suit = 'N' if call == '6N' else call[1]
+        return HistoricalDerivation(
+            call, rule='derive_two_suit_keycard_placement',
+            public_meaning={
+                'nature_labels': ['natural'],
+                'call_act_types': ['signoff', 'final_placement'],
+                'action_type': 'two_suit_keycard_placement',
+                'target_suit': suit,
+                'agreed_suit': suit if suit in 'CD' else None,
+                'purpose_completed': True,
+            },
+            evidence=evidence)
     shortage = _minor_shortage_context(trace)
+    if shortage == 'S' and call == '4N':
+        return HistoricalDerivation(
+            call, rule='derive_two_suit_keycard',
+            public_meaning={
+                'nature_labels': ['artificial'],
+                'call_act_types': ['inquiry', 'keycard_asking'],
+                'action_type': 'two_suit_keycard',
+                'target_suit': 'C',
+                'suits': ['C', 'D'],
+                'keycards_total': 6,
+            },
+            effects=(
+                {'key': 'two_suit_keycard', 'status': 'pending',
+                 'method': 'two_suit_keycard', 'low_suit': 'C',
+                 'high_suit': 'D', 'keycards_total': 6},
+            ),
+            evidence=evidence)
     if shortage == 'H' and call == '4S':
         return HistoricalDerivation(
             call, rule='derive_shortage_club_support',
@@ -156,6 +216,22 @@ def _minor_shortage_context(trace):
         if meaning.get('action_type') == 'minor_shortage_slam_try':
             return meaning.get('shortage_suit')
         return None
+    return None
+
+
+def _two_suit_keycard_pending(trace):
+    for record in reversed(trace.current_state_records):
+        if (record.key == 'two_suit_keycard'
+                and record.attribute('status') == 'pending'):
+            return record
+    return None
+
+
+def _two_suit_keycard_answered(trace):
+    for record in reversed(trace.current_state_records):
+        if (record.key == 'two_suit_keycard'
+                and record.attribute('status') == 'answered'):
+            return record
     return None
 
 

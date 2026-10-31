@@ -104,6 +104,25 @@ class DaqiushOneNotrumpExpansionTests(unittest.TestCase):
         self.assertEqual(
             diamonds.selected_candidate.public_meaning['target_suit'], 'D')
 
+    def test_derived_two_suit_keycard_primary_answers_and_placement(self):
+        north = 'SK9HAK5DT64CAT654'
+        south = 'SAJ8HADAKQJ8CKQJ9'
+        self.assertEqual(
+            choose_bid(self.profile, Auction.parse('1NP3DP3NP4SP'),
+                       Hand.parse(north)).call, '4N')
+        self.assertEqual(
+            choose_bid(self.profile,
+                       Auction.parse('1NP3DP3NP4SP4NTP'),
+                       Hand.parse(south)).call, '6C')
+        self.assertEqual(
+            choose_bid(self.profile,
+                       Auction.parse('1NP3DP3NP4SP4NTP6CP'),
+                       Hand.parse(north)).call, '6D')
+        self.assertEqual(
+            choose_bid(self.profile,
+                       Auction.parse('1NP3DP3NP4SP4NTP6CP6DP'),
+                       Hand.parse(south)).call, 'P')
+
     def test_minor_two_suiter_uses_partner_stopper_after_three_hearts(self):
         responder = 'SQTH9DAK543CQJ876'
         self.assertEqual(self.bid('1NP', responder), '3D')
