@@ -800,7 +800,17 @@ class OneNotrumpInvitations(Gadget):
                 continuation.applies = applies
                 continuation.meaning.action = action
                 continuation.meaning.nature = ['natural']
-                continuation.meaning.acts = ['descriptive'] if answer == '2H' and bid == '3NT' else ['signoff', 'final_placement']
+                if answer == '2D' and bid == '3NT':
+                    # game_stayman already treats 10 HCP / strong-nine as
+                    # game-going; after the 2D major denial this 3NT is the
+                    # defined game-forcing route, not a bare signoff.
+                    continuation.meaning.acts = [
+                        'game_forcing', 'signoff', 'final_placement']
+                    continuation.meaning.forcing = 'game_forcing'
+                elif answer == '2H' and bid == '3NT':
+                    continuation.meaning.acts = ['descriptive']
+                else:
+                    continuation.meaning.acts = ['signoff', 'final_placement']
                 continuation.meaning.target_suit = 'N' if bid == '3NT' else bid[-1]
                 if bid in ('4H', '4S'):
                     continuation.meaning.quality_upgrade = True

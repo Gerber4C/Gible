@@ -36,6 +36,14 @@ class DaqiushStaymanTests(unittest.TestCase):
         self.assertEqual(self.bid('1NP2CP2HP3NP', 'SAJ65HK762DAQ3CK3'), '4S')
         self.assertEqual(self.bid('1NP2CP2HP3NP', 'SAQ7HKJ83DA762CQ5'), 'P')
 
+    def test_game_forcing_3nt_covers_major_denial_boundary_hands(self):
+        # 10 HCP with 4-0-5-4 and 9 HCP strong-nine with 4-4-0-5 have no
+        # natural 2NT invitation; their 3NT is the game-forcing route.
+        self.assertEqual(
+            self.bid('1NP2CP2DP', 'S7432H-DKQJ93CKJ76'), '3N')
+        self.assertEqual(
+            self.bid('1NP2CP2DP', 'SA643HK854DCQ7532'), '3N')
+
     def test_three_level_high_suit_meanings_after_stayman(self):
         # 2D denied a major: 3S is a cue with spade control; without it,
         # 3H remains the minor-support cue.
