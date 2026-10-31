@@ -51,7 +51,7 @@ def terminal_pass_candidate(auction, trace) -> CallCandidate | None:
     acts = set(meaning.get('call_act_types', ()))
     completed = (meaning.get('purpose_completed') is True
                  or ('final_placement' in acts and 'signoff' in acts
-                     and 'invite' not in acts))
+                     and not (acts & {'invite', 'reject', 'accept'})))
     if not completed or 'final_placement' not in acts:
         return None
     # A pure pass-or-correct 7C is not automatically accepted: the asker may

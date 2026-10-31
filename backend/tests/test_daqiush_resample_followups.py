@@ -288,6 +288,20 @@ class DaqiushResampleFollowupTests(unittest.TestCase):
         self.assertEqual(sample.call_args.kwargs['public_constraints']['n']['min_lengths']['S'], 4)
         self.assertEqual(sample.call_args.kwargs['public_constraints']['n']['max_lengths']['H'], 3)
 
+    @patch('engine.simulation_decision.sample_deals')
+    @patch('engine.simulation_decision.calculate_available_table')
+    def test_seven_four_uses_small_sample_instead_of_td(self, solve, sample):
+        responder = Hand.parse('SA743H7DACAKQJ852')
+        opener = Hand.parse('SKQJ62HAKQDQ92C94')
+        sample.return_value = SimpleNamespace(
+            deals=tuple({'n': opener, 's': responder} for _ in range(7)),
+            attempts=16549, seed=1)
+        solve.return_value = {'C': {'s': 12}, 'S': {'n': 11}}
+        result = decide_minor_major_74(
+            self.profile, Auction.parse('1NP2CP2SP'), responder)
+        self.assertEqual(result['call'], '3C')
+        self.assertEqual(result['sample_count'], 7)
+
     def test_five_five_minors_above_the_old_cap_use_three_diamonds(self):
         self.assertEqual(self.bid('1NP', 'S52HADK9764CAK743'), '3D')
 

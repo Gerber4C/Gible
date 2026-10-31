@@ -38,7 +38,6 @@ SIX_FOUR_MAJOR_THREE_NOTRUMP = {
     ('1N', 'P', '2C', 'P', '2D', 'P', '3S', 'P', '3N', 'P'): 'H',
 }
 SAMPLE_COUNT = 40
-MIN_GOOD_SAMPLES = 12
 
 
 def is_minor_5422_decision(profile_id: str, auction: Auction) -> bool:
@@ -91,8 +90,11 @@ def decide_six_four_major_after_three_notrump(profile, auction: Auction,
     deals = tuple(deal for deal in sampled.deals
                   if opening(SimpleNamespace(hand=deal[partner],
                                              hand_quality=assess_quality(deal[partner])))['eligible'])
-    if len(deals) < 8:
-        raise ValueError(f'Only {len(deals)} sampled hands matched the public 1NT promise')
+    if not deals:
+        return {'call': '4' + major, 'sample_count': 0,
+                'attempts': sampled.attempts, 'seed': sampled.seed,
+                'completion_rates': {},
+                'comparison': 'no public-compatible opener sample; place game'}
     estimates = compare_contract_targets(
         deals, (ContractTarget(4, major, actor), ContractTarget(6, major, actor)),
         solve_table=calculate_available_table)
@@ -157,8 +159,12 @@ def decide_two_major_spade_slam(profile, auction: Auction, hand: Hand) -> dict:
         deals = tuple(deal for deal in sampled.deals
                       if opening(SimpleNamespace(hand=deal[partner],
                                                  hand_quality=assess_quality(deal[partner])))['eligible'])
-    if len(deals) < 8:
-        raise ValueError(f'Only {len(deals)} sampled hands matched the public 1NT promise')
+    if not deals:
+        call = '4N' if hand.hcp + 15 >= 33 else '4S'
+        return {'call': call, 'sample_count': 0,
+                'seed': sampled.seed, 'attempts': sampled.attempts,
+                'completion_rates': {},
+                'comparison': 'no public-compatible opener sample; combined-HCP fallback'}
     try:
         estimates = compare_contract_targets(
             deals, (ContractTarget(4, 'S', partner), ContractTarget(6, 'S', partner)),
@@ -234,8 +240,6 @@ def _sample_superaccept_openers(responder: Hand, doubleton: str | None,
         deals.append({'n': north, 's': responder,
                       'e': _hand_from_cards(east_west[:13]),
                       'w': _hand_from_cards(east_west[13:])})
-    if len(deals) < 8:
-        raise SamplingExhausted(attempts, len(deals))
     return SamplingResult(tuple(deals), attempts, seed)
 
 
@@ -262,8 +266,13 @@ def decide_minor_major_74(profile, auction: Auction, hand: Hand) -> dict:
     deals = tuple(deal for deal in sampled.deals
                   if opening(SimpleNamespace(hand=deal[partner],
                                              hand_quality=assess_quality(deal[partner])))['eligible'])
-    if len(deals) < 8:
-        raise ValueError(f'Only {len(deals)} sampled hands matched the public 1NT promise')
+    if not deals:
+        return {
+            'call': '3' + minor, 'sample_count': 0,
+            'attempts': sampled.attempts, 'seed': sampled.seed,
+            'completion_rates': {},
+            'comparison': 'no public-compatible opener sample; prefer the seven-card minor',
+        }
     estimates = compare_contract_targets(
         deals, (ContractTarget(6, minor, actor), ContractTarget(6, major, partner)),
         solve_table=calculate_available_table)
@@ -320,8 +329,16 @@ def decide_minor_5422(auction: Auction, hand: Hand) -> dict:
                            sample_count=SAMPLE_COUNT, seed=_seed(auction, hand),
                            max_attempts=50000, max_seconds=20.0)
     deals = tuple(deal for deal in sampled.deals if assess_quality(deal[partner])['good'])
-    if len(deals) < MIN_GOOD_SAMPLES:
-        raise ValueError(f'Only {len(deals)} sampled responder hands matched the public good-hand promise')
+    if not deals:
+        club_length = hand.length('C')
+        diamond_length = hand.length('D')
+        call = '5N' if club_length == diamond_length else (
+            '5C' if club_length > diamond_length else '5D')
+        return {
+            'call': call, 'sample_count': 0, 'attempts': sampled.attempts,
+            'seed': sampled.seed,
+            'comparison': 'no public-compatible responder sample; choose by minor length',
+        }
     targets = tuple(ContractTarget(level, suit, actor)
                     for level in (5, 6) for suit in 'CD')
     estimates = compare_contract_targets(deals, targets,
