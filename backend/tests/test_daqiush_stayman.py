@@ -56,6 +56,13 @@ class DaqiushStaymanTests(unittest.TestCase):
         self.assertEqual(
             self.bid('1NP2CP2SP', 'S2H9654DA432CAQT8'), '3N')
 
+    def test_spade_shortage_counterinvite_is_slam_try(self):
+        # 3S is a shortage counterinvite, not a game invitation with an
+        # unknown responder HCP range.
+        self.assertEqual(
+            self.bid('1NP2CP2SP3HP3SP',
+                     'SAK43HAKQ7DCKQ964'), '4N')
+
     def test_three_level_high_suit_meanings_after_stayman(self):
         # 2D denied a major: 3S is a cue with spade control; without it,
         # 3H remains the minor-support cue.

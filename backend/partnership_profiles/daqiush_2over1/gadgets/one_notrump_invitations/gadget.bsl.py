@@ -881,10 +881,11 @@ class OneNotrumpInvitations(Gadget):
                     counter.applies = lambda ctx: top_honors_only_outside_trump(ctx, 'S')
                     counter.meaning.action = 'shortage_counterinvite'
                     counter.meaning.nature = ['artificial']
-                    counter.meaning.acts = ['invite']
+                    counter.meaning.acts = ['invite', 'slam_try']
                     counter.meaning.agreed_suit = 'S'
                     counter.meaning.target_suit = 'S'
-                    counter.description = 'Only A, AK, AKQ, or AKQJ side-suit honor structures: counterinvite in three spades.'
+                    counter.description = ('Only A, AK, AKQ, or AKQJ side-suit honor '
+                                           'structures: slam counterinvite in three spades.')
 
                 ask_shortage = self.call('stayman_' + answer.lower() + '_ask_shortage')
                 ask_shortage.when = shortage_prefix
