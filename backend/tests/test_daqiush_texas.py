@@ -48,6 +48,17 @@ class DaqiushTexasTests(unittest.TestCase):
         self.assertEqual(self.bid('1NP4CP', 'SAQ7HAK8DA762C754'), '4D')
         self.assertEqual(self.bid('1NP4DP', 'SAQ7HAK8DA762C754'), '4H')
 
+    def test_eight_card_majors_use_texas_and_reach_keycard(self):
+        south_hearts = 'S4HAQJ98765DKQCAK'
+        north = 'SAK7HKT4DAT864CQ2'
+        self.assertEqual(self.bid('1NP', south_hearts), '4C')
+        self.assertEqual(self.bid('1NP4CP', north), '4H')
+        self.assertEqual(self.bid('1NP4CP4HP', south_hearts), '4N')
+        self.assertEqual(self.bid('1NP4CP4HP4NP', north), '5D')
+
+        south_spades = 'SAQJ98765H4DKQCAK'
+        self.assertEqual(self.bid('1NP', south_spades), '4D')
+
     def test_simulation_advances_past_screenshot_block(self):
         result = simulate_auction(self.profile, {
             'n': 'SAQ7HKJ8DA762CQ54',

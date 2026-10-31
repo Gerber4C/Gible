@@ -135,6 +135,24 @@ def shapely_description_proxy(hand: Hand, long_suit: str) -> dict:
         'effective_points': shapely_combined_effective_points(hand) + 2,
     }
 
+
+def convention_length(hand: Hand, suit: str) -> int:
+    """Length used by convention selection, with the proxy as the default.
+
+    An eight-card or longer suit is described as one card shorter so ordinary
+    seven-card routes can still classify the hand. The actual card count is
+    never changed for play or scoring.
+    """
+    suit = normalize_suit_name(suit)
+    length = hand.length(suit)
+    if length < 8:
+        return length
+    try:
+        return shapely_description_proxy(hand, suit)['described_length']
+    except ValueError:
+        return length
+
+
 FEATURE_DESCRIPTIONS = {
     "control_balance": "A/K count minus Q/J count",
     "honor_concentration": "Grouped honors in suits of at least three cards",

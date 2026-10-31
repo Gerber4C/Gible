@@ -10,12 +10,32 @@ SLAM_INTEREST = {
 }
 
 
+def shapely_second_minor_strength(ctx, trump):
+    """Adjusted honor count for a 6M-5m-1-1 hand; None means other shapes."""
+    if ctx.hand is None or ctx.hand.length(trump) != 6:
+        return None
+    other_major = 'S' if trump == 'H' else 'H'
+    if ctx.hand.length(other_major) != 1:
+        return None
+    if sorted(ctx.hand.length(suit) for suit in 'CD') != [1, 5]:
+        return None
+    minor_short = 'C' if ctx.hand.length('C') == 1 else 'D'
+    points = ctx.hand.hcp
+    for suit in (other_major, minor_short):
+        rank = ctx.hand.holding(suit)
+        ordinary = {'A': 4, 'K': 3, 'Q': 2, 'J': 1}.get(rank, 0)
+        retained = {'A': 4, 'K': 1}.get(rank, 0)
+        points += retained - ordinary
+    return points
+
+
 def has_texas_game(ctx, suit):
-    if ctx.hand is None or ctx.hand.length(suit) < 6:
+    length = None if ctx.hand is None else convention_length(ctx.hand, suit)
+    if length is None or length < 6:
         return False
     if sorted((ctx.hand.length('H'), ctx.hand.length('S'))) == [4, 6]:
         return 7 <= shapely_combined_effective_points(ctx.hand) < 10
-    shaped_points = named_evaluator(ctx, 'shapely_second_minor_strength_' + suit)
+    shaped_points = shapely_second_minor_strength(ctx, suit)
     return (ctx.hand_quality['kr_points'] + 15 >= GAME_KR_TOTAL
             or shaped_points is not None and 4 <= shaped_points <= 6)
 
@@ -34,7 +54,8 @@ SEVEN_KEYCARD_KR = 17.0
 
 def long_major_band(ctx, suit):
     """K-R strength band for a seven-plus card major."""
-    if ctx.hand is None or ctx.hand.length(suit) < 7:
+    length = None if ctx.hand is None else convention_length(ctx.hand, suit)
+    if length is None or length < 7:
         return None
     kr = ctx.hand_quality['kr_points']
     if kr >= SEVEN_GAME_KR:
@@ -65,7 +86,7 @@ def _side_class(ctx, suit):
 
 
 def six_card_slam_interest(ctx, suit):
-    length = None if ctx.hand is None else ctx.hand.length(suit)
+    length = None if ctx.hand is None else convention_length(ctx.hand, suit)
     if length is None or length < 6:
         return False
     side_class, _ = _side_class(ctx, suit)
@@ -86,7 +107,7 @@ def six_card_slam_interest(ctx, suit):
 
 def game_only_texas(ctx, suit):
     """Game-only Texas: 6+ trumps and game strength, independent of shape."""
-    length = ctx.hand.length(suit)
+    length = convention_length(ctx.hand, suit)
     if not has_texas_game(ctx, suit) or length < 6:
         return False
     if length >= 7:
@@ -102,7 +123,7 @@ def slam_keycard_texas(ctx, suit):
 
     A seventh card is measured in K-R rather than by discounting HCP.
     """
-    length = ctx.hand.length(suit)
+    length = convention_length(ctx.hand, suit)
     if not has_texas_game(ctx, suit) or length not in (6, 7):
         return False
     if min(ctx.hand.length(other) for other in 'SHDC' if other != suit) < 2:
@@ -113,16 +134,16 @@ def slam_keycard_texas(ctx, suit):
 
 
 def texas_ordinary_slam(ctx, suit):
-    """A single-suit six/seven-card major asks keycards through Texas."""
+    """A single-suit six-plus-card major asks keycards through Texas."""
     return (ctx.hand is not None
-            and ctx.hand.length(suit) in (6, 7)
+            and convention_length(ctx.hand, suit) in (6, 7)
             and six_card_slam_interest(ctx, suit)
             and max(ctx.hand.length(s) for s in 'CD') < 4
             and min(ctx.hand.length(s) for s in 'HS') < 4)
 
 
 def shapely_game_texas(ctx, suit):
-    points = named_evaluator(ctx, 'shapely_second_minor_strength_' + suit)
+    points = shapely_second_minor_strength(ctx, suit)
     return (points is not None and 4 <= points <= 6
             and has_texas_game(ctx, suit)
             and not six_card_slam_interest(ctx, suit))

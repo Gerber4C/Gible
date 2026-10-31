@@ -7,8 +7,8 @@ from typing import Any
 
 from .evaluator import evaluate_expression
 from .short_suit_valuation import splinter_adjusted_hcp
-from .hand_quality import (inquiry_stopper, minor_game_control_points,
-                           minor_slam_interest,
+from .hand_quality import (convention_length, inquiry_stopper,
+                           minor_game_control_points, minor_slam_interest,
                            shapely_effective_points,
                            shapely_combined_effective_points, shapely_description_proxy)
 from .voidwood import (answer_bids, current_voidwood_trump,
@@ -1218,6 +1218,7 @@ def _base_namespace(collector: _Collector) -> dict[str, Any]:
         "ordinary_lowest_counterinvite_king": lowest_counterinvite_king,
         "lowest_showable_side_king": lowest_showable_side_king,
         "zar_total": _zar_total,
+        "convention_length": convention_length,
         "shapely_effective_points": shapely_effective_points,
         "shapely_combined_effective_points": shapely_combined_effective_points,
         "shapely_description_proxy": shapely_description_proxy,

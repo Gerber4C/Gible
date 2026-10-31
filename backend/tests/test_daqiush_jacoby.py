@@ -41,6 +41,23 @@ class DaqiushJacobyTests(unittest.TestCase):
                             self.assertEqual(self.bid(prefix, hand),
                                              '3H' if transfer == '2H' else '3D')
 
+    def test_five_invitation_other_major_acceptance_shows_fifth_major(self):
+        hearts = choose_bid(self.profile,
+                            Auction.parse('1NP2DP2HP2NP'),
+                            Hand.parse('SAKQJ2H32DKQ4CQ32'))
+        self.assertEqual(hearts.call, '3S')
+        self.assertEqual(
+            hearts.selected_candidate.public_meaning['action_type'],
+            'jacoby_five_invitation_accept_other')
+
+        spades = choose_bid(self.profile,
+                            Auction.parse('1NP2HP2SP2NP'),
+                            Hand.parse('SA2HKQJ76DKQ4CQ32'))
+        self.assertEqual(spades.call, '3H')
+        self.assertEqual(
+            spades.selected_candidate.public_meaning['action_type'],
+            'jacoby_five_invitation_accept_other')
+
     def test_six_minor_five_major_invite_uses_description_proxy(self):
         self.assertEqual(self.bid('1NP2DP2HP', 'S3HKQJ76D4CQ98765'), '3H')
 

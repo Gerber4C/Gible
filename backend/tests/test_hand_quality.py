@@ -23,6 +23,13 @@ class HandQualityTests(unittest.TestCase):
                          shapely_combined_effective_points(hand) + 2)
         self.assertEqual(hand.length('D'), 6)
 
+    def test_convention_length_describes_eight_card_suits_as_seven(self):
+        from engine.hand_quality import convention_length
+        hand = Hand.parse('S4HAQJ98765DKQCAK')
+        self.assertEqual(hand.length('H'), 8)
+        self.assertEqual(convention_length(hand, 'H'), 7)
+        self.assertEqual(hand.length('H'), 8)
+
     def test_minor_slam_interest_uses_shared_kr_threshold(self):
         from engine.hand_quality import MINOR_SLAM_KR, minor_slam_interest
 
