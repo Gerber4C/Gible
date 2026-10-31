@@ -51,6 +51,11 @@ class DaqiushStaymanTests(unittest.TestCase):
         self.assertEqual(
             self.bid(auction, 'SJ832HQT32D2CQ432'), 'P')
 
+    def test_weak_4441_after_spade_reply_plays_3nt(self):
+        # 4C is the strong 4441 minor probe; 10 HCP with no fit is 3NT.
+        self.assertEqual(
+            self.bid('1NP2CP2SP', 'S2H9654DA432CAQT8'), '3N')
+
     def test_three_level_high_suit_meanings_after_stayman(self):
         # 2D denied a major: 3S is a cue with spade control; without it,
         # 3H remains the minor-support cue.

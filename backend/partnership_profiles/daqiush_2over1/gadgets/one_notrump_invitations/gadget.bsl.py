@@ -275,10 +275,13 @@ def minor_stayman_probe(ctx):
 
 
 def four_four_four_one(ctx, answer):
-    """Any 4441 without a shown major fit asks the four-card minor with 4C."""
+    """A strong 4441 without a shown major fit asks the minor with 4C."""
     if ctx.hand is None:
         return False
-    if sorted(ctx.hand.length(s) for s in 'SHDC') != [1, 4, 4, 4]:
+    if (ctx.hand.hcp < 12
+            or ctx.hand_quality['kr_points'] < 14):
+        return False
+    if sorted(ctx.hand.length(suit) for suit in 'SHDC') != [1, 4, 4, 4]:
         return False
     if answer in ('2H', '2S'):
         return ctx.hand.length(answer[-1]) != 4
@@ -800,10 +803,11 @@ class OneNotrumpInvitations(Gadget):
                 continuation.applies = applies
                 continuation.meaning.action = action
                 continuation.meaning.nature = ['natural']
-                if answer == '2D' and bid == '3NT':
+                if answer in ('2D', '2S') and bid == '3NT':
                     # game_stayman already treats 10 HCP / strong-nine as
-                    # game-going; after the 2D major denial this 3NT is the
-                    # defined game-forcing route, not a bare signoff.
+                    # game-going; after a major denial or a spade response
+                    # this 3NT is the defined game-forcing route, not a bare
+                    # signoff.
                     continuation.meaning.acts = [
                         'game_forcing', 'signoff', 'final_placement']
                     continuation.meaning.forcing = 'game_forcing'
