@@ -29,7 +29,8 @@ def _confirmed_no_trump(trace, evidence):
         if seat is None or SIDE_BY_SEAT.get(seat) != evidence.side:
             continue
         meaning = entry.get('public_meaning', {}) or {}
-        if meaning.get('target_suit') in 'CDHS':
+        target = meaning.get('target_suit')
+        if isinstance(target, str) and target in 'CDHS':
             return False
     return True
 

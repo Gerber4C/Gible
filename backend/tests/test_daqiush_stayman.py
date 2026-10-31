@@ -80,6 +80,13 @@ class DaqiushStaymanTests(unittest.TestCase):
         self.assertEqual(
             self.bid('1NP2CP2HP3CP', 'SAK87HKQT83DQJ7C5'), '3S')
 
+    def test_seven_card_club_slam_after_natural_heart_reply(self):
+        south = 'SA964H9DKCAKQ8652'
+        north = 'SA42HAK875DA73CT3'
+        self.assertEqual(self.bid('1NP2CP2HP3CP3HP', south), '6C')
+        self.assertEqual(
+            self.bid('1NP2CP2HP3CP3HP6CP', north), 'P')
+
     def test_natural_two_notrump_invite_accept_shows_five_card_major(self):
         # After 1NT-2C-2H-2NT, a maximum with five hearts accepts via 3H,
         # showing the fifth heart; four hearts accepts with 3NT.

@@ -1994,3 +1994,49 @@ class OneNotrumpInvitations(Gadget):
                 cue.meaning.control_suit = minor
                 cue.effect('agreed_suit').suit = long_major
                 cue.description = 'Control cue with the six-card major agreed; later choices need simulation.'
+        slam_prefix = '1NP2CP2HP3CP3HP'
+        ask = self.call('stayman_2h_c_after_natural_hearts_keycard')
+        ask.when = slam_prefix
+        ask.bid = '4NT'
+        ask.applies = (
+            lambda ctx: ctx.hand is not None
+            and ctx.hand.length('C') >= 6
+            and minor_slam_interest(ctx.hand))
+        ask.meaning.action = 'rkcb_1430'
+        ask.meaning.nature = ['artificial']
+        ask.meaning.acts = ['inquiry', 'keycard_asking']
+        ask.meaning.target_suit = 'C'
+        ask.meaning.agreed_suit = 'C'
+        ask.effect('agreed_suit').suit = 'C'
+        context = ask.effect('keycard_context')
+        context.trump_suit = 'C'
+        context.ask_call = '4N'
+        context.method = 'rkcb_1430'
+        context.status = 'pending'
+
+        six = self.call('stayman_2h_c_after_natural_hearts_6c')
+        six.when = slam_prefix
+        six.bid = '6C'
+        six.applies = (
+            lambda ctx: ctx.hand is not None
+            and ctx.hand.length('C') >= 6
+            and minor_slam_interest(ctx.hand))
+        six.meaning.action = 'minor_slam_placement'
+        six.meaning.nature = ['natural']
+        six.meaning.acts = ['signoff', 'final_placement']
+        six.meaning.target_suit = 'C'
+        six.meaning.agreed_suit = 'C'
+        six.meaning.purpose_completed = True
+        six.effect('agreed_suit').suit = 'C'
+
+        five = self.call('stayman_2h_c_after_natural_hearts_5c')
+        five.when = slam_prefix
+        five.bid = '5C'
+        five.applies = lambda ctx: ctx.hand is not None
+        five.meaning.action = 'minor_game_after_natural_hearts'
+        five.meaning.nature = ['natural']
+        five.meaning.acts = ['signoff', 'final_placement']
+        five.meaning.target_suit = 'C'
+        five.meaning.agreed_suit = 'C'
+        five.meaning.purpose_completed = True
+        five.effect('agreed_suit').suit = 'C'
