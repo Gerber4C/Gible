@@ -101,6 +101,13 @@ class DaqiushJacobyTests(unittest.TestCase):
         self.assertEqual(
             self.bid('1NP2HP2SP3CP3SP3NTP', 'SKQ32HAK7DA76C976'), '4N')
 
+    def test_serious_cue_game_is_a_suggestion_not_a_forced_signoff(self):
+        auction = '1NP2DP2HP3DP3HP3SP4CP4DP4HP'
+        self.assertEqual(
+            self.bid(auction, 'SQJHQJ2DQJ54CQJ32'), 'P')
+        self.assertEqual(
+            self.bid(auction, 'SAKQJHAKQJDAKQJC2'), '6H')
+
     def test_extreme_maximum_keycard_useful_void_and_grand_invite(self):
         north = 'SKQ32HAK7DA76C976'
         south = 'SQJT76HK32D-CAKJ54'

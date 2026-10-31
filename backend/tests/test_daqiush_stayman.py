@@ -44,6 +44,13 @@ class DaqiushStaymanTests(unittest.TestCase):
         self.assertEqual(
             self.bid('1NP2CP2DP', 'SA643HK854DCQ7532'), '3N')
 
+    def test_shortage_game_is_a_suggestion_not_a_forced_signoff(self):
+        auction = '1NP2CP2HP3SP3NP4CP4HP'
+        self.assertEqual(
+            self.bid(auction, 'SAJ83HAKT3D2CKQ54'), '4N')
+        self.assertEqual(
+            self.bid(auction, 'SJ832HQT32D2CQ432'), 'P')
+
     def test_three_level_high_suit_meanings_after_stayman(self):
         # 2D denied a major: 3S is a cue with spade control; without it,
         # 3H remains the minor-support cue.

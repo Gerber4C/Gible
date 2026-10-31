@@ -201,6 +201,15 @@ class DaqiushOneNotrumpExpansionTests(unittest.TestCase):
             'two_suit_keycard_grand_correction',
         ])
 
+    def test_serious_cue_game_is_a_suggestion_not_a_forced_signoff(self):
+        # The serious bidder has already cued 4H; the later 5C is a
+        # suggestion, not an immediate missing-control signoff.
+        auction = '1NP2SP3CP3NP4DP4HP5CP'
+        self.assertEqual(
+            self.bid(auction, 'SAK5HKQ4DQ76CJ432'), 'P')
+        self.assertEqual(
+            self.bid(auction, 'SAK5HKQ4DAKQ76C32'), '6C')
+
     def test_two_minor_stopper_3nt_is_a_suggestion_not_a_forced_signoff(self):
         auction = '1NP3DP3HP3NTP'
         self.assertEqual(self.bid(auction, 'SA2HKQ3DKQJ4CKJ32'), '4N')

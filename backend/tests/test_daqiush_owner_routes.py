@@ -54,6 +54,13 @@ class OwnerRouteTests(unittest.TestCase):
         self.assertIn('signoff', decision.selected_candidate.public_meaning['call_act_types'])
         self.assertNotIn('purpose_completed', decision.selected_candidate.public_meaning)
 
+    def test_two_major_force_4h_is_a_suggestion_not_a_forced_signoff(self):
+        auction = '1NP2HP2SP3HP4HP'
+        self.assertEqual(
+            self.bid(auction, 'SAJ765HKQ654D2C32'), 'P')
+        self.assertEqual(
+            self.bid(auction, 'SAKQ76HKQJ54D32C2'), '4N')
+
     def test_two_major_force_spade_game_is_a_signoff(self):
         north = 'SQJ4HK2DAK7652CQ3'
         decision = choose_bid(

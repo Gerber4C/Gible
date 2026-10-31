@@ -941,11 +941,81 @@ class OneNotrumpInvitations(Gadget):
                                          and not shortage_has_control(ctx, c))))
                     stop.meaning.action = 'shortage_adjusted_game_signoff'
                     stop.meaning.nature = ['natural']
-                    stop.meaning.acts = ['signoff', 'final_placement']
+                    if game_call == 'P':
+                        stop.meaning.acts = ['signoff', 'final_placement']
+                        stop.meaning.purpose_completed = True
+                    else:
+                        # The shortage bidder has not denied a control; this
+                        # four-of-major is a suggestion, not a forced signoff.
+                        stop.meaning.acts = ['signoff']
+                        stop.meaning.purpose_completed = False
                     stop.meaning.target_suit = trump
                     stop.meaning.agreed_suit = trump
-                    stop.meaning.purpose_completed = True
-                    stop.description = 'After removing short-suit waste, play game if strength or the first cue control is missing.'
+                    stop.description = ('After removing short-suit waste, play game if strength or the first cue control is missing.'
+                                        if game_call == 'P' else
+                                        'After removing short-suit waste, suggest game; '
+                                        'the shortage bidder may still continue.')
+
+                    if game_call != 'P':
+                        stop_prefix = next_prefix + game_call + 'P'
+                        stop_pass = self.call(
+                            'stayman_' + trump.lower() + '_after_'
+                            + answer_bid.lower() + '_shortage_game_pass')
+                        stop_pass.when = stop_prefix
+                        stop_pass.bid = 'P'
+                        stop_pass.applies = (
+                            lambda ctx: (ctx.hand is not None
+                                         and ctx.hand.hcp < 15))
+                        stop_pass.meaning.action = 'shortage_game_pass'
+                        stop_pass.meaning.nature = ['natural']
+                        stop_pass.meaning.acts = [
+                            'signoff', 'final_placement']
+                        stop_pass.meaning.target_suit = trump
+                        stop_pass.meaning.agreed_suit = trump
+                        stop_pass.meaning.purpose_completed = True
+                        stop_pass.description = (
+                            'Accept the suggested game without extra strength.')
+
+                        stop_keycard = self.call(
+                            'stayman_' + trump.lower() + '_after_'
+                            + answer_bid.lower() + '_shortage_game_keycard')
+                        stop_keycard.when = stop_prefix
+                        stop_keycard.bid = '4NT'
+                        stop_keycard.applies = (
+                            lambda ctx: (ctx.hand is not None
+                                         and 15 <= ctx.hand.hcp < 18))
+                        stop_keycard.meaning.action = 'rkcb_1430'
+                        stop_keycard.meaning.nature = ['artificial']
+                        stop_keycard.meaning.acts = [
+                            'inquiry', 'keycard_asking']
+                        stop_keycard.meaning.target_suit = trump
+                        stop_keycard.meaning.agreed_suit = trump
+                        stop_keycard.effect('agreed_suit').suit = trump
+                        context = stop_keycard.effect('keycard_context')
+                        context.trump_suit = trump
+                        context.ask_call = '4N'
+                        context.method = 'rkcb_1430'
+                        context.status = 'pending'
+                        stop_keycard.description = (
+                            'With extra strength after the suggested game, ask keycards.')
+
+                        stop_six = self.call(
+                            'stayman_' + trump.lower() + '_after_'
+                            + answer_bid.lower() + '_shortage_game_six')
+                        stop_six.when = stop_prefix
+                        stop_six.bid = '6' + trump
+                        stop_six.applies = (
+                            lambda ctx: (ctx.hand is not None
+                                         and ctx.hand.hcp >= 18))
+                        stop_six.meaning.action = 'shortage_game_six'
+                        stop_six.meaning.nature = ['natural']
+                        stop_six.meaning.acts = [
+                            'signoff', 'final_placement']
+                        stop_six.meaning.target_suit = trump
+                        stop_six.meaning.agreed_suit = trump
+                        stop_six.meaning.purpose_completed = True
+                        stop_six.description = (
+                            'With extra strength after the suggested game, raise to six.')
 
                     cue = self.call('stayman_' + trump.lower() + '_after_'
                                     + answer_bid.lower() + '_shortage_cue')
@@ -1764,13 +1834,56 @@ class OneNotrumpInvitations(Gadget):
                                                if not sequence
                                                else 'serious_cue_game')
                         game.meaning.nature = ['natural']
-                        game.meaning.acts = ['signoff', 'final_placement']
+                        immediate_signoff = len(sequence) <= 1
+                        game.meaning.acts = (['signoff', 'final_placement']
+                                             if immediate_signoff else ['signoff'])
                         game.meaning.target_suit = suit
                         game.meaning.agreed_suit = suit
-                        game.meaning.purpose_completed = True
+                        game.meaning.purpose_completed = immediate_signoff
                         game.description = ('Sign off in five of the minor.'
-                                            if not sequence else
-                                            'Return to the minor game.')
+                                            if immediate_signoff else
+                                            'Suggest the minor game after the '
+                                            'serious bidder has already cued; '
+                                            'partner may still continue.')
+
+                        if not immediate_signoff:
+                            game_pass = self.call(
+                                'transfer_' + suit.lower() + '_serious_'
+                                + sequence_label + '_game_pass')
+                            game_pass.when = node_prefix + game_minor + 'P'
+                            game_pass.bid = 'P'
+                            game_pass.applies = (
+                                lambda ctx: (ctx.hand is not None
+                                             and ctx.hand.hcp < 18))
+                            game_pass.meaning.action = 'serious_cue_game_pass'
+                            game_pass.meaning.nature = ['natural']
+                            game_pass.meaning.acts = [
+                                'signoff', 'final_placement']
+                            game_pass.meaning.target_suit = suit
+                            game_pass.meaning.agreed_suit = suit
+                            game_pass.meaning.purpose_completed = True
+                            game_pass.description = (
+                                'Accept the suggested minor game without '
+                                'extra strength.')
+
+                            game_raise = self.call(
+                                'transfer_' + suit.lower() + '_serious_'
+                                + sequence_label + '_game_raise_six')
+                            game_raise.when = node_prefix + game_minor + 'P'
+                            game_raise.bid = '6' + suit
+                            game_raise.applies = (
+                                lambda ctx: (ctx.hand is not None
+                                             and ctx.hand.hcp >= 18))
+                            game_raise.meaning.action = 'serious_cue_game_raise'
+                            game_raise.meaning.nature = ['natural']
+                            game_raise.meaning.acts = [
+                                'signoff', 'final_placement']
+                            game_raise.meaning.target_suit = suit
+                            game_raise.meaning.agreed_suit = suit
+                            game_raise.meaning.purpose_completed = True
+                            game_raise.description = (
+                                'After the suggested minor game, the partner '
+                                'with extra strength may raise to six.')
 
                     slam_cues = [('3H', 'H'), ('3S', 'S')]
                 else:
@@ -1964,9 +2077,53 @@ class OneNotrumpInvitations(Gadget):
                             finish.applies = lambda ctx: ctx.hand is not None
                             finish.meaning.action = 'minor_slam_strength_reply'
                             finish.meaning.nature = ['natural']
-                            finish.meaning.acts = ['signoff', 'final_placement']
+                            if finish_bid == '5' + suit:
+                                # After a strength cue, controls are already
+                                # known; five of the minor is a suggestion,
+                                # not a missing-control signoff.
+                                finish.meaning.acts = ['signoff']
+                                finish.meaning.purpose_completed = False
+                                finish.description = (
+                                    'Suggest five of the minor after the strength cue; '
+                                    'partner may still continue.')
+                                finish_after = finish.when + finish_bid + 'P'
+                                finish_pass = self.call(
+                                    'transfer_' + suit.lower()
+                                    + '_strength_game_pass_'
+                                    + finish_bid.lower() + '_' + lift.lower()
+                                    + '_after_' + cue_bid.lower())
+                                finish_pass.when = finish_after
+                                finish_pass.bid = 'P'
+                                finish_pass.applies = (
+                                    lambda ctx: (ctx.hand is not None
+                                                 and ctx.hand.hcp < 17))
+                                finish_pass.meaning.action = 'minor_slam_strength_pass'
+                                finish_pass.meaning.nature = ['natural']
+                                finish_pass.meaning.acts = [
+                                    'signoff', 'final_placement']
+                                finish_pass.meaning.target_suit = suit
+                                finish_pass.meaning.purpose_completed = True
+
+                                finish_raise = self.call(
+                                    'transfer_' + suit.lower()
+                                    + '_strength_game_raise_'
+                                    + finish_bid.lower() + '_' + lift.lower()
+                                    + '_after_' + cue_bid.lower())
+                                finish_raise.when = finish_after
+                                finish_raise.bid = '6' + suit
+                                finish_raise.applies = (
+                                    lambda ctx: (ctx.hand is not None
+                                                 and ctx.hand.hcp >= 17))
+                                finish_raise.meaning.action = 'minor_slam_strength_raise'
+                                finish_raise.meaning.nature = ['natural']
+                                finish_raise.meaning.acts = [
+                                    'signoff', 'final_placement']
+                                finish_raise.meaning.target_suit = suit
+                                finish_raise.meaning.purpose_completed = True
+                            else:
+                                finish.meaning.acts = ['signoff', 'final_placement']
+                                finish.meaning.purpose_completed = True
                             finish.meaning.target_suit = suit
-                            finish.meaning.purpose_completed = (finish_bid == '6' + suit)
 
                             close = self.call('transfer_' + suit.lower()
                                               + '_strength_game_close_'

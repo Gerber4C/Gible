@@ -489,7 +489,8 @@ class JacobyMajorTransfers(Gadget):
                     # purpose_completed, so a specifically authored override
                     # remains possible.
                     reply.meaning.acts = (['signoff', 'final_placement']
-                                           if bid in ('4S', '4H')
+                                           if bid == '4S'
+                                           else ['signoff'] if bid == '4H'
                                            else ['descriptive'])
                     reply.meaning.target_suit = target
                     if target in 'HS':
@@ -501,12 +502,54 @@ class JacobyMajorTransfers(Gadget):
                     placement = self.call('two_major_force_game_after_' + answer.lower())
                     placement.when = force_prefix + answer + 'P'
                     placement.bid = '4' + agreed_major if answer == '3S' else 'P'
-                    placement.applies = lambda ctx: major_two_suit_force(ctx)
+                    placement.applies = (
+                        lambda ctx, a=answer: (
+                            major_two_suit_force(ctx)
+                            and (a != '4H' or ctx.hand.hcp < 15)))
                     placement.meaning.action = 'two_major_game_placement'
                     placement.meaning.nature = ['natural']
                     placement.meaning.acts = ['signoff', 'final_placement']
                     placement.meaning.target_suit = agreed_major
                     placement.description = 'Suggested major-game signoff after the 5-5-major force.'
+
+                    if answer == '4H':
+                        force_after = force_prefix + '4HP'
+                        force_keycard = self.call('two_major_force_4h_keycard')
+                        force_keycard.when = force_after
+                        force_keycard.bid = '4NT'
+                        force_keycard.applies = (
+                            lambda ctx: (ctx.hand is not None
+                                         and 15 <= ctx.hand.hcp < 19))
+                        force_keycard.meaning.action = 'rkcb_1430'
+                        force_keycard.meaning.nature = ['artificial']
+                        force_keycard.meaning.acts = [
+                            'inquiry', 'keycard_asking']
+                        force_keycard.meaning.target_suit = 'H'
+                        force_keycard.meaning.agreed_suit = 'H'
+                        force_keycard.effect('agreed_suit').suit = 'H'
+                        context = force_keycard.effect('keycard_context')
+                        context.trump_suit = 'H'
+                        context.ask_call = '4N'
+                        context.method = 'rkcb_1430'
+                        context.status = 'pending'
+                        force_keycard.description = (
+                            'With extra strength after the suggested 4H, ask keycards.')
+
+                        force_six = self.call('two_major_force_4h_six')
+                        force_six.when = force_after
+                        force_six.bid = '6H'
+                        force_six.applies = (
+                            lambda ctx: (ctx.hand is not None
+                                         and ctx.hand.hcp >= 19))
+                        force_six.meaning.action = 'two_major_force_six'
+                        force_six.meaning.nature = ['natural']
+                        force_six.meaning.acts = [
+                            'signoff', 'final_placement']
+                        force_six.meaning.target_suit = 'H'
+                        force_six.meaning.agreed_suit = 'H'
+                        force_six.meaning.purpose_completed = True
+                        force_six.description = (
+                            'With extra strength after the suggested 4H, raise to six.')
 
                 slam = self.call('two_major_force_spade_keycard')
                 slam.when = force_prefix + '3SP'
@@ -878,12 +921,80 @@ class JacobyMajorTransfers(Gadget):
                         finish.applies = lambda ctx: ctx.hand is not None
                         finish.meaning.action = 'major_game_after_serious_cue'
                         finish.meaning.nature = ['natural']
-                        finish.meaning.acts = ['signoff', 'final_placement']
+                        finish.meaning.acts = ['signoff']
                         finish.meaning.target_suit = trump
                         finish.meaning.agreed_suit = trump
-                        finish.meaning.purpose_completed = True
+                        finish.meaning.purpose_completed = False
                         finish.effect('agreed_suit').suit = trump
-                        finish.description = 'Sign off in the major game.'
+                        finish.description = ('Suggest the major game after the '
+                                              'serious bidder has already cued; '
+                                              'partner may still continue.')
+
+                        finish_after = finish.when + '4' + trump + 'P'
+                        finish_pass = self.call(
+                            'jacoby_' + trump.lower() + '_' + minor.lower()
+                            + '_serious_' + cue_bid.lower() + '_after_'
+                            + next_bid.lower() + '_game_pass')
+                        finish_pass.when = finish_after
+                        finish_pass.bid = 'P'
+                        finish_pass.applies = (
+                            lambda ctx: (ctx.hand is not None
+                                         and ctx.hand.hcp < 17))
+                        finish_pass.meaning.action = 'major_game_pass'
+                        finish_pass.meaning.nature = ['natural']
+                        finish_pass.meaning.acts = [
+                            'signoff', 'final_placement']
+                        finish_pass.meaning.target_suit = trump
+                        finish_pass.meaning.agreed_suit = trump
+                        finish_pass.meaning.purpose_completed = True
+                        finish_pass.effect('agreed_suit').suit = trump
+                        finish_pass.description = (
+                            'Accept the suggested major game without extra strength.')
+
+                        finish_keycard = self.call(
+                            'jacoby_' + trump.lower() + '_' + minor.lower()
+                            + '_serious_' + cue_bid.lower() + '_after_'
+                            + next_bid.lower() + '_game_keycard')
+                        finish_keycard.when = finish_after
+                        finish_keycard.bid = '4NT'
+                        finish_keycard.applies = (
+                            lambda ctx: (ctx.hand is not None
+                                         and 17 <= ctx.hand.hcp < 19))
+                        finish_keycard.meaning.action = 'rkcb_1430'
+                        finish_keycard.meaning.nature = ['artificial']
+                        finish_keycard.meaning.acts = [
+                            'inquiry', 'keycard_asking']
+                        finish_keycard.meaning.target_suit = trump
+                        finish_keycard.meaning.agreed_suit = trump
+                        finish_keycard.effect('agreed_suit').suit = trump
+                        context = finish_keycard.effect('keycard_context')
+                        context.trump_suit = trump
+                        context.ask_call = '4N'
+                        context.method = 'rkcb_1430'
+                        context.status = 'pending'
+                        finish_keycard.description = (
+                            'After the suggested game, ask keycards with extra strength.')
+
+                        finish_raise = self.call(
+                            'jacoby_' + trump.lower() + '_' + minor.lower()
+                            + '_serious_' + cue_bid.lower() + '_after_'
+                            + next_bid.lower() + '_game_raise_six')
+                        finish_raise.when = finish_after
+                        finish_raise.bid = '6' + trump
+                        finish_raise.applies = (
+                            lambda ctx: (ctx.hand is not None
+                                         and ctx.hand.hcp >= 19))
+                        finish_raise.meaning.action = 'major_game_raise_six'
+                        finish_raise.meaning.nature = ['natural']
+                        finish_raise.meaning.acts = [
+                            'signoff', 'final_placement']
+                        finish_raise.meaning.target_suit = trump
+                        finish_raise.meaning.agreed_suit = trump
+                        finish_raise.meaning.purpose_completed = True
+                        finish_raise.effect('agreed_suit').suit = trump
+                        finish_raise.description = (
+                            'After the suggested game, the partner with extra '
+                            'strength may raise to six.')
 
                     keycard = self.call('jacoby_' + trump.lower() + '_'
                                         + minor.lower() + '_serious_'
