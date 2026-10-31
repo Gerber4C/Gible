@@ -116,6 +116,14 @@ class OwnerRouteTests(unittest.TestCase):
         self.assertIn('4C', result.calls)
         self.assertEqual(result.calls[-1], 'P')
 
+    def test_minor_superaccept_publishes_the_club_fit_and_avoids_6nt(self):
+        decision = choose_bid(
+            self.profile, Auction.parse('1NP2SP2NP'),
+            Hand.parse('SAJ6HKDACAKJT9532'))
+        self.assertEqual(decision.call, '4N')
+        self.assertEqual(decision.trace.trump_state('ns').suit, 'C')
+        self.assertEqual(decision.trace.trump_state('ns').status, 'agreed')
+
     def test_minor_serious_3nt_forced_cue_ladder_clubs(self):
         serious = 'SQJHQJDAKQCAQJxxx'
         self.assertEqual(self.bid('1NP2SP3CP', serious), '3N')

@@ -78,6 +78,21 @@ def derive_historical_call(profile, auction, call, trace) -> HistoricalDerivatio
                                       for item in matches],
                             'message': 'Multiple derived meanings claim this call'},
             evidence=evidence)
+    if call == '6N':
+        # 6NT is hand-dependent when selected, but its public meaning is a
+        # natural final small-slam placement. Replay cannot see the earlier
+        # actor's hand, so publish that meaning here instead of leaving the
+        # next player with an undefined prior call.
+        return HistoricalDerivation(
+            call, rule='derive_six_notrump_placement',
+            public_meaning={
+                'nature_labels': ['natural'],
+                'call_act_types': ['signoff', 'final_placement'],
+                'action_type': 'derived_six_notrump_placement',
+                'target_suit': 'N',
+                'purpose_completed': True,
+            },
+            evidence=evidence)
     conflicts = [item for item in result.conflicts
                  if item.get('call') in (None, call)]
     return HistoricalDerivation(

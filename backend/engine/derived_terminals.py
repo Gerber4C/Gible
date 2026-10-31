@@ -4,15 +4,40 @@ from __future__ import annotations
 
 from .derived_semantics import DerivationResult, derived_candidate
 from .hand_quality import has_good_five_card_suit
-from .legality import is_call_legal
+from .legality import SIDE_BY_SEAT, is_call_legal
+
+
+def _confirmed_no_trump(trace, evidence):
+    """Only derive 6NT when no possible trump has been shown publicly.
+
+    Absence of an agreed trump is not enough: a transfer superaccept, a
+    natural suit, or a supported/guaranteed long suit can still establish a
+    fit later.
+    """
+    if evidence.agreed_trump or evidence.provisional_trump:
+        return False
+    if evidence.plausible_trumps:
+        return False
+    if evidence.supported_suits.get(evidence.side):
+        return False
+    if evidence.guaranteed_long_suits.get(evidence.side):
+        return False
+    if trace is None:
+        return True
+    for entry in trace.applied_meanings:
+        seat = entry.get('seat')
+        if seat is None or SIDE_BY_SEAT.get(seat) != evidence.side:
+            continue
+        meaning = entry.get('public_meaning', {}) or {}
+        if meaning.get('target_suit') in 'CDHS':
+            return False
+    return True
 
 
 def derive_six_notrump(profile, auction, trace, evidence, allowed, hand=None):
     if '6N' not in allowed or not is_call_legal(auction, '6N'):
         return DerivationResult(evidence)
-    if evidence.agreed_trump or evidence.provisional_trump:
-        return DerivationResult(evidence)
-    if evidence.supported_suits.get(evidence.side):
+    if not _confirmed_no_trump(trace, evidence):
         return DerivationResult(evidence)
     if evidence.contract_level >= 4:
         return DerivationResult(evidence)

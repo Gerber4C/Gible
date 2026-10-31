@@ -1406,6 +1406,8 @@ class OneNotrumpInvitations(Gadget):
                 reply.meaning.nature = ['artificial' if answer != ordinary else 'natural']
                 reply.meaning.acts = ['descriptive']
                 reply.meaning.target_suit = suit
+                reply.meaning.agreed_suit = suit
+                reply.effect('agreed_suit').suit = suit
                 reply.description = 'Superaccept says an invitation is accepted; ordinary reply does not.'
 
                 prefix = '1NP' + transfer + 'P' + answer + 'P'

@@ -184,6 +184,18 @@ class DispatcherIntegrationTests(unittest.TestCase):
         self.assertIn('derive_control_cue', rules)
         self.assertEqual(decision.call, '4N')
 
+    def test_hand_dependent_six_notrump_is_replayable(self):
+        from engine.selector import choose_bid
+        profile = load_profile('daqiush_2over1')
+        north = Hand.parse('SKQ2HAQJ93DQ7CQ76')
+        auction = Auction.parse('1NP2SP2NP6NP')
+        trace = replay_auction(profile, auction, north)
+        entry = next(item for item in trace.applied_meanings
+                     if item['call'] == '6N')
+        self.assertEqual(entry['public_meaning']['action_type'],
+                         'derived_six_notrump_placement')
+        self.assertEqual(choose_bid(profile, auction, north).call, 'P')
+
     def test_trace_derivation_contains_no_private_cards(self):
         import json
         from engine.selector import choose_bid
