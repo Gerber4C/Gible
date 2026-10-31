@@ -68,9 +68,14 @@ def derive_terminal_pass(profile, auction, trace, evidence, allowed, hand=None):
     last = _last_meaning(trace)
     if last is None:
         return DerivationResult(evidence)
+    from .keycard_stop import is_non_contractual
+    if is_non_contractual(last.get('public_meaning')):
+        return DerivationResult(evidence)
     if any(record.key == 'two_suit_keycard'
            and record.attribute('status') != 'completed'
            for record in trace.current_state_records):
+        return DerivationResult(evidence)
+    if _active_keycard_frame(trace):
         return DerivationResult(evidence)
     seat = last.get('seat')
     partner = {'n': 's', 's': 'n', 'e': 'w', 'w': 'e'}[evidence.actor]
@@ -98,6 +103,30 @@ def derive_terminal_pass(profile, auction, trace, evidence, allowed, hand=None):
 def _last_meaning(trace):
     entries = [entry for entry in trace.applied_meanings if entry.get('seat')]
     return entries[-1] if entries else None
+
+
+def _active_keycard_frame(trace):
+    latest = _latest_state(trace, 'keycard_context')
+    if latest is not None:
+        status = latest.attribute('status') or 'pending'
+        if status not in ('completed', 'disrupted'):
+            return True
+    latest_void = _latest_state(trace, 'voidwood')
+    if latest_void is not None:
+        if (latest_void.attribute('status') or 'pending') not in (
+                'completed', 'disrupted'):
+            return True
+    if _latest_state(trace, 'voidwood_answer') is not None:
+        return not (latest_void is not None
+                    and latest_void.attribute('status') == 'completed')
+    return False
+
+
+def _latest_state(trace, key):
+    for record in reversed(trace.current_state_records):
+        if record.key == key:
+            return record
+    return None
 
 
 def _partner_minimum(trace, actor):

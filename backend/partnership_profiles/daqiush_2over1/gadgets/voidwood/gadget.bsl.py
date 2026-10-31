@@ -363,6 +363,7 @@ class Voidwood(Gadget):
                 answer.meaning.action = 'voidwood_answer'
                 answer.meaning.nature = ['artificial']
                 answer.meaning.acts = ['descriptive', 'keycard_answer']
+                answer.meaning.contract_effect = 'none'
                 answer.meaning.target_suit = trump
                 answer.meaning.agreed_suit = trump
                 answer.meaning.keycard_counts = list(counts)
@@ -373,6 +374,7 @@ class Voidwood(Gadget):
                 public_answer.trump = trump
                 public_answer.void = void
                 public_answer.ask = ask
+                public_answer.answer_call = answer_map[index]
                 public_answer.keycard_counts = list(counts)
                 public_answer.effective_trump_queen = queen
                 answer.description = ('Voidwood answer: ' + answer_map[index]
@@ -734,6 +736,7 @@ class Voidwood(Gadget):
                         answer.meaning.action = 'voidwood_answer'
                         answer.meaning.nature = ['artificial']
                         answer.meaning.acts = ['descriptive', 'keycard_answer']
+                        answer.meaning.contract_effect = 'none'
                         answer.meaning.target_suit = trump
                         answer.meaning.agreed_suit = trump
                         answer.meaning.keycard_counts = list(counts)
@@ -744,6 +747,7 @@ class Voidwood(Gadget):
                         public_answer.trump = trump
                         public_answer.void = void
                         public_answer.ask = ask
+                        public_answer.answer_call = answers[step]
                         public_answer.keycard_counts = list(counts)
                         public_answer.effective_trump_queen = queen
                         answer.description = ('Voidwood answer ' + answers[step]

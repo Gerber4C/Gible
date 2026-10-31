@@ -85,6 +85,7 @@ def _primary_answer(auction, state, evidence, allowed, hand):
         'nature_labels': ['artificial'],
         'call_act_types': ['descriptive', 'keycard_answer'],
         'action_type': 'two_suit_keycard_answer',
+        'contract_effect': 'none',
         'target_suit': state.get('low_suit', 'C'),
         'keycard_counts': list(_possible_counts(answer)),
         'queen_category': _queen_category(answer),
@@ -107,6 +108,7 @@ def _queen_answer(auction, state, evidence, allowed, hand):
         'nature_labels': ['artificial'],
         'call_act_types': ['descriptive', 'queen_answer'],
         'action_type': 'two_suit_keycard_queen_answer',
+        'contract_effect': 'none',
         'target_suit': state.get('low_suit', 'C'),
         'queen_category': _queen_category(answer),
     }

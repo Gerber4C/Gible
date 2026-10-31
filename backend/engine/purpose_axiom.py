@@ -45,6 +45,9 @@ def terminal_pass_candidate(auction, trace) -> CallCandidate | None:
         return None
     entry = next((item for item in trace.applied_meanings if item.get('index') == index), None)
     meaning = entry['public_meaning'] if entry else {}
+    from .keycard_stop import is_non_contractual
+    if is_non_contractual(meaning):
+        return None
     acts = set(meaning.get('call_act_types', ()))
     completed = (meaning.get('purpose_completed') is True
                  or ('final_placement' in acts and 'signoff' in acts
@@ -340,6 +343,10 @@ def _last_non_pass_call(auction):
 
 def _game_or_rescue(auction, trace, purpose, hand, frame, with_stage, profile):
     game = f'5{purpose.trump}'
+    # If the artificial answer itself is five of the agreed trump, Pass is the
+    # keycard stop; a rescue relay would incorrectly bid past it.
+    if _last_non_pass_call(auction) == game:
+        return _StageResult('P', purpose=_completed(with_stage))
     if five_trump_available(auction, purpose.trump):
         return _StageResult(game, purpose=_completed(with_stage))
     role = five_spade_role(auction, frame)

@@ -123,6 +123,18 @@ class PurposeAxiomTests(unittest.TestCase):
         self.assertTrue(any('ambiguous' in item.lower()
                             for item in decision.trace.diagnostics))
 
+    def test_five_heart_answer_stop_is_a_pass_not_a_rescue_relay(self):
+        hand = 'SKQHA98765DKQJCQJ'
+        base = {'kind': 'keycard_slam', 'owner': 's', 'source_index': 6,
+                'source_call': '4N', 'trump': 'H',
+                'owns_trump_queen': False, 'status': 'active'}
+        for own, expected in ((1, 'P'), (2, 'P'), (3, '6H')):
+            with self.subTest(own_keycards=own):
+                purpose = dict(base, own_keycards=own)
+                decision = self.choose(
+                    '1NP4CP4HP4NP5HP', hand, purpose)
+                self.assertEqual(decision.call, expected)
+
     def test_queen_ask_is_authored_but_its_answer_table_is_not(self):
         purpose = {'kind': 'keycard_slam', 'owner': 's', 'source_index': 6,
                    'source_call': '4N', 'trump': 'H', 'own_keycards': 3,
@@ -238,25 +250,14 @@ class PurposeAxiomTests(unittest.TestCase):
         self.assertIn('not completed', result.error)
         self.assertEqual(result.purpose.status, 'active')
 
-    def test_rescue_relay_is_selected_then_passes_after_forced_five_notrump(self):
-        from unittest.mock import patch
-        from engine.rkcb_simulation import RescueDecision
+    def test_five_heart_answer_with_two_missing_keycards_stops(self):
         purpose = {'kind': 'keycard_slam', 'owner': 's', 'source_index': 6,
                    'source_call': '4N', 'trump': 'H', 'own_keycards': 0,
                    'owns_trump_queen': False, 'status': 'active'}
-        hand = 'S32HQ98765D432C32'
-        with patch('engine.purpose_axiom.compare_rescue_routes',
-                   return_value=RescueDecision('5S', 'test comparison')):
-            decision = self.choose('1NP4CP4HP4NP5HP', hand, purpose)
-        self.assertEqual(decision.call, '5S')
-        saved = decision.private_memory.purposes[0]
-        self.assertEqual((saved.status, saved.rkcb_stage, saved.relay_intent),
-                         ('active', 'await_relay_completion', 'rescue'))
-        continuation = choose_bid(
-            self.profile, Auction.parse('1NP4CP4HP4NP5HP5SP5NP'),
-            Hand.parse(hand), private_memory=decision.private_memory.to_dict())
-        self.assertEqual(continuation.call, 'P')
-        self.assertEqual(continuation.private_memory.purposes[0].status,
+        decision = self.choose(
+            '1NP4CP4HP4NP5HP', 'S32HQ98765D432C32', purpose)
+        self.assertEqual(decision.call, 'P')
+        self.assertEqual(decision.private_memory.purposes[0].status,
                          'completed')
 
     def test_purpose_selects_an_authored_continuation_and_keeps_its_meaning(self):

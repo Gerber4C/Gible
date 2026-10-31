@@ -144,6 +144,18 @@ def choose_bid(
                            private_memory=actor_memory)
     if nfrkcb is not None:
         candidates = (nfrkcb,)
+    keycard_stop_rules = {
+        'derive_keycard_five_of_trump_stop',
+        'derive_keycard_small_slam_placement',
+        'derive_voidwood_five_of_trump_stop',
+        'derive_voidwood_small_slam_placement',
+    }
+    keycard_stop = next(
+        (candidate for candidate in candidates
+         if candidate.metadata.get('derived_rule') in keycard_stop_rules),
+        None)
+    if keycard_stop is not None:
+        candidates = (keycard_stop,)
     frame = ordinary_rkcb_frame(trace)
     if (frame is not None
             and frame.continuation_stage == 'grand_invitation'

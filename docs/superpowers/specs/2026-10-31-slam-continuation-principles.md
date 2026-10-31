@@ -147,6 +147,31 @@ Implementation: `backend/engine/derived_grand_invite.py` owns the suit/rank
 rules, and `backend/engine/derived_two_suit_keycard.py` owns the public state
 machine and replayable effects.
 
+## 10. Artificial answers and the five-of-trump stop
+
+Keycard answers, queen answers, king answers, and relays are non-contractual:
+they never define the contract strain and never change the agreed trump. A
+Pass after such an answer is therefore not an automatic acceptance of the
+literal bid.
+
+The stop target is always **five of the agreed trump**, derived separately from
+the answer:
+
+- if the artificial answer is already five of the trump, the stop is Pass;
+- otherwise the stop is the five-level trump call (for example, a Voidwood
+  `5D` answer with hearts agreed must stop in `5H`, never Pass `5D`);
+- stop when two or more keycards are missing, or when one keycard is missing
+  and the trump queen is denied;
+- with no missing keycard, or one missing and the queen known, continue to six
+  of the trump; with one missing and the queen unknown, ask the queen;
+- when the stop target is unavailable, the engine continues or uses a defined
+  relay/rescue rather than passing the artificial answer.
+
+Implementation: `engine/keycard_stop.py` classifies non-contractual answers and
+owns the stop geometry; `engine/derived_keycard_stop.py` fills the stop or
+small-slam candidate from the public frame and the asker's keycards. The same
+rule is mirrored in the saved-purpose continuation.
+
 ## Implementation mapping
 
 - Minor serious 3NT and low-limit 4m:
@@ -155,6 +180,8 @@ machine and replayable effects.
   `daqiush_2over1/gadgets/jacoby_major_transfers/gadget.bsl.py`
 - Derived serious relay and forced responses: `engine/derived_fit_calls.py`
 - Global Voidwood and inferred trumps: `engine/voidwood.py`
+- Non-contractual answers and five-of-trump stop: `engine/keycard_stop.py`,
+  `engine/derived_keycard_stop.py`
 - Future generic derivation: the `derived_*` engine layer should fill any
   otherwise undefined call from these rules, with authored profile calls
   retaining priority.

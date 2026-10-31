@@ -254,6 +254,7 @@ class ConfirmedKeycard(Gadget):
                 answer.meaning.action = 'rkcb_1430_answer'
                 answer.meaning.nature = ['artificial']
                 answer.meaning.acts = ['descriptive', 'keycard_answer']
+                answer.meaning.contract_effect = 'none'
                 answer.meaning.target_suit = trump
                 answer.meaning.agreed_suit = trump
                 answer.meaning.keycard_counts = list(counts)
