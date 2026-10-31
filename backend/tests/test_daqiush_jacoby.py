@@ -139,7 +139,7 @@ class DaqiushJacobyTests(unittest.TestCase):
 
     def test_diamond_fit_support_cue_offers_four_heart_and_denial_choices(self):
         north = 'SAK9HQ9DK754CA973'
-        south = 'S4HAKJT53DQJT8CQ5'
+        south = 'S4HAQJ842DQJT8C42'
         self.assertEqual(self.bid('1NP2DP2HP3DP', north), '3S')
         self.assertEqual(self.bid('1NP2DP2HP3DP3SP', south), '4H')
         self.assertEqual(self.bid('1NP2DP2HP3DP3SP4HP', north), '4N')
