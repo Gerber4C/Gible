@@ -3,6 +3,7 @@ import unittest
 from engine.auction import Auction
 from engine.cards import Hand
 from engine.loader import load_profile
+from engine.replay import replay_auction
 from engine.selector import choose_bid
 from engine.simulator import simulate_auction
 
@@ -122,6 +123,83 @@ class DaqiushOneNotrumpExpansionTests(unittest.TestCase):
             choose_bid(self.profile,
                        Auction.parse('1NP3DP3NP4SP4NTP6CP6DP'),
                        Hand.parse(south)).call, 'P')
+
+    def test_derived_two_suit_keycard_queen_ask_and_answer(self):
+        north = 'SK9HAK5DT64CAT654'
+        south = 'S32H2DAQJ87CQJT93'
+        prefix = '1NP3DP3NP4SP4NTP'
+        self.assertEqual(
+            choose_bid(self.profile, Auction.parse(prefix),
+                       Hand.parse(south)).call, '5C')
+        self.assertEqual(
+            choose_bid(self.profile, Auction.parse(prefix + '5CP'),
+                       Hand.parse(north)).call, '5H')
+        self.assertEqual(
+            choose_bid(self.profile, Auction.parse(prefix + '5CP5HP'),
+                       Hand.parse(south)).call, '6N')
+
+    def test_derived_two_suit_grand_invitation_after_five_notrump_answer(self):
+        north = 'S9HAK5DT64CAT6543'
+        prefix = '1NP3DP3NP4SP4NTP5NP'
+        self.assertEqual(self.bid(prefix, north), '6S')
+        trace = replay_auction(self.profile, Auction.parse(prefix + '6S'))
+        entry = next(item for item in trace.applied_meanings
+                     if item['call'] == '6S')
+        self.assertEqual(
+            entry['public_meaning']['action_type'],
+            'two_suit_keycard_grand_invitation')
+        self.assertEqual(entry['public_meaning']['skipped_kings'], ['H'])
+
+        south_with_sk = 'SK2H2DAQJ87CKT932'
+        self.assertEqual(self.bid(prefix + '6SP', south_with_sk), '7C')
+        south_without_sk = 'S32H2DAQJ87CKT932'
+        self.assertEqual(self.bid(prefix + '6SP', south_without_sk), '6N')
+        south_with_skipped_hk = 'S32HK2DAQJ87CKT93'
+        self.assertEqual(
+            self.bid(prefix + '6SP', south_with_skipped_hk), '6N')
+        self.assertEqual(self.bid(prefix + '6SP7CP', north), 'P')
+        diamond_preference = 'S9HAK5DAQJ87CAT65'
+        self.assertEqual(
+            self.bid(prefix + '6SP7CP', diamond_preference), '7D')
+
+    def test_derived_two_suit_five_spade_then_five_notrump_invitation(self):
+        prefix = '1NP3DP3NP4SP4NTP5SP'
+        self.assertEqual(
+            self.bid(prefix, 'S9HQJ5DT64CAT6543'), '5N')
+        self.assertEqual(
+            self.bid(prefix + '5NP', 'S32HK2DAJ876CKQT9'), '6H')
+        self.assertEqual(
+            self.bid(prefix + '5NP', 'SK2H2DAJ876CKQT93'), '6S')
+        self.assertEqual(
+            self.bid(prefix + '5NP', 'S32HQ2DAJ876CKQT9'), '6C')
+
+    def test_derived_two_suit_no_king_reply_can_still_place_grand(self):
+        prefix = '1NP3DP3NP4SP4NTP5SP5NP'
+        south = 'S32HQ2DAJ876CKQT9'
+        north = 'SAK9HAK5DAQJCKQ54'
+        self.assertEqual(self.bid(prefix, south), '6C')
+        self.assertEqual(self.bid(prefix + '6CP', north), '7C')
+
+    def test_derived_two_suit_six_heart_grand_invitation_and_pass_or_correct(self):
+        prefix = '1NP3DP3NP4SP4NTP5NP6HP'
+        self.assertEqual(
+            self.bid(prefix, 'S32HK2DAQJ87CKT93'), '7C')
+        self.assertEqual(
+            self.bid(prefix, 'SK2H2DAQJ87CKT932'), '6S')
+        self.assertEqual(
+            self.bid(prefix + '7CP', 'S9HQJ5DT64CAT6543'), 'P')
+        self.assertEqual(
+            self.bid(prefix + '7CP', 'S9HAK5DAQJ87CAT65'), '7D')
+        trace = replay_auction(
+            self.profile, Auction.parse(prefix + '7CP7DP'))
+        meanings = [item['public_meaning']['action_type']
+                    for item in trace.applied_meanings
+                    if item['call'] in ('6H', '7C', '7D')]
+        self.assertEqual(meanings, [
+            'two_suit_keycard_grand_invitation',
+            'two_suit_keycard_grand_accept',
+            'two_suit_keycard_grand_correction',
+        ])
 
     def test_minor_two_suiter_uses_partner_stopper_after_three_hearts(self):
         responder = 'SQTH9DAK543CQJ876'

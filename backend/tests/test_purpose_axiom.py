@@ -46,7 +46,7 @@ class PurposeAxiomTests(unittest.TestCase):
                    'source_call': '4C', 'trump': 'H', 'status': 'active',
                    'responses': {'4D': '4H', '4H': 'P'}}
         decision = self.choose('1NP4C4D4HP', 'ST2HAQT976D53CKJ2', purpose)
-        self.assertIsNone(decision.call)
+        self.assertEqual(decision.call, '4N')
         self.assertEqual(decision.private_memory.purposes[0].status, 'disrupted')
 
     def test_selected_keycard_ask_saves_private_slam_purpose(self):
@@ -109,10 +109,16 @@ class PurposeAxiomTests(unittest.TestCase):
         self.assertEqual(deterministic.call, '5H')
 
     def test_ambiguous_answer_tds_when_sampling_is_unavailable(self):
+        from unittest.mock import patch
+        from engine.rkcb_simulation import AmbiguousDecision
         purpose = {'kind': 'keycard_slam', 'owner': 's', 'source_index': 6,
                    'source_call': '4N', 'trump': 'H', 'own_keycards': 2,
                    'owns_trump_queen': False, 'status': 'active'}
-        decision = self.choose('1NP4CP4HP4NP5DP', 'SA2HAJ9876D432C42', purpose)
+        with patch('engine.purpose_axiom.compare_ambiguous_continuations',
+                   return_value=AmbiguousDecision(
+                       None, 'test unavailable', unavailable=True)):
+            decision = self.choose(
+                '1NP4CP4HP4NP5DP', 'SA2HAJ9876D432C42', purpose)
         self.assertIsNone(decision.call)
         self.assertTrue(any('ambiguous' in item.lower()
                             for item in decision.trace.diagnostics))

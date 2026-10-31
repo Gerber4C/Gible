@@ -88,8 +88,9 @@ class JacobySplinter(Gadget):
             weak.applies = lambda ctx, t=trump, s=short: reply_in_range(ctx, t, s, 0, 15)
             weak.meaning.action = 'splinter_decline'
             weak.meaning.nature = ['natural']
-            weak.meaning.acts = ['signoff']
+            weak.meaning.acts = ['signoff', 'final_placement']
             weak.meaning.agreed_suit = trump
+            weak.meaning.purpose_completed = True
             weak.description = 'Adjusted HCP below 15.5; return to four of the agreed major.'
 
             for cue_bid in cues:

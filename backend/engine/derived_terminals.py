@@ -68,6 +68,10 @@ def derive_terminal_pass(profile, auction, trace, evidence, allowed, hand=None):
     last = _last_meaning(trace)
     if last is None:
         return DerivationResult(evidence)
+    if any(record.key == 'two_suit_keycard'
+           and record.attribute('status') != 'completed'
+           for record in trace.current_state_records):
+        return DerivationResult(evidence)
     seat = last.get('seat')
     partner = {'n': 's', 's': 'n', 'e': 'w', 'w': 'e'}[evidence.actor]
     if seat != partner:

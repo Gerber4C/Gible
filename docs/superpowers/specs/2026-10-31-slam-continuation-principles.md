@@ -120,6 +120,33 @@ legal final route, the engine must TD with a structured explanation. It must
 not invent an agreement, and it must not read private cards from the other
 hand.
 
+## 9. Two-suit keycard grand invitation
+
+After the two-suit keycard answer has shown a queen, the next step follows the
+missing side king rather than a new specific-king ladder:
+
+- `5S` answer: `5NT` is the generic grand invitation.
+- `5NT` or `6C` answer: a six-level side-suit bid is the invitation, in the
+  lowest side suit whose king the asker lacks.
+- A lower side king already held by the asker is deliberately skipped. A lower
+  side king the asker lacks is unintentionally skipped and must be ignored by
+  responder.
+- After a `5NT` invitation, `6C` = no side king, `6H` = heart king, `6S` =
+  spade king without the heart king.
+- After a `6H` invitation, `7C` = heart king and is pass-or-correct; `6S` =
+  spade king without the heart king; a missing side king signs off in `6NT`.
+- After a `6S` invitation, the spade king accepts (`7C`), while a skipped heart
+  king or no king signs off in `6NT`.
+- `7C` accepts the lower trump; Pass accepts it, while `7D` is the correction
+  to the higher trump. The immediate response to a six-level invitation cannot
+  use `7D`; the correction is legal only after `7C`.
+- With both side kings and a compatible keycard count, responder may place
+  `7C`/`7D` directly instead of stopping to answer a king.
+
+Implementation: `backend/engine/derived_grand_invite.py` owns the suit/rank
+rules, and `backend/engine/derived_two_suit_keycard.py` owns the public state
+machine and replayable effects.
+
 ## Implementation mapping
 
 - Minor serious 3NT and low-limit 4m:

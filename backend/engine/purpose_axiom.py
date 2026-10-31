@@ -45,7 +45,17 @@ def terminal_pass_candidate(auction, trace) -> CallCandidate | None:
         return None
     entry = next((item for item in trace.applied_meanings if item.get('index') == index), None)
     meaning = entry['public_meaning'] if entry else {}
-    if meaning.get('purpose_completed') is not True or 'final_placement' not in meaning.get('call_act_types', ()):
+    acts = set(meaning.get('call_act_types', ()))
+    completed = (meaning.get('purpose_completed') is True
+                 or ('final_placement' in acts and 'signoff' in acts
+                     and 'invite' not in acts))
+    if not completed or 'final_placement' not in acts:
+        return None
+    # A pure pass-or-correct 7C is not automatically accepted: the asker may
+    # still correct to the higher trump.  The derived two-suit state supplies
+    # both Pass and 7D with a hand-based preference.
+    if (meaning.get('pass_or_correct') == 'pure'
+            or meaning.get('action_type') == 'two_suit_keycard_grand_signoff'):
         return None
     origin = {'namespace': 'axiom', 'object_type': 'purpose',
               'object_id': 'terminal_pass', 'qualified_id': 'axiom/purpose:terminal_pass'}

@@ -53,49 +53,9 @@ def derive_historical_call(profile, auction, call, trace) -> HistoricalDerivatio
             )
             return _nfrkcb_historical(call, 'nfrkcb_answer', meaning,
                                       effects, evidence)
-    two_suit = _two_suit_keycard_pending(trace)
-    if two_suit and call in ('5C', '5D', '5H', '5S', '5N', '6C'):
-        category = {
-            '5C': '14', '5D': '036', '5H': '25_none',
-            '5S': '25_low', '5N': '25_high', '6C': '25_both',
-        }[call]
-        counts = {
-            '5C': (1, 4), '5D': (0, 3, 6), '5H': (2, 5),
-            '5S': (2, 5), '5N': (2, 5), '6C': (2, 5),
-        }[call]
-        return HistoricalDerivation(
-            call, rule='derive_two_suit_keycard_answer',
-            public_meaning={
-                'nature_labels': ['artificial'],
-                'call_act_types': ['descriptive', 'keycard_answer'],
-                'action_type': 'two_suit_keycard_answer',
-                'target_suit': 'C',
-                'keycard_counts': list(counts),
-                'queen_category': {
-                    '5H': 'none', '5S': 'low', '5N': 'high',
-                    '6C': 'both',
-                }.get(call),
-            },
-            effects=(
-                {'key': 'two_suit_keycard', 'status': 'answered',
-                 'method': 'two_suit_keycard', 'answer_call': call,
-                 'category': category},
-            ),
-            evidence=evidence)
-    if (_two_suit_keycard_answered(trace)
-            and call in ('6C', '6D', '6N', '7C', '7D')):
-        suit = 'N' if call == '6N' else call[1]
-        return HistoricalDerivation(
-            call, rule='derive_two_suit_keycard_placement',
-            public_meaning={
-                'nature_labels': ['natural'],
-                'call_act_types': ['signoff', 'final_placement'],
-                'action_type': 'two_suit_keycard_placement',
-                'target_suit': suit,
-                'agreed_suit': suit if suit in 'CD' else None,
-                'purpose_completed': True,
-            },
-            evidence=evidence)
+    two_suit = _two_suit_keycard_historical(trace, call, evidence)
+    if two_suit is not None:
+        return two_suit
     shortage = _minor_shortage_context(trace)
     if shortage == 'S' and call == '4N':
         return HistoricalDerivation(
@@ -111,7 +71,8 @@ def derive_historical_call(profile, auction, call, trace) -> HistoricalDerivatio
             effects=(
                 {'key': 'two_suit_keycard', 'status': 'pending',
                  'method': 'two_suit_keycard', 'low_suit': 'C',
-                 'high_suit': 'D', 'keycards_total': 6},
+                 'high_suit': 'D', 'keycards_total': 6,
+                 'asker': auction.actor_to_call},
             ),
             evidence=evidence)
     if shortage == 'H' and call == '4S':
@@ -202,6 +163,246 @@ def _nfrkcb_offer(trace):
     return None
 
 
+_TWO_SUIT_PRIMARY_ANSWERS = ('5C', '5D', '5H', '5S', '5N', '6C')
+_TWO_SUIT_QUEEN_ANSWERS = ('6C', '5S', '5N', '6H', '6S', '6N')
+_TWO_SUIT_PLACEMENTS = ('6C', '6D', '6N', '7C', '7D')
+
+
+def _two_suit_keycard_historical(trace, call, evidence):
+    record = _two_suit_keycard_latest(trace)
+    if record is None:
+        return None
+    state = dict(record.attributes)
+    status = state.get('status')
+    low_suit = state.get('low_suit') or 'C'
+    high_suit = state.get('high_suit') or 'D'
+
+    if status == 'pending' and call in _TWO_SUIT_PRIMARY_ANSWERS:
+        category = {
+            '5C': '14', '5D': '036', '5H': '25_none',
+            '5S': '25_low', '5N': '25_high', '6C': '25_both',
+        }[call]
+        counts = {
+            '5C': (1, 4), '5D': (0, 3, 6), '5H': (2, 5),
+            '5S': (2, 5), '5N': (2, 5), '6C': (2, 5),
+        }[call]
+        return HistoricalDerivation(
+            call, rule='derive_two_suit_keycard_answer',
+            public_meaning={
+                'nature_labels': ['artificial'],
+                'call_act_types': ['descriptive', 'keycard_answer'],
+                'action_type': 'two_suit_keycard_answer',
+                'target_suit': low_suit,
+                'keycard_counts': list(counts),
+                'queen_category': _queen_category(call),
+            },
+            effects=(_carry_replay(
+                state, status='answered', answer_call=call,
+                primary_answer=call, category=category),),
+            evidence=evidence)
+
+    if status == 'answered':
+        answer = state.get('primary_answer') or state.get('answer_call')
+        if call == '5H' and answer in ('5C', '5D'):
+            return HistoricalDerivation(
+                call, rule='derive_two_suit_keycard_queen_ask',
+                public_meaning={
+                    'nature_labels': ['artificial'],
+                    'call_act_types': ['inquiry', 'queen_ask'],
+                    'action_type': 'two_suit_keycard_queen_ask',
+                    'target_suit': low_suit,
+                },
+                effects=(_carry_replay(state, status='queen_ask'),),
+                evidence=evidence)
+        if _two_suit_invitation_allowed(call, answer):
+            return _two_suit_invitation_historical(
+                call, state, evidence)
+        if call in _TWO_SUIT_PLACEMENTS:
+            return _two_suit_placement_historical(
+                call, state, evidence)
+
+    if status == 'queen_ask' and call in _TWO_SUIT_QUEEN_ANSWERS:
+        category = {
+            '6C': 'none', '5S': 'low', '5N': 'high',
+            '6H': 'both_hk', '6S': 'both_sk', '6N': 'both_none',
+        }[call]
+        return HistoricalDerivation(
+            call, rule='derive_two_suit_keycard_queen_answer',
+            public_meaning={
+                'nature_labels': ['artificial'],
+                'call_act_types': ['descriptive', 'queen_answer'],
+                'action_type': 'two_suit_keycard_queen_answer',
+                'target_suit': low_suit,
+                'queen_category': category,
+            },
+            effects=(_carry_replay(
+                state, status='queen_answered', answer_call=call,
+                queen_answer=call, queen_category=category),),
+            evidence=evidence)
+
+    if status == 'queen_answered':
+        answer = state.get('queen_answer') or state.get('answer_call')
+        if _two_suit_invitation_allowed(call, answer):
+            return _two_suit_invitation_historical(
+                call, state, evidence)
+        if call in _TWO_SUIT_PLACEMENTS:
+            return _two_suit_placement_historical(
+                call, state, evidence)
+
+    if status == 'grand_invite' and call in ('6C', '6H', '6S', '6N', '7C'):
+        invitation = state.get('invitation_call')
+        if call == '7C':
+            return HistoricalDerivation(
+                call, rule='derive_two_suit_keycard_grand_accept',
+                public_meaning={
+                    'nature_labels': ['natural'],
+                    'call_act_types': ['signoff', 'final_placement',
+                                       'grand_accept'],
+                    'action_type': 'two_suit_keycard_grand_accept',
+                    'target_suit': low_suit,
+                    'agreed_suit': low_suit,
+                    'pass_or_correct': 'pure',
+                    'control_suit': state.get('invitation_suit'),
+                    'purpose_completed': True,
+                },
+                effects=(_carry_replay(
+                    state, status='pass_or_correct',
+                    grand_answer_call=call,
+                    shown_king=state.get('invitation_suit'),
+                    accepted_grand=True),),
+                evidence=evidence)
+        if call in ('6H', '6S') and call != invitation:
+            return HistoricalDerivation(
+                call, rule='derive_two_suit_keycard_grand_k_answer',
+                public_meaning={
+                    'nature_labels': ['artificial'],
+                    'call_act_types': ['descriptive', 'control_showing',
+                                       'slam_try', 'invite'],
+                    'action_type': 'two_suit_keycard_grand_k_answer',
+                    'target_suit': low_suit,
+                    'suits': [low_suit, high_suit],
+                    'control_suit': call[1],
+                    'invitation_call': invitation,
+                    'skipped_kings': list(state.get('skipped_kings') or ()),
+                },
+                effects=(_carry_replay(
+                    state, status='invite_answered',
+                    grand_answer_call=call, shown_king=call[1]),),
+                evidence=evidence)
+        if call in ('6C', '6N'):
+            return HistoricalDerivation(
+                call, rule='derive_two_suit_keycard_grand_signoff',
+                public_meaning={
+                    'nature_labels': ['natural'],
+                    'call_act_types': ['signoff', 'final_placement',
+                                       'invite_minus'],
+                    'action_type': 'two_suit_keycard_grand_signoff',
+                    'target_suit': 'N' if call == '6N' else low_suit,
+                    'suits': [low_suit, high_suit],
+                    'purpose_completed': True,
+                },
+                effects=(_carry_replay(
+                    state, status='invite_answered',
+                    grand_answer_call=call),),
+                evidence=evidence)
+
+    if status == 'invite_answered':
+        answer = state.get('grand_answer_call')
+        if answer == '6H' and call == '6S':
+            return _two_suit_invitation_historical(
+                call, state, evidence, skipped_kings=('H',))
+        if call in _TWO_SUIT_PLACEMENTS:
+            return _two_suit_placement_historical(
+                call, state, evidence)
+
+    if status == 'pass_or_correct' and call == '7D':
+        return HistoricalDerivation(
+            call, rule='derive_two_suit_keycard_grand_correction',
+            public_meaning={
+                'nature_labels': ['natural'],
+                'call_act_types': ['signoff', 'final_placement'],
+                'action_type': 'two_suit_keycard_grand_correction',
+                'target_suit': high_suit,
+                'agreed_suit': high_suit,
+                'purpose_completed': True,
+            },
+            effects=(_carry_replay(
+                state, status='completed', final_call=call),),
+            evidence=evidence)
+    return None
+
+
+def _two_suit_invitation_allowed(call, answer):
+    if call == '5N':
+        return answer == '5S'
+    if call in ('6H', '6S'):
+        return answer in ('5S', '5N', '6C', '6H', '6S')
+    return False
+
+
+def _two_suit_invitation_historical(call, state, evidence,
+                                    skipped_kings=None):
+    low_suit = state.get('low_suit') or 'C'
+    high_suit = state.get('high_suit') or 'D'
+    kind = 'five_notrump' if call == '5N' else 'six_level'
+    suit = None if call == '5N' else call[1]
+    if skipped_kings is None:
+        skipped = () if call != '6S' else ('H',)
+    else:
+        skipped = tuple(skipped_kings)
+    return HistoricalDerivation(
+        call, rule='derive_two_suit_keycard_grand_invitation',
+        public_meaning={
+            'nature_labels': ['artificial'],
+            'call_act_types': ['invite', 'slam_try'],
+            'action_type': 'two_suit_keycard_grand_invitation',
+            'target_suit': low_suit,
+            'suits': [low_suit, high_suit],
+            'invitation_kind': kind,
+            'invitation_suit': suit,
+            'skipped_kings': list(skipped),
+            'unintentionally_skipped_kings': [],
+        },
+        effects=(_carry_replay(
+            state, status='grand_invite', invitation_call=call,
+            invitation_kind=kind, invitation_suit=suit,
+            skipped_kings=list(skipped),
+            unintentionally_skipped_kings=[],
+            grand_answer_call=None, shown_king=None),),
+        evidence=evidence)
+
+
+def _two_suit_placement_historical(call, state, evidence):
+    suit = 'N' if call == '6N' else call[1]
+    return HistoricalDerivation(
+        call, rule='derive_two_suit_keycard_placement',
+        public_meaning={
+            'nature_labels': ['natural'],
+            'call_act_types': ['signoff', 'final_placement'],
+            'action_type': 'two_suit_keycard_placement',
+            'target_suit': suit,
+            'agreed_suit': suit if suit in 'CD' else None,
+            'purpose_completed': True,
+        },
+        effects=(_carry_replay(
+            state, status='completed', final_call=call),),
+        evidence=evidence)
+
+
+def _carry_replay(state, **updates):
+    result = {'key': 'two_suit_keycard',
+              **{key: value for key, value in state.items()
+                 if key not in ('key', 'status')}}
+    result.update(updates)
+    return result
+
+
+def _queen_category(call):
+    return {
+        '5H': 'none', '5S': 'low', '5N': 'high', '6C': 'both',
+    }.get(call)
+
+
 def _minor_shortage_context(trace):
     has_two_minor = any(
         (entry.get('public_meaning', {}) or {}).get('action_type')
@@ -219,18 +420,9 @@ def _minor_shortage_context(trace):
     return None
 
 
-def _two_suit_keycard_pending(trace):
+def _two_suit_keycard_latest(trace):
     for record in reversed(trace.current_state_records):
-        if (record.key == 'two_suit_keycard'
-                and record.attribute('status') == 'pending'):
-            return record
-    return None
-
-
-def _two_suit_keycard_answered(trace):
-    for record in reversed(trace.current_state_records):
-        if (record.key == 'two_suit_keycard'
-                and record.attribute('status') == 'answered'):
+        if record.key == 'two_suit_keycard':
             return record
     return None
 
