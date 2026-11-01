@@ -1,7 +1,9 @@
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from engine.coverage_extend import (
     _merge_overflow_hand, _repair_partner_low_cards,
@@ -537,6 +539,26 @@ class IVScannerTests(unittest.TestCase):
         self.assertEqual(repaired.holding('S'), south.holding('S'))
         self.assertIsNone(_repair_partner_low_cards(
             north, 'SAKQ2HK32DQJ2C432'))
+
+    def test_report_write_retries_transient_windows_lock(self):
+        from engine.iv_scanner import _atomic_write_report
+        real_replace = os.replace
+        calls = {'count': 0}
+
+        def flaky_replace(source, target):
+            calls['count'] += 1
+            if calls['count'] == 1:
+                raise PermissionError(13, 'Access is denied')
+            return real_replace(source, target)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'report.json'
+            with patch('engine.iv_scanner.os.replace',
+                       side_effect=flaky_replace), \
+                    patch('engine.iv_scanner.time.sleep'):
+                _atomic_write_report(path, {'schema_version': 2})
+            self.assertEqual(json.loads(path.read_text()), {'schema_version': 2})
+            self.assertEqual(calls['count'], 2)
 
     def test_merged_partner_examples_stay_disjoint_from_primary(self):
         from engine.iv_scanner import _hand_cards, _primary_hand_groups

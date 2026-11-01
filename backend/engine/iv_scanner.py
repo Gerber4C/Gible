@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import re
+import stat
 import threading
+import time
 import uuid
 from collections.abc import Mapping
 from datetime import datetime, timezone
@@ -30,6 +33,45 @@ FLAG_CATEGORY = {
     'missed_grand_slam': 'missed',
     'wrong_game': 'wrong',
 }
+
+_WINDOWS_REPLACE_ERRORS = {5, 32, 33}
+
+
+def _atomic_write_report(path: Path, report: dict) -> None:
+    """Write a report without failing on a transient Windows file lock.
+
+    Antivirus scanners and browser readers can briefly hold the destination
+    open.  Keep the atomic-write shape, retry access-denied/sharing errors,
+    clear a read-only destination when possible, and only then fall back to a
+    direct write.
+    """
+    temporary = path.with_name(path.name + '.tmp')
+    payload = json.dumps(report, ensure_ascii=False) + '\n'
+    temporary.write_text(payload, encoding='utf-8')
+    last_error = None
+    for attempt in range(40):
+        try:
+            os.replace(temporary, path)
+            return
+        except OSError as exc:
+            winerror = getattr(exc, 'winerror', None)
+            if (not isinstance(exc, PermissionError)
+                    and winerror not in _WINDOWS_REPLACE_ERRORS):
+                raise
+            last_error = exc
+            try:
+                os.chmod(path, stat.S_IWRITE)
+            except OSError:
+                pass
+            time.sleep(min(0.05 * (attempt + 1), 0.5))
+    try:
+        path.write_text(payload, encoding='utf-8')
+        try:
+            temporary.unlink()
+        except OSError:
+            pass
+    except OSError:
+        raise last_error
 
 
 def _json_safe(value):
@@ -864,11 +906,7 @@ class ScannerJobs:
                         dds_boards=summary.get('dds_boards', 0))
 
         def snapshot(report: dict) -> None:
-            temporary = path.with_name(path.name + '.tmp')
-            temporary.write_text(
-                json.dumps(report, ensure_ascii=False) + chr(10),
-                encoding='utf-8')
-            temporary.replace(path)
+            _atomic_write_report(path, report)
             with self._lock:
                 if self._current and self._current['id'] == job_id:
                     self._current.update(
@@ -921,14 +959,10 @@ class ScannerJobs:
         self.root.mkdir(parents=True, exist_ok=True)
         json_path = self.root / f'{stem}.json'
         html_path = self.root / f'{stem}.html'
-        temporary = self.root / f'{stem}.json.tmp'
-
         def snapshot(report: dict) -> None:
-            # Atomic write so the browser never reads a half-written report.
-            temporary.write_text(
-                json.dumps(report, ensure_ascii=False) + '\n',
-                encoding='utf-8')
-            temporary.replace(json_path)
+            # Atomic write with Windows lock retries so the browser never
+            # reads a half-written report.
+            _atomic_write_report(json_path, report)
             with self._lock:
                 if self._current and self._current['id'] == job_id:
                     self._current.update(
