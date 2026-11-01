@@ -140,6 +140,8 @@ def public_voidwood_requires(ctx, trump):
     """
     if ctx.state.exists('keycard_context', method='rkcb_1430'):
         return False
+    if ctx.state.exists('voidwood', status='pending'):
+        return False
     current = current_voidwood_trump(ctx.trace, ctx.auction.actor_to_call)
     if current is not None:
         return current == trump
@@ -175,10 +177,59 @@ def state_voidwood_ask(ctx, trump, void, ask):
     return verdict.safe
 
 
+def voidwood_public_state(ctx, ask, trump, void):
+    return state_exists(ctx, 'voidwood', ask=ask, trump=trump, void=void,
+                        status='pending')
+
+
+def voidwood_actor_is_asker(ctx, ask):
+    asker = asker_seat(ctx.auction, ask)
+    return asker is not None and ctx.auction.actor_to_call == asker
+
+
+def voidwood_actor_is_responder(ctx, ask):
+    asker = asker_seat(ctx.auction, ask)
+    return (asker is not None
+            and ctx.auction.actor_to_call == partner_seat(asker))
+
+
+def state_voidwood_primary_answer_public(ctx, ask, trump, void):
+    return (voidwood_public_state(ctx, ask, trump, void)
+            and voidwood_actor_is_responder(ctx, ask)
+            and last_non_pass(ctx.auction) == ask)
+
+
+def state_voidwood_queen_ask_public(ctx, ask, trump, void):
+    return (voidwood_public_state(ctx, ask, trump, void)
+            and voidwood_actor_is_asker(ctx, ask)
+            and last_non_pass(ctx.auction) == answer_bids(ask)[0])
+
+
+def state_voidwood_queen_answer_public(ctx, ask, trump, void):
+    q = queen_ask_bid(ask, trump)
+    return (q is not None
+            and voidwood_public_state(ctx, ask, trump, void)
+            and voidwood_actor_is_responder(ctx, ask)
+            and last_non_pass(ctx.auction) == engine_bid(q))
+
+
+def state_voidwood_grand_invite_public(ctx, ask, trump, void):
+    q = queen_ask_bid(ask, trump)
+    return (q is not None
+            and voidwood_public_state(ctx, ask, trump, void)
+            and voidwood_actor_is_asker(ctx, ask)
+            and last_non_pass(ctx.auction) == engine_bid(q))
+
+
 def state_voidwood_answer(ctx, ask, step):
     if ctx.hand is None:
         return False
     if not state_exists(ctx, 'voidwood', ask=ask, status='pending'):
+        return False
+    asker = asker_seat(ctx.auction, ask)
+    if asker is None or ctx.auction.actor_to_call != partner_seat(asker):
+        return False
+    if last_non_pass(ctx.auction) != ask:
         return False
     trump = state_attribute(ctx, 'voidwood', 'trump')
     void = state_attribute(ctx, 'voidwood', 'void')
@@ -726,9 +777,9 @@ class Voidwood(Gadget):
                                            + ask.lower() + '_answer_'
                                            + answers[step].lower())
                         answer.when = '*'
-                        answer.requires = StateExists('voidwood', ask=ask,
-                                                      trump=trump, void=void,
-                                                      status='pending')
+                        answer.requires = (
+                            lambda ctx, a=ask, t=trump, v=void:
+                            state_voidwood_primary_answer_public(ctx, a, t, v))
                         answer.bid = answers[step]
                         answer.applies = (lambda ctx, a=ask, s=step:
                                           state_voidwood_answer(ctx, a, s))
@@ -758,9 +809,9 @@ class Voidwood(Gadget):
                                           + '_void_' + void.lower() + '_'
                                           + ask.lower() + '_queen_ask')
                         qcall.when = '*'
-                        qcall.requires = StateExists('voidwood', ask=ask,
-                                                    trump=trump, void=void,
-                                                    status='pending')
+                        qcall.requires = (
+                            lambda ctx, a=ask, t=trump, v=void:
+                            state_voidwood_queen_ask_public(ctx, a, t, v))
                         qcall.bid = q
                         qcall.applies = (lambda ctx, a=ask, t=trump:
                                          queen_ask_applies(ctx, a, t))
@@ -779,9 +830,9 @@ class Voidwood(Gadget):
                                              + ask.lower() + '_queen_answer_'
                                              + q_bid.lower())
                             qans.when = '*'
-                            qans.requires = StateExists('voidwood', ask=ask,
-                                                        trump=trump, void=void,
-                                                        status='pending')
+                            qans.requires = (
+                                lambda ctx, a=ask, t=trump, v=void:
+                                state_voidwood_queen_answer_public(ctx, a, t, v))
                             qans.bid = q_bid
                             qans.applies = (lambda ctx, a=ask, t=trump, v=void,
                                             b=q_bid:
@@ -796,9 +847,9 @@ class Voidwood(Gadget):
                                            + '_void_' + void.lower() + '_'
                                            + ask.lower() + '_grand_invite')
                         invite.when = '*'
-                        invite.requires = StateExists('voidwood', ask=ask,
-                                                      trump=trump, void=void,
-                                                      status='pending')
+                        invite.requires = (
+                            lambda ctx, a=ask, t=trump, v=void:
+                            state_voidwood_grand_invite_public(ctx, a, t, v))
                         invite.bid = '6' + trump
                         invite.applies = (lambda ctx, a=ask, t=trump:
                                           grand_invite_applies(ctx, a, t))
@@ -814,9 +865,11 @@ class Voidwood(Gadget):
                                              + ask.lower() + '_grand_'
                                              + g_bid.lower())
                             gans.when = '*'
-                            gans.requires = StateExists('voidwood', ask=ask,
-                                                        trump=trump, void=void,
-                                                        status='pending')
+                            gans.requires = (
+                                lambda ctx, a=ask, t=trump, v=void:
+                                (voidwood_public_state(ctx, a, t, v)
+                                 and voidwood_actor_is_responder(ctx, a)
+                                 and last_non_pass(ctx.auction) == '6' + t))
                             gans.bid = g_bid
                             if g_bid == 'P':
                                 gans.applies = (lambda ctx, t=trump:

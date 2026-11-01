@@ -169,7 +169,14 @@ def choose_bid(
         (candidate for candidate in candidates
          if candidate.metadata.get('derived_rule') in keycard_stop_rules),
         None)
-    if keycard_stop is not None:
+    ordinary_stop = (keycard_stop is not None
+                     and keycard_stop.metadata.get('derived_rule') in (
+                         'derive_keycard_five_of_trump_stop',
+                         'derive_keycard_small_slam_placement'))
+    if (ordinary_stop
+            or (keycard_stop is not None
+                and all(candidate.score <= keycard_stop.score
+                        for candidate in candidates))):
         candidates = (keycard_stop,)
     frame = ordinary_rkcb_frame(trace)
     if (frame is not None
@@ -490,6 +497,18 @@ def choose_bid(
             else:
                 candidates = ((keycard,) if hand.hcp >= 18 else (pass_candidate,))
 
+    voidwood_queen = next(
+        (candidate for candidate in candidates
+         if candidate.public_meaning.get('action_type')
+         == 'voidwood_queen_ask'), None)
+    voidwood_king = next(
+        (candidate for candidate in candidates
+         if candidate.public_meaning.get('action_type')
+         == 'voidwood_king_ask'), None)
+    if (voidwood_queen is not None and voidwood_king is not None
+            and voidwood_queen.score >= voidwood_king.score):
+        candidates = tuple(candidate for candidate in candidates
+                           if candidate is not voidwood_king)
     decision = choose_candidate(
         candidates,
         profile.all_policy_functions,

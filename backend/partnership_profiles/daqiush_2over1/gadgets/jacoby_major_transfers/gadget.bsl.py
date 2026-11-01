@@ -460,6 +460,7 @@ class JacobyMajorTransfers(Gadget):
                     show = self.call('two_major_force_heart_cue_' + cue.lower())
                     show.when = force_prefix
                     show.bid = '4' + cue
+                    show.priority = -1
                     show.applies = (lambda ctx, s=cue:
                                     two_major_force_heart_cue(ctx, s))
                     show.meaning.action = 'two_major_force_heart_cue'

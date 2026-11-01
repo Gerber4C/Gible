@@ -99,7 +99,7 @@ def _voidwood(auction, trace, evidence, allowed, hand):
         return DerivationResult(evidence, (derived_candidate(
             call, 'derive_voidwood_five_of_trump_stop',
             stop_meaning(trump), evidence,
-            effects=effects, score=10),))
+            effects=effects, score=-1),))
     if placement_required(missing_count, queen):
         call = '6' + trump
         if call not in allowed or not is_call_legal(auction, call):
@@ -108,7 +108,7 @@ def _voidwood(auction, trace, evidence, allowed, hand):
         return DerivationResult(evidence, (derived_candidate(
             call, 'derive_voidwood_small_slam_placement',
             small_slam_meaning(trump), evidence,
-            effects=effects, score=10),))
+            effects=effects, score=-1),))
     return DerivationResult(evidence)
 
 

@@ -155,6 +155,34 @@ class VoidwoodProfileTests(unittest.TestCase):
         self.assertEqual(
             self.bid('1NP2DP2HP', 'S-HAQJ765DKQCKQ765'), '4S')
 
+    def test_queen_ask_is_not_preempted_by_a_derived_stop(self):
+        decision = choose_bid(
+            self.profile, Auction.parse('1NP2HP2SP5CP5DP'),
+            Hand.parse('SAK9742HAQ754DA6C-'))
+        self.assertEqual(decision.call, '5H')
+        self.assertEqual(
+            decision.selected_candidate.public_meaning['action_type'],
+            'voidwood_queen_ask')
+
+    def test_six_level_answer_and_queen_ask_do_not_overlap(self):
+        from engine.replay import replay_auction
+
+        hand = Hand.parse('SAK9742HAQ754DA6C-')
+        prefix = '1NP2HP2SP3HP4SP6CP6DP'
+        trace = replay_auction(self.profile, Auction.parse(prefix), hand)
+        self.assertFalse(any('Ambiguous' in item
+                             for item in trace.diagnostics))
+        decision = choose_bid(
+            self.profile, Auction.parse(prefix), hand)
+        self.assertIsNotNone(decision.call)
+
+        queen = replay_auction(
+            self.profile, Auction.parse(prefix + '6HP'), hand)
+        entry = next(item for item in queen.applied_meanings
+                     if item['call'] == '6H')
+        self.assertEqual(entry['public_meaning']['action_type'],
+                         'voidwood_queen_ask')
+
     def test_legacy_and_state_voidwood_answers_publish_effective_queen(self):
         from engine.replay import replay_auction
 
