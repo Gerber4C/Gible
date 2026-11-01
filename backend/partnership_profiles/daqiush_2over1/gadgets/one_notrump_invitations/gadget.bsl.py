@@ -808,11 +808,11 @@ class OneNotrumpInvitations(Gadget):
                 if answer in ('2D', '2S') and bid == '3NT':
                     # game_stayman already treats 10 HCP / strong-nine as
                     # game-going; after a major denial or a spade response
-                    # this 3NT is the defined game-forcing route, not a bare
-                    # signoff.
-                    continuation.meaning.acts = [
-                        'game_forcing', 'signoff', 'final_placement']
-                    continuation.meaning.forcing = 'game_forcing'
+                    # this is a natural game placement.  Mark it as an
+                    # upgraded game route for the invitation axiom, but do
+                    # not make partner's Pass a forcing pass.
+                    continuation.meaning.acts = ['signoff', 'final_placement']
+                    continuation.meaning.quality_upgrade = True
                 elif answer == '2H' and bid == '3NT':
                     continuation.meaning.acts = ['descriptive']
                 else:

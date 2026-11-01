@@ -36,6 +36,12 @@ class DaqiushStaymanTests(unittest.TestCase):
         self.assertEqual(self.bid('1NP2CP2HP3NP', 'SAJ65HK762DAQ3CK3'), '4S')
         self.assertEqual(self.bid('1NP2CP2HP3NP', 'SAQ7HKJ83DA762CQ5'), 'P')
 
+    def test_natural_stayman_game_3nt_is_passable(self):
+        # The 2D denial 3NT is an upgraded natural game, not a forcing call
+        # that requires partner to keep bidding.
+        self.assertEqual(
+            self.bid('1NP2CP2DP3NTP', 'SKQH54DQ76CAKJ852'), 'P')
+
     def test_game_forcing_3nt_covers_major_denial_boundary_hands(self):
         # 10 HCP with 4-0-5-4 and 9 HCP strong-nine with 4-4-0-5 have no
         # natural 2NT invitation; their 3NT is the game-forcing route.
