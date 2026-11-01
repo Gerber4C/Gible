@@ -392,7 +392,9 @@ def minor_slam_transfer(ctx, suit):
     """
     return (ctx.hand is not None and ctx.hand.length(suit) >= 6
             and minor_slam_interest(ctx.hand)
-            and max(ctx.hand.length(s) for s in 'HS') <= 3)
+            and (max(ctx.hand.length(s) for s in 'HS') <= 3
+                 or (ctx.hand.length(suit) >= 7
+                     and max(ctx.hand.length(s) for s in 'HS') == 4)))
 
 
 MINOR_SERIOUS_OVERSTRENGTH_HCP = 18

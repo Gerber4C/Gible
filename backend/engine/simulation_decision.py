@@ -38,6 +38,140 @@ SIX_FOUR_MAJOR_THREE_NOTRUMP = {
     ('1N', 'P', '2C', 'P', '2D', 'P', '3S', 'P', '3N', 'P'): 'H',
 }
 SAMPLE_COUNT = 40
+PRE_STAYMAN_74_MIN_HCP = 13
+PRE_STAYMAN_74_MIN_KR = 14
+SIX_SEVEN_QUALIFY_RATE = 0.5
+
+
+def _seven_four_shape(hand: Hand):
+    if hand is None:
+        return None
+    majors = [suit for suit in 'SH' if hand.length(suit) == 4]
+    minors = [suit for suit in 'CD' if hand.length(suit) >= 7]
+    if len(majors) != 1 or len(minors) != 1:
+        return None
+    return majors[0], minors[0]
+
+
+def is_pre_stayman_74_decision(profile_id: str, auction: Auction,
+                               hand: Hand) -> bool:
+    """A 4M-7m hand deciding whether to use Stayman or a minor transfer."""
+    if profile_id != 'daqiush_2over1' or auction.calls != ('1N', 'P'):
+        return False
+    if auction.actor_to_call not in 'ns':
+        return False
+    shape = _seven_four_shape(hand)
+    return (shape is not None
+            and hand.hcp >= PRE_STAYMAN_74_MIN_HCP
+            and assess_quality(hand)['kr_points'] >= PRE_STAYMAN_74_MIN_KR)
+
+
+def decide_pre_stayman_74(profile, auction: Auction, hand: Hand) -> dict:
+    """Compare Stayman's 4S option with the direct long-minor route."""
+    if not is_pre_stayman_74_decision(profile.id, auction, hand):
+        raise ValueError('This simulation requires a 1NT 4M-7m response')
+    actor = auction.actor_to_call
+    partner = {'n': 's', 's': 'n', 'e': 'w', 'w': 'e'}[actor]
+    major, minor = _seven_four_shape(hand)
+    direct = '2S' if minor == 'C' else '2N'
+    opening = next((item.definition for item in profile.named_evaluators
+                    if item.id == 'opening_assessment'), None)
+    if opening is None:
+        raise ValueError('Profile lacks the public 1NT opening predicate')
+
+    fit_sampled = sample_deals(
+        actor, hand,
+        public_constraints={partner: {
+            'min_hcp': 14, 'max_hcp': 18,
+            'min_lengths': {major: 4},
+        }},
+        sample_count=60, seed=_seed(auction, hand),
+        max_attempts=50000, max_seconds=8.0)
+    fit_deals = tuple(
+        deal for deal in fit_sampled.deals
+        if opening(SimpleNamespace(hand=deal[partner],
+                                   hand_quality=assess_quality(deal[partner])))['eligible'])
+    if not fit_deals:
+        raise ValueError('No sampled opener matched the 4-card major fit')
+
+    nofit_sampled = sample_deals(
+        actor, hand,
+        public_constraints={partner: {
+            'min_hcp': 14, 'max_hcp': 18,
+            'max_lengths': {major: 3},
+        }},
+        sample_count=60, seed=_seed(auction, hand) ^ 1,
+        max_attempts=50000, max_seconds=8.0)
+    nofit_deals = tuple(
+        deal for deal in nofit_sampled.deals
+        if opening(SimpleNamespace(hand=deal[partner],
+                                   hand_quality=assess_quality(deal[partner])))['eligible'])
+    if not nofit_deals:
+        raise ValueError('No sampled opener matched the no-fit branch')
+
+    fit_targets = tuple(ContractTarget(level, suit, actor)
+                        for level in (6, 7) for suit in (minor, major))
+    nofit_targets = tuple(ContractTarget(level, minor, actor)
+                          for level in (5, 6, 7))
+    fit_rates = _rates_for_targets(fit_deals, fit_targets)
+    nofit_rates = _rates_for_targets(nofit_deals, nofit_targets)
+
+    def qualified(level):
+        return tuple(
+            suit for suit in (minor, major)
+            if fit_rates[f'{level}{suit}'] >= SIX_SEVEN_QUALIFY_RATE)
+
+    def preferred(level):
+        available = qualified(level)
+        if not available:
+            return None
+        if len(available) == 1:
+            return available[0]
+        return max(available, key=lambda suit: fit_rates[f'{level}{suit}'])
+
+    for level in (7, 6):
+        best = preferred(level)
+        if best is not None:
+            return {
+                'call': '2C' if best == major else direct,
+                'level': level,
+                'strain': best,
+                'sample_count': len(fit_deals),
+                'rates': {
+                    **{f'{level}{minor}': fit_rates[f'{level}{minor}'],
+                       f'{level}{major}': fit_rates[f'{level}{major}']},
+                },
+                'comparison': 'Stayman option versus direct long-minor transfer',
+            }
+
+    # No slam qualifies; Stayman is still useful if a major/minor game is
+    # qualified. Otherwise the direct minor transfer is the safer route.
+    major_game = fit_rates[f'4{major}']
+    minor_game = nofit_rates[f'5{minor}']
+    if max(major_game, minor_game) >= SIX_SEVEN_QUALIFY_RATE:
+        return {
+            'call': '2C',
+            'level': 4,
+            'strain': major if major_game >= minor_game else minor,
+            'sample_count': len(fit_deals),
+            'rates': {'4' + major: major_game, '5' + minor: minor_game},
+            'comparison': 'game-only Stayman option',
+        }
+    return {
+        'call': direct,
+        'level': 5,
+        'strain': minor,
+        'sample_count': len(fit_deals),
+        'rates': {'4' + major: major_game, '5' + minor: minor_game},
+        'comparison': 'no qualified Stayman branch; direct minor transfer',
+    }
+
+
+def _rates_for_targets(deals, targets):
+    estimates = compare_contract_targets(
+        deals, targets, solve_table=calculate_available_table)
+    return {estimate.contract: estimate.completion_rate
+            for estimate in estimates}
 
 
 def is_minor_5422_decision(profile_id: str, auction: Auction) -> bool:

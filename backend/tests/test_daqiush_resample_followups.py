@@ -7,7 +7,8 @@ from engine.cards import Hand
 from engine.loader import load_profile
 from engine.replay import replay_auction
 from engine.selector import choose_bid
-from engine.simulation_decision import decide_minor_major_74
+from engine.simulation_decision import (decide_minor_major_74,
+                                        decide_pre_stayman_74)
 from engine.simulator import simulate_auction
 
 
@@ -301,6 +302,47 @@ class DaqiushResampleFollowupTests(unittest.TestCase):
             self.profile, Auction.parse('1NP2CP2SP'), responder)
         self.assertEqual(result['call'], '3C')
         self.assertEqual(result['sample_count'], 7)
+
+    def test_pre_stayman_74_chooses_between_stayman_and_transfer(self):
+        cards = 'SA743H7DACAKQJ852'
+        with patch('engine.selector.decide_pre_stayman_74',
+                   return_value={'call': '2S'}):
+            self.assertEqual(self.bid('1NP', cards), '2S')
+        with patch('engine.selector.decide_pre_stayman_74',
+                   return_value={'call': '2C'}):
+            self.assertEqual(self.bid('1NP', cards), '2C')
+
+    @patch('engine.simulation_decision._rates_for_targets')
+    @patch('engine.simulation_decision.sample_deals')
+    def test_pre_stayman_qualifies_before_choosing_strain(self, sample, rates):
+        responder = Hand.parse('SA743H7DACAKQJ852')
+        fit_opener = Hand.parse('SAQ72HKJ8DA76CQ54')
+        nofit_opener = Hand.parse('SQ72HAKJDA765CQ54')
+        fit_sample = SimpleNamespace(
+            deals=tuple({'n': fit_opener, 's': responder} for _ in range(4)),
+            attempts=1, seed=1)
+        nofit_sample = SimpleNamespace(
+            deals=tuple({'n': nofit_opener, 's': responder} for _ in range(4)),
+            attempts=1, seed=2)
+        sample.side_effect = [fit_sample, nofit_sample,
+                              fit_sample, nofit_sample]
+        rates.side_effect = [
+            {'6C': 0.5, '6S': 0.5, '7C': 0.6, '7S': 0.7},
+            {'5C': 0.8, '6C': 0.6, '7C': 0.6},
+        ]
+        result = decide_pre_stayman_74(
+            self.profile, Auction.parse('1NP'), responder)
+        self.assertEqual((result['call'], result['level'], result['strain']),
+                         ('2C', 7, 'S'))
+
+        rates.side_effect = [
+            {'6C': 0.7, '6S': 0.6, '7C': 0.6, '7S': 0.5},
+            {'5C': 0.8, '6C': 0.6, '7C': 0.6},
+        ]
+        result = decide_pre_stayman_74(
+            self.profile, Auction.parse('1NP'), responder)
+        self.assertEqual((result['call'], result['level'], result['strain']),
+                         ('2S', 7, 'C'))
 
     def test_five_five_minors_above_the_old_cap_use_three_diamonds(self):
         self.assertEqual(self.bid('1NP', 'S52HADK9764CAK743'), '3D')

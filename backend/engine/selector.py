@@ -36,6 +36,8 @@ from .five_major_inquiry_policy import (
     quantitative_ace_decision)
 from .simulation_decision import (decide_minor_5422, is_minor_5422_decision,
                                   decide_minor_major_74, is_minor_major_74_decision,
+                                  decide_pre_stayman_74,
+                                  is_pre_stayman_74_decision,
                                   decide_two_major_spade_slam,
                                   is_two_major_spade_slam_decision,
                                   decide_six_four_major_after_three_notrump,
@@ -223,6 +225,21 @@ def choose_bid(
     new_quantitative_5c = any(
         (candidate.public_meaning or {}).get('action_type')
         == 'quantitative_5c_feature_ask' for candidate in candidates)
+    if (purpose.candidate is None
+            and is_pre_stayman_74_decision(profile.id, auction, hand)):
+        try:
+            simulated = decide_pre_stayman_74(profile, auction, hand)
+        except (DDSUnavailableError, SamplingExhausted, RuntimeError,
+                ValueError) as exc:
+            trace.warn('Pre-Stayman 7-4 comparison unavailable: ' + str(exc))
+        else:
+            selected = next((candidate for candidate in candidates
+                             if candidate.call == simulated['call']), None)
+            if selected is not None:
+                trace.simulation_decision = simulated
+                candidates = (selected,)
+            else:
+                trace.warn('Pre-Stayman comparison chose a call absent from this profile')
     if is_minor_5422_decision(profile.id, auction) and not new_quantitative_5c:
         try:
             simulated = decide_minor_5422(auction, hand)
