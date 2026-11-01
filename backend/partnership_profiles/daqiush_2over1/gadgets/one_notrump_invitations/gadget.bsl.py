@@ -278,8 +278,8 @@ def four_four_four_one(ctx, answer):
     """A strong 4441 without a shown major fit asks the minor with 4C."""
     if ctx.hand is None:
         return False
-    if (ctx.hand.hcp < 12
-            or ctx.hand_quality['kr_points'] < 14):
+    if (ctx.hand.hcp < 14
+            or ctx.hand_quality['kr_points'] < 16):
         return False
     if sorted(ctx.hand.length(suit) for suit in 'SHDC') != [1, 4, 4, 4]:
         return False

@@ -52,9 +52,11 @@ class DaqiushStaymanTests(unittest.TestCase):
             self.bid(auction, 'SJ832HQT32D2CQ432'), 'P')
 
     def test_weak_4441_after_spade_reply_plays_3nt(self):
-        # 4C is the strong 4441 minor probe; 10 HCP with no fit is 3NT.
+        # 4C is the strong 4441 minor probe; below 14 HCP / 16 KR is 3NT.
         self.assertEqual(
             self.bid('1NP2CP2SP', 'S2H9654DA432CAQT8'), '3N')
+        self.assertEqual(
+            self.bid('1NP2CP2SP', 'S2HAKQ7DQJ54CJ543'), '3N')
 
     def test_spade_shortage_counterinvite_is_slam_try(self):
         # 3S is a shortage counterinvite, not a game invitation with an
