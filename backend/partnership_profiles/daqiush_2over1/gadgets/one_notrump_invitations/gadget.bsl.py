@@ -1201,13 +1201,6 @@ class OneNotrumpInvitations(Gadget):
                     else:
                         reply.description = ('Natural new suit, conventional '
                                              'minor support, or 3NT without support.')
-                    if (answer == '2S' and minor == 'D'
-                            and action == 'natural_spades'):
-                        reply.meaning.agreed_suit = 'S'
-                        reply.effect('agreed_suit').suit = 'S'
-                        reply.description = (
-                            'After the natural 3D slam probe, 3S agrees spades.')
-
                 notrump_signoff = self.call('stayman_' + answer.lower() + '_'
                                             + minor.lower() + '_notrump_signoff')
                 notrump_signoff.when = probe_prefix + '3NTP'
@@ -1277,6 +1270,7 @@ class OneNotrumpInvitations(Gadget):
         diamonds.meaning.target_suit = 'D'
         diamonds.meaning.agreed_suit = 'S'
         diamonds.meaning.minimum_length = 6
+        diamonds.effect('agreed_suit').suit = 'S'
         diamonds.description = (
             'Natural six-card diamond suit with extra strength; spades remain agreed.')
 

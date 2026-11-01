@@ -103,7 +103,7 @@ class DaqiushStaymanTests(unittest.TestCase):
         self.assertEqual(
             self.bid('1NP2CP2HP3DP', 'SQJ2HKQ32DAK5CQ32'), '3H')
 
-    def test_spade_agreement_after_natural_three_diamond_probe(self):
+    def test_natural_three_diamond_probe_continuations(self):
         prefix = '1NP2CP2SP3DP3SP'
         cases = (
             ('SA95H63DAKT87CAQ9', '4C'),   # club control is the first cue
@@ -111,13 +111,20 @@ class DaqiushStaymanTests(unittest.TestCase):
             ('SA95HA3DAKT87C932', '4H'),   # heart control, denies club control
             ('SA95H63DAQT876C32', '3N'),   # six diamonds without extra strength
         )
-        trace = replay_auction(self.profile, Auction.parse(prefix))
-        self.assertEqual(trace.trump_state('ns').status, 'agreed')
-        self.assertEqual(trace.trump_state('ns').suit, 'S')
+        natural = replay_auction(self.profile, Auction.parse(prefix))
+        self.assertEqual(natural.trump_state('ns').status, 'unset')
+        entry = next(item for item in natural.applied_meanings
+                     if item['call'] == '3S')
+        self.assertEqual(entry['public_meaning']['action_type'],
+                         'natural_spades')
         for cards, call in cases:
             with self.subTest(call=call):
                 self.assertEqual(self.bid(prefix, cards), call)
 
+        cue = replay_auction(
+            self.profile, Auction.parse(prefix + '4CP'))
+        self.assertEqual(cue.trump_state('ns').status, 'agreed')
+        self.assertEqual(cue.trump_state('ns').suit, 'S')
         self.assertEqual(
             self.bid(prefix, 'SK95H63DAKQ876CK2'), '4C')
 
