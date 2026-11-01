@@ -53,6 +53,9 @@ def derive_historical_call(profile, auction, call, trace) -> HistoricalDerivatio
             )
             return _nfrkcb_historical(call, 'nfrkcb_answer', meaning,
                                       effects, evidence)
+    ordinary_stop = _ordinary_keycard_stop_historical(trace, call, evidence)
+    if ordinary_stop is not None:
+        return ordinary_stop
     voidwood_stop = _voidwood_stop_historical(trace, call, evidence)
     if voidwood_stop is not None:
         return voidwood_stop
@@ -409,6 +412,75 @@ def _queen_category(call):
     }.get(call)
 
 
+def _ordinary_keycard_stop_historical(trace, call, evidence):
+    """Replay the derived five/six-of-trump stop after an ordinary answer."""
+    frame = None
+    for record in reversed(trace.current_state_records):
+        if record.key == 'keycard_context':
+            frame = record
+            break
+    if frame is None or frame.attribute('method') != 'rkcb_1430':
+        return None
+    status = frame.attribute('status') or 'pending'
+    if status not in ('answered', 'relay_completed'):
+        return None
+    if frame.attribute('continuation_stage') not in (None, 'relay'):
+        return None
+    trump = frame.attribute('trump_suit')
+    if trump not in 'CDHS':
+        return None
+    if call == '6' + trump:
+        return HistoricalDerivation(
+            call, rule='derive_keycard_small_slam_placement',
+            public_meaning={
+                'nature_labels': ['natural'],
+                'call_act_types': ['signoff', 'final_placement'],
+                'action_type': 'keycard_small_slam_placement',
+                'target_suit': trump,
+                'agreed_suit': trump,
+                'purpose_completed': True,
+            },
+            effects=(_ordinary_completed_replay(frame),),
+            evidence=evidence)
+    if call == '5' + trump:
+        return HistoricalDerivation(
+            call, rule='derive_keycard_five_of_trump_stop',
+            public_meaning={
+                'nature_labels': ['natural'],
+                'call_act_types': ['signoff', 'final_placement'],
+                'action_type': 'keycard_five_of_trump_signoff',
+                'target_suit': trump,
+                'agreed_suit': trump,
+                'purpose_completed': True,
+            },
+            effects=(_ordinary_completed_replay(frame),),
+            evidence=evidence)
+    if call == '7' + trump:
+        return HistoricalDerivation(
+            call, rule='derive_keycard_grand_placement',
+            public_meaning={
+                'nature_labels': ['natural'],
+                'call_act_types': ['signoff', 'final_placement'],
+                'action_type': 'keycard_grand_placement',
+                'target_suit': trump,
+                'agreed_suit': trump,
+                'purpose_completed': True,
+            },
+            effects=(_ordinary_completed_replay(frame),),
+            evidence=evidence)
+    return None
+
+
+def _ordinary_completed_replay(frame):
+    return {
+        'key': 'keycard_context', 'method': 'rkcb_1430',
+        'trump_suit': frame.attribute('trump_suit'), 'status': 'completed',
+        'answer_call': frame.attribute('answer_call'),
+        'answer_category': frame.attribute('answer_category'),
+        'keycard_counts': frame.attribute('keycard_counts'),
+    }
+
+
 def _voidwood_stop_historical(trace, call, evidence):
     """Public meaning for the derived five/seven-of-trump stop after Voidwood."""
     answer = None
@@ -452,6 +524,26 @@ def _voidwood_stop_historical(trace, call, evidence):
                 'nature_labels': ['natural'],
                 'call_act_types': ['signoff', 'final_placement'],
                 'action_type': 'keycard_five_of_trump_signoff',
+                'target_suit': trump,
+                'agreed_suit': trump,
+                'purpose_completed': True,
+            },
+            effects=(
+                {'key': 'keycard_context', 'method': 'voidwood',
+                 'trump_suit': trump, 'excluded_suit': void,
+                 'status': 'completed'},
+                {'key': 'voidwood', 'method': 'voidwood', 'trump': trump,
+                 'void': void, 'ask': answer.attribute('ask'),
+                 'status': 'completed'},
+            ),
+            evidence=evidence)
+    if call == '7' + trump:
+        return HistoricalDerivation(
+            call, rule='derive_voidwood_grand_placement',
+            public_meaning={
+                'nature_labels': ['natural'],
+                'call_act_types': ['signoff', 'final_placement'],
+                'action_type': 'keycard_grand_placement',
                 'target_suit': trump,
                 'agreed_suit': trump,
                 'purpose_completed': True,

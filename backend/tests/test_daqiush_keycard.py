@@ -118,6 +118,37 @@ class DaqiushKeycardPrefixTests(unittest.TestCase):
             self.profile, Auction.parse('1NP4CP4HP4NP5NP7HP'))
         self.assertEqual(ordinary_rkcb_frame(final).status, 'completed')
 
+    def test_derived_ordinary_six_minor_placement_replays(self):
+        trace = replay_auction(
+            self.profile,
+            Auction.parse('1NP3DP3NP4HP4SP4NTP5DP6CPP'))
+        self.assertFalse(any('Undefined prior call 6C' in item
+                             for item in trace.diagnostics))
+        entry = next(item for item in trace.applied_meanings
+                     if item['call'] == '6C')
+        self.assertEqual(
+            entry['public_meaning']['action_type'],
+            'keycard_small_slam_placement')
+        self.assertTrue(entry['public_meaning']['purpose_completed'])
+
+    def test_derived_seven_level_keycard_placements_replay(self):
+        for auction, call in (
+            ('1NP4CP4DP4NP5HP7HP', '7H'),
+            ('1NP2SP3CP3NP4CP4NP5HP7CP', '7C'),
+            ('1NP2NP3DP3NP4DP4NP5HP7DP', '7D'),
+        ):
+            with self.subTest(auction=auction):
+                trace = replay_auction(
+                    self.profile, Auction.parse(auction))
+                self.assertFalse(any(
+                    f'Undefined prior call {call}' in item
+                    for item in trace.diagnostics))
+                entry = next(item for item in trace.applied_meanings
+                             if item['call'] == call)
+                self.assertEqual(
+                    entry['public_meaning']['action_type'],
+                    'keycard_grand_placement')
+
     def test_grand_invitation_counterinvite_and_asker_decision(self):
         rejected = replay_auction(
             self.profile, Auction.parse('1NP4CP4HP4NP5NP6DP6HP'))
