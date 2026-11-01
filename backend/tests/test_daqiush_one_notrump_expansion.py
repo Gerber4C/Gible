@@ -16,6 +16,12 @@ class DaqiushOneNotrumpExpansionTests(unittest.TestCase):
     def bid(self, auction, cards):
         return choose_bid(self.profile, Auction.parse(auction), Hand.parse(cards)).call
 
+    def test_eight_card_majors_still_transfer(self):
+        self.assertEqual(
+            self.bid('1NP', 'S-HAJT76543DAJ5CAK'), '2D')
+        self.assertEqual(
+            self.bid('1NP', 'ST9876432H82D92C5'), '2H')
+
     def test_featureless_game_placement(self):
         responder = 'SQ3HA6DKJ92C98754'
         self.assertEqual(self.bid('1NP', responder), '3N')

@@ -30,6 +30,7 @@ def starts_jacoby(ctx, trump):
     selected_weak_major = weak_major_transfer_suit(ctx)
     if selected_weak_major is not None:
         return trump == selected_weak_major
+    length = convention_length(ctx.hand, trump)
     if min(ctx.hand.length('H'), ctx.hand.length('S')) >= 5:
         points = shapely_combined_effective_points(ctx.hand)
         if points >= 9:
@@ -37,14 +38,14 @@ def starts_jacoby(ctx, trump):
         if points >= 5:
             return trump == 'H'  # 2D–2H–2S: invitational 5-5 majors.
     other = 'S' if trump == 'H' else 'H'
-    if ctx.hand.length(trump) == 5:
+    if length == 5:
         return ctx.hand.length(other) <= 3
-    if ctx.hand.length(trump) not in (6, 7) or ctx.hand.length(other) >= 4:
+    if length not in (6, 7) or ctx.hand.length(other) >= 4:
         return False
     if exclusion_slam_available(ctx, trump):
         return True  # Keep the space below game for exclusion keycard.
     shaped_points = shapely_second_minor_strength(ctx, trump)
-    weak_window = 4 + (1 if ctx.hand.length(trump) == 7 else 0)
+    weak_window = 4 + (1 if length == 7 else 0)
     if shaped_points is not None and weak_window <= shaped_points <= 6:
         return False  # A weak 6M-5m-1-1 describes only the major game via Texas.
     if named_evaluator(ctx, 'texas_slam_keycard_' + trump):
