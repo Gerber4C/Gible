@@ -38,7 +38,7 @@ class AxiomIntegrationTests(unittest.TestCase):
         self.assertEqual(result.calls, ('1C','P'))
         self.assertEqual(result.status,'blocked')
         self.assertEqual(result.blocked['seat'],'s')
-        self.assertIn('FORCING_PASS',[e['code'] for e in result.blocked['axioms']['errors']])
+        self.assertIn('PASSING_FORCING',[e['code'] for e in result.blocked['axioms']['errors']])
 
     def test_policy_sees_only_compliant_candidates(self):
         p = profile(spec('open','','1C',axiom_tags=['forcing']),

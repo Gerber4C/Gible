@@ -164,7 +164,7 @@ def evaluate_axioms(auction, hand, trace, candidates, raw_config=None):
         if candidate.call == 'P' and rho_pass and candidate_tags & (INVITES | {'forcing','game_forcing'}):
             reject('PASS_SEMANTICS','Pass cannot be forcing or invitational after RHO passes',True)
         if candidate.call == 'P' and forced:
-            reject('FORCING_PASS','Current actor must answer the forcing call; a signoff must be a suitable non-Pass call',True)
+            reject('PASSING_FORCING','Passing a forcing call is not allowed; the current actor must answer it',True)
         if forces:
             for source in forces:
                 if gf_satisfied(source,facts,auction,config,candidate.call,m):
