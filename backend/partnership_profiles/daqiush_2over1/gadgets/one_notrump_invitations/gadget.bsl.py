@@ -1201,6 +1201,12 @@ class OneNotrumpInvitations(Gadget):
                     else:
                         reply.description = ('Natural new suit, conventional '
                                              'minor support, or 3NT without support.')
+                    if (answer == '2S' and minor == 'D'
+                            and action == 'natural_spades'):
+                        reply.meaning.agreed_suit = 'S'
+                        reply.effect('agreed_suit').suit = 'S'
+                        reply.description = (
+                            'After the natural 3D slam probe, 3S agrees spades.')
 
                 notrump_signoff = self.call('stayman_' + answer.lower() + '_'
                                             + minor.lower() + '_notrump_signoff')
@@ -1232,6 +1238,82 @@ class OneNotrumpInvitations(Gadget):
                     hearts_notrump.description = (
                         'After opener shows five hearts, choose 3NT without '
                         'further slam interest.')
+
+        # 1N-2C-2S-3D-3S: the 3S call agrees spades.  The responder may
+        # sign off in 3NT without a fit (or with a weak six-card diamond
+        # suit), show six diamonds and extra strength, or cue the only two
+        # available controls.  Cues take precedence over natural 4D.
+        agreed_spades = '1NP2CP2SP3DP3SP'
+
+        notrump = self.call('stayman_2s_3d_3s_notrump_signoff')
+        notrump.when = agreed_spades
+        notrump.bid = '3NT'
+        notrump.applies = (
+            lambda ctx: ctx.hand is not None
+            and (ctx.hand.length('S') < 3
+                 or (ctx.hand.length('D') >= 6
+                     and ctx.hand.hcp < 15)))
+        notrump.meaning.action = 'stayman_3d_3s_notrump_signoff'
+        notrump.meaning.nature = ['natural']
+        notrump.meaning.acts = ['signoff', 'final_placement']
+        notrump.meaning.target_suit = 'N'
+        notrump.meaning.purpose_completed = True
+        notrump.description = (
+            'Natural 3NT: no spade fit, or six diamonds without extra strength.')
+
+        diamonds = self.call('stayman_2s_3d_3s_natural_diamonds')
+        diamonds.when = agreed_spades
+        diamonds.bid = '4D'
+        diamonds.applies = (
+            lambda ctx: ctx.hand is not None
+            and ctx.hand.length('S') >= 3
+            and ctx.hand.length('D') >= 6
+            and ctx.hand.hcp >= 15
+            and not shortage_has_control(ctx, 'C')
+            and not shortage_has_control(ctx, 'H'))
+        diamonds.meaning.action = 'stayman_3d_3s_natural_diamonds'
+        diamonds.meaning.nature = ['natural']
+        diamonds.meaning.acts = ['slam_try']
+        diamonds.meaning.target_suit = 'D'
+        diamonds.meaning.agreed_suit = 'S'
+        diamonds.meaning.minimum_length = 6
+        diamonds.description = (
+            'Natural six-card diamond suit with extra strength; spades remain agreed.')
+
+        club_cue = self.call('stayman_2s_3d_3s_club_cue')
+        club_cue.when = agreed_spades
+        club_cue.bid = '4C'
+        club_cue.applies = (
+            lambda ctx: ctx.hand is not None
+            and ctx.hand.length('S') >= 3
+            and shortage_has_control(ctx, 'C'))
+        club_cue.meaning.action = 'stayman_3d_3s_control_cue'
+        club_cue.meaning.nature = ['artificial']
+        club_cue.meaning.acts = ['slam_try', 'control_showing']
+        club_cue.meaning.control_suit = 'C'
+        club_cue.meaning.agreed_suit = 'S'
+        club_cue.meaning.target_suit = 'S'
+        club_cue.effect('agreed_suit').suit = 'S'
+        club_cue.description = (
+            'The first of the two available spade-slam control cues.')
+
+        heart_cue = self.call('stayman_2s_3d_3s_heart_cue')
+        heart_cue.when = agreed_spades
+        heart_cue.bid = '4H'
+        heart_cue.applies = (
+            lambda ctx: ctx.hand is not None
+            and ctx.hand.length('S') >= 3
+            and not shortage_has_control(ctx, 'C')
+            and shortage_has_control(ctx, 'H'))
+        heart_cue.meaning.action = 'stayman_3d_3s_control_cue'
+        heart_cue.meaning.nature = ['artificial']
+        heart_cue.meaning.acts = ['slam_try', 'control_showing']
+        heart_cue.meaning.control_suit = 'H'
+        heart_cue.meaning.agreed_suit = 'S'
+        heart_cue.meaning.target_suit = 'S'
+        heart_cue.effect('agreed_suit').suit = 'S'
+        heart_cue.description = (
+            'The second spade-slam control cue, denying club control.')
 
         for bid, applies, action in (
             ('4S', lambda ctx: ctx.hand is not None and ctx.hand.length('S') >= 4, 'spade_fit'),

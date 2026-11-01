@@ -103,6 +103,24 @@ class DaqiushStaymanTests(unittest.TestCase):
         self.assertEqual(
             self.bid('1NP2CP2HP3DP', 'SQJ2HKQ32DAK5CQ32'), '3H')
 
+    def test_spade_agreement_after_natural_three_diamond_probe(self):
+        prefix = '1NP2CP2SP3DP3SP'
+        cases = (
+            ('SA95H63DAKT87CAQ9', '4C'),   # club control is the first cue
+            ('SAK5H63DAKQ876C32', '4D'),   # six diamonds, extra, no side cue
+            ('SA95HA3DAKT87C932', '4H'),   # heart control, denies club control
+            ('SA95H63DAQT876C32', '3N'),   # six diamonds without extra strength
+        )
+        trace = replay_auction(self.profile, Auction.parse(prefix))
+        self.assertEqual(trace.trump_state('ns').status, 'agreed')
+        self.assertEqual(trace.trump_state('ns').suit, 'S')
+        for cards, call in cases:
+            with self.subTest(call=call):
+                self.assertEqual(self.bid(prefix, cards), call)
+
+        self.assertEqual(
+            self.bid(prefix, 'SK95H63DAKQ876CK2'), '4C')
+
     def test_natural_minor_probe_shows_fifth_heart_and_passes_three_notrump(self):
         south = 'SJ963HA64D-CAJT852'
         north = 'SA87HKQT83DQJ75CK'
