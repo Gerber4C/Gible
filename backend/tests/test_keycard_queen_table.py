@@ -1,8 +1,10 @@
 import unittest
 
+from engine.cards import Hand
 from engine.keycard_queen_table import (
     RELAY_AVAILABLE, RELAY_UNAVAILABLE, RELAY_USUALLY_UNNECESSARY,
-    five_spade_relay_status, queen_answer_geometry, queen_ask,
+    five_spade_relay_status, queen_answer_call, queen_answer_facts,
+    queen_answer_geometry, queen_ask,
 )
 
 
@@ -85,6 +87,44 @@ class QueenTableTests(unittest.TestCase):
                     five_spade_relay_status(
                         answer, trump, five_trump_available[(trump, answer)]),
                     expected)
+
+    def test_queen_answer_call_uses_the_nearest_available_fact(self):
+        no_queen = Hand.parse('SA2HAJ9876D432CK2')
+        club_king = Hand.parse('SA2HQJ9876D432CK2')
+        diamond_king = Hand.parse('SA2HQJ9876DK32C42')
+        both_kings = Hand.parse('SA2HQJ9876DK32CK2')
+        no_side_king = Hand.parse('SA2HQJ9876D432C43')
+
+        self.assertEqual(queen_answer_call(no_queen, 'H', '1/4'), '5H')
+        self.assertEqual(queen_answer_call(club_king, 'H', '1/4'), '6C')
+        self.assertEqual(queen_answer_call(diamond_king, 'H', '1/4'), '6D')
+        self.assertEqual(queen_answer_call(both_kings, 'H', '1/4'), '6C')
+        self.assertEqual(queen_answer_call(no_side_king, 'H', '1/4'), '6H')
+        self.assertEqual(
+            queen_answer_call(no_side_king, 'H', '1/4', high=True), '5N')
+
+    def test_queen_answer_without_space_for_side_kings(self):
+        with_queen = Hand.parse('SA2HQJ9876D432CQ2')
+        self.assertEqual(queen_answer_call(with_queen, 'C', '1/4'), '5N')
+        self.assertEqual(
+            queen_answer_facts('5N', 'C', '1/4'),
+            {'trump_queen': True, 'side_king': None,
+             'queen_answer_category': 'queen_no_side_king'})
+
+    def test_queen_answer_facts(self):
+        self.assertEqual(
+            queen_answer_facts('5H', 'H', '1/4'),
+            {'trump_queen': False, 'side_king': None,
+             'queen_answer_category': 'no_queen'})
+        self.assertEqual(
+            queen_answer_facts('6C', 'H', '1/4'),
+            {'trump_queen': True, 'side_king': 'C',
+             'queen_answer_category': 'queen_side_king'})
+        self.assertEqual(
+            queen_answer_facts('5N', 'H', '1/4'),
+            {'trump_queen': True, 'side_king': None,
+             'queen_answer_category': 'queen_no_side_king'})
+        self.assertIsNone(queen_answer_facts('7H', 'H', '1/4'))
 
 
 if __name__ == '__main__':

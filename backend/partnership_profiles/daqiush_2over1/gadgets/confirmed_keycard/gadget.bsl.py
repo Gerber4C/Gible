@@ -1,5 +1,9 @@
-# Basic uncontested Roman keycard 1430 answers. Special void answers and
-# post-answer signoffs remain unimplemented, so those branches still block.
+# Basic uncontested Roman keycard 1430 answers, the structural trump-queen
+# ask, and the public queen-answer table.
+
+CALL_ORDER = ('4C', '4D', '4H', '4S', '4N', '5C', '5D', '5H', '5S',
+              '5N', '6C', '6D', '6H', '6S', '6N', '7C', '7D', '7H',
+              '7S', '7N')
 
 
 def route_intent_not_yet_selected(ctx):
@@ -26,6 +30,55 @@ def ordinary_relay_requires(ctx, trump):
     return (frame is not None and frame.status == 'answered'
             and frame.continuation_stage is None
             and ordinary_five_spade_role(ctx.auction, frame) == 'relay')
+
+
+def ordinary_queen_ask_pending(ctx, trump, category):
+    frame = current_ordinary_frame(ctx, trump)
+    return (frame is not None and frame.status == 'answered'
+            and frame.continuation_stage == 'queen_ask'
+            and frame.answer_category == category
+            and current_bidder_is_partner(ctx))
+
+
+def ordinary_queen_answer_for_hand(ctx, trump, category):
+    if ctx.hand is None:
+        return None
+    # Six of trumps is the minimum queen-without-side-king answer; 5NT shows
+    # the top of the notrump range.
+    return ordinary_queen_answer_call(ctx.hand, trump, category,
+                                      high=ctx.hand.hcp >= 17)
+
+
+def ordinary_queen_answered_for_actor(ctx, trump):
+    frame = current_ordinary_frame(ctx, trump)
+    return (frame is not None and frame.status == 'answered'
+            and frame.continuation_stage == 'queen_answered'
+            and current_bidder_is_partner(ctx))
+
+
+def ordinary_queen_answer_pass_for_actor(ctx, trump):
+    if not ordinary_queen_answered_for_actor(ctx, trump):
+        return False
+    last = ordinary_last_non_pass(ctx.auction)
+    return last in ('5' + trump, '6' + trump)
+
+
+def ordinary_last_non_pass(auction):
+    for index in range(len(auction.calls) - 1, -1, -1):
+        call = auction.calls[index]
+        if call not in ('P', 'X', 'R'):
+            return call
+    return None
+
+
+def ordinary_queen_placement_for_actor(ctx, trump, bid):
+    if not ordinary_queen_answered_for_actor(ctx, trump):
+        return False
+    if bid == 'P':
+        return ordinary_queen_answer_pass_for_actor(ctx, trump)
+    last = ordinary_last_non_pass(ctx.auction)
+    return (last is not None
+            and CALL_ORDER.index(bid) > CALL_ORDER.index(last))
 
 
 def ordinary_relay_pending(ctx):
@@ -320,6 +373,85 @@ class ConfirmedKeycard(Gadget):
                 record.trump_suit = trump
                 record.status = 'answered'
                 record.continuation_stage = 'queen_ask'
+                carry_answer_state(record, trump)
+
+            for category in categories:
+                geometry = ordinary_queen_answer_geometry(trump, category)
+                if geometry is None:
+                    continue
+                answer_bids = [geometry.no_queen]
+                answer_bids.extend(geometry.side_king_answers)
+                answer_bids.extend(geometry.queen_no_king_answers)
+                for answer_bid in answer_bids:
+                    facts = ordinary_queen_answer_facts(
+                        answer_bid, trump, category)
+                    if facts is None:
+                        continue
+                    answer = self.call(
+                        'ordinary_rkcb_' + trump.lower() + '_queen_answer_'
+                        + category.replace('/', '_') + '_'
+                        + answer_bid.lower())
+                    answer.when = '*'
+                    answer.requires = (
+                        lambda ctx, t=trump, c=category:
+                        ordinary_queen_ask_pending(ctx, t, c))
+                    answer.bid = answer_bid
+                    answer.applies = (
+                        lambda ctx, t=trump, c=category, b=answer_bid:
+                        ordinary_queen_ask_pending(ctx, t, c)
+                        and ordinary_queen_answer_for_hand(ctx, t, c) == b)
+                    answer.meaning.action = 'rkcb_1430_queen_answer'
+                    answer.meaning.nature = ['artificial']
+                    answer.meaning.acts = ['descriptive', 'queen_answer']
+                    answer.meaning.contract_effect = 'none'
+                    answer.meaning.target_suit = trump
+                    answer.meaning.agreed_suit = trump
+                    answer.meaning.trump_queen = facts['trump_queen']
+                    answer.meaning.queen_answer_category = (
+                        facts['queen_answer_category'])
+                    if facts['side_king'] is not None:
+                        answer.meaning.queen_side_king = facts['side_king']
+                    answer.description = (
+                        'Answer the trump-queen ask with the nearest available '
+                        'queen/side-king fact.')
+                    record = answer.effect('keycard_context')
+                    record.method = 'rkcb_1430'
+                    record.trump_suit = trump
+                    record.status = 'answered'
+                    record.continuation_stage = 'queen_answered'
+                    carry_answer_state(record, trump)
+                    record.queen_answer_call = answer_bid
+                    record.queen_answer_category = (
+                        facts['queen_answer_category'])
+                    record.trump_queen = facts['trump_queen']
+                    record.queen_side_king = facts['side_king']
+
+            for placement_bid in ('P', '5' + trump, '6' + trump,
+                                  '7' + trump):
+                place = self.call('ordinary_rkcb_' + trump.lower()
+                                  + '_queen_answer_placement_'
+                                  + placement_bid.lower())
+                place.when = '*'
+                place.requires = (
+                    lambda ctx, t=trump, b=placement_bid:
+                    ordinary_queen_placement_for_actor(ctx, t, b))
+                place.applies = (
+                    lambda ctx, t=trump, b=placement_bid:
+                    ordinary_queen_placement_for_actor(ctx, t, b))
+                place.bid = placement_bid
+                place.meaning.action = 'rkcb_1430_queen_answer_placement'
+                place.meaning.nature = ['natural']
+                place.meaning.acts = ['signoff', 'final_placement']
+                place.meaning.target_suit = trump
+                place.meaning.agreed_suit = trump
+                place.meaning.purpose_completed = True
+                place.description = (
+                    'Place the contract after the trump-queen answer.')
+                record = place.effect('keycard_context')
+                record.method = 'rkcb_1430'
+                record.trump_suit = trump
+                record.status = 'completed'
+                record.continuation_stage = 'queen_answered'
                 carry_answer_state(record, trump)
 
             relay = self.call('ordinary_rkcb_' + trump.lower()

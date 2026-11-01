@@ -37,6 +37,9 @@ class OrdinaryRKCBFrame:
     invitation_call: str | None = None
     shown_king: str | None = None
     counterinvite_count: int = 0
+    queen_answer_call: str | None = None
+    queen_answer_category: str | None = None
+    queen_side_king: str | None = None
 
     @property
     def active(self) -> bool:
@@ -93,6 +96,9 @@ def ordinary_rkcb_frame(trace) -> OrdinaryRKCBFrame | None:
         invitation_call=record.attribute('invitation_call'),
         shown_king=record.attribute('shown_king'),
         counterinvite_count=int(record.attribute('counterinvite_count') or 0),
+        queen_answer_call=record.attribute('queen_answer_call'),
+        queen_answer_category=record.attribute('queen_answer_category'),
+        queen_side_king=record.attribute('queen_side_king'),
     )
 
 

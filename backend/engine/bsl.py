@@ -14,6 +14,9 @@ from .hand_quality import (convention_length, inquiry_stopper,
 from .voidwood import (answer_bids, current_voidwood_trump,
                        effective_keycards, inferred_voidwood_trump,
                        is_safe_voidwood_ask, voidwood_jump)
+from .keycard_queen_table import (
+    queen_answer_call, queen_answer_facts, queen_answer_geometry,
+)
 from .rkcb_continuation import (
     five_spade_role, five_trump_available, high_answer_invitations,
     is_high_answer, lowest_counterinvite_king, lowest_showable_side_king,
@@ -1209,6 +1212,9 @@ def _base_namespace(collector: _Collector) -> dict[str, Any]:
         "ordinary_rkcb_response_call": _ordinary_rkcb_response_call,
         "ordinary_rkcb_frame": ordinary_rkcb_frame,
         "ordinary_queen_ask_call": queen_ask_call,
+        "ordinary_queen_answer_call": queen_answer_call,
+        "ordinary_queen_answer_facts": queen_answer_facts,
+        "ordinary_queen_answer_geometry": queen_answer_geometry,
         "ordinary_five_spade_role": five_spade_role,
         "ordinary_five_trump_available": five_trump_available,
         "ordinary_is_high_answer": is_high_answer,

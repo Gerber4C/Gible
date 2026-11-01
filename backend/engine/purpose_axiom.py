@@ -6,6 +6,7 @@ from dataclasses import dataclass, replace
 from .calls import normalize_call
 from .context import CallCandidate
 from .legality import SIDE_BY_SEAT, is_call_legal, last_contract_state
+from .keycard_stop import possible_missing_counts
 from .memory import Purpose, SeatMemory
 from .rkcb_continuation import (
     bid_rank, five_spade_role, five_trump_available, high_answer_invitations,
@@ -370,6 +371,52 @@ def _game_or_rescue(auction, trace, purpose, hand, frame, with_stage, profile):
                         authored_only=True)
 
 
+def _choose_after_queen_answer(auction, purpose, frame):
+    missing = possible_missing_counts(
+        purpose.own_keycards, frame.keycard_counts, 5)
+    if len(missing) != 1:
+        return _StageResult(
+            error='Trump-queen answer leaves the missing-keycard count ambiguous',
+            purpose=purpose)
+    missing_count = missing.pop()
+    trump = purpose.trump
+    game = f'5{trump}'
+    slam = f'6{trump}'
+    grand = f'7{trump}'
+    last = _last_non_pass_call(auction)
+
+    if frame.trump_queen is True and missing_count == 0:
+        if purpose.grand_candidate and is_call_legal(auction, grand):
+            return _StageResult(grand, purpose=_completed(purpose),
+                                authored_only=True)
+        if is_call_legal(auction, slam):
+            return _StageResult(slam, purpose=_completed(purpose),
+                                authored_only=True)
+        if last == slam:
+            return _StageResult('P', purpose=_completed(purpose),
+                                authored_only=True)
+        return _StageResult(
+            error='No legal small-slam placement after the trump-queen answer',
+            purpose=purpose)
+
+    target = game if missing_count >= 1 else slam
+    if is_call_legal(auction, target):
+        return _StageResult(target, purpose=_completed(purpose),
+                            authored_only=True)
+    if last == target:
+        return _StageResult('P', purpose=_completed(purpose),
+                            authored_only=True)
+    if target == game and is_call_legal(auction, slam):
+        return _StageResult(slam, purpose=_completed(purpose),
+                            authored_only=True)
+    if target == game and last == slam:
+        return _StageResult('P', purpose=_completed(purpose),
+                            authored_only=True)
+    return _StageResult(
+        error='No legal stopping contract after the trump-queen answer',
+        purpose=purpose)
+
+
 def _choose_continuation(auction, trace, purpose, hand, frame, profile=None):
     if frame is None:
         return _StageResult(error='Ordinary keycard frame is unavailable')
@@ -389,10 +436,8 @@ def _choose_continuation(auction, trace, purpose, hand, frame, profile=None):
         return _StageResult(
             error='Relay is awaiting partner\'s forced five notrump',
             purpose=purpose)
-    if frame.continuation_stage == 'queen_ask':
-        return _StageResult(
-            error='QUEEN_ASK_CONTINUATION_UNAUTHORED: the queen-ask answer table is not authored',
-            purpose=purpose)
+    if frame.continuation_stage == 'queen_answered':
+        return _choose_after_queen_answer(auction, purpose, frame)
     if frame.continuation_stage == 'counterinvited':
         if frame.counterinvite_count > 1:
             return _StageResult(

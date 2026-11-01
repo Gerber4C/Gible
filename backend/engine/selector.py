@@ -42,6 +42,8 @@ from .simulation_decision import (decide_minor_5422, is_minor_5422_decision,
                                   is_two_major_spade_slam_decision,
                                   decide_six_four_major_after_three_notrump,
                                   is_six_four_major_after_three_notrump)
+from .void_keycard_game import (choose_void_keycard_continuation,
+                                is_void_keycard_continuation)
 
 
 def _partner_minimum(auction: Auction, owner: str) -> int:
@@ -222,6 +224,24 @@ def choose_bid(
         return BidDecision(call=None, selected_candidate=None, candidate_pool=CandidatePool((),auction),
                            trace=trace, private_memory=actor_memory)
 
+    if (purpose.candidate is None
+            and is_void_keycard_continuation(profile.id, auction, trace, hand)):
+        try:
+            simulated = choose_void_keycard_continuation(
+                profile, auction, trace, hand,
+                tuple(candidate.call for candidate in candidates))
+        except (DDSUnavailableError, SamplingExhausted, RuntimeError,
+                ValueError) as exc:
+            trace.warn('Void keycard game tree unavailable: ' + str(exc))
+        else:
+            if simulated is not None:
+                selected = next((candidate for candidate in candidates
+                                 if candidate.call == simulated['call']), None)
+                if selected is not None:
+                    trace.simulation_decision = simulated
+                    candidates = (selected,)
+                else:
+                    trace.warn('Void keycard game tree chose a call absent from this profile')
     new_quantitative_5c = any(
         (candidate.public_meaning or {}).get('action_type')
         == 'quantitative_5c_feature_ask' for candidate in candidates)

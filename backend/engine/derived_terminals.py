@@ -65,7 +65,15 @@ def derive_terminal_pass(profile, auction, trace, evidence, allowed, hand=None):
         return DerivationResult(evidence)
     if evidence.forcing:
         return DerivationResult(evidence)
-    last = _last_meaning(trace)
+    last_index = _last_non_pass_index(auction)
+    if last_index is None:
+        return DerivationResult(evidence)
+    partner = {'n': 's', 's': 'n', 'e': 'w', 'w': 'e'}[auction.actor_to_call]
+    if auction.actor_at(last_index) != partner:
+        return DerivationResult(evidence)
+    last = next(
+        (entry for entry in trace.applied_meanings
+         if entry.get('index') == last_index and entry.get('seat')), None)
     if last is None:
         return DerivationResult(evidence)
     from .keycard_stop import is_non_contractual
@@ -77,9 +85,8 @@ def derive_terminal_pass(profile, auction, trace, evidence, allowed, hand=None):
         return DerivationResult(evidence)
     if _active_keycard_frame(trace):
         return DerivationResult(evidence)
-    seat = last.get('seat')
-    partner = {'n': 's', 's': 'n', 'e': 'w', 'w': 'e'}[evidence.actor]
-    if seat != partner:
+    if last.get('seat') != {'n': 's', 's': 'n', 'e': 'w',
+                            'w': 'e'}[evidence.actor]:
         return DerivationResult(evidence)
     meaning = last.get('public_meaning', {}) or {}
     acts = set(meaning.get('call_act_types', ()) or ())
@@ -100,9 +107,11 @@ def derive_terminal_pass(profile, auction, trace, evidence, allowed, hand=None):
     return DerivationResult(evidence, (candidate,))
 
 
-def _last_meaning(trace):
-    entries = [entry for entry in trace.applied_meanings if entry.get('seat')]
-    return entries[-1] if entries else None
+def _last_non_pass_index(auction):
+    for index in range(len(auction.calls) - 1, -1, -1):
+        if auction.calls[index] not in ('P', 'X', 'R'):
+            return index
+    return None
 
 
 def _active_keycard_frame(trace):

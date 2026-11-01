@@ -135,20 +135,47 @@ class PurposeAxiomTests(unittest.TestCase):
                     '1NP4CP4HP4NP5HP', hand, purpose)
                 self.assertEqual(decision.call, expected)
 
-    def test_queen_ask_is_authored_but_its_answer_table_is_not(self):
-        purpose = {'kind': 'keycard_slam', 'owner': 's', 'source_index': 6,
-                   'source_call': '4N', 'trump': 'H', 'own_keycards': 3,
-                   'owns_trump_queen': False, 'status': 'active'}
-        decision = self.choose('1NP4CP4HP4NP5CP', 'SA2HAJ9876DA32CK2', purpose)
-        self.assertEqual(decision.call, '5D')
-        self.assertEqual(decision.private_memory.purposes[0].status, 'active')
-        continuation = choose_bid(
-            self.profile, Auction.parse('1NP4CP4HP4NP5CP5DPPP'),
-            Hand.parse('SA2HAJ9876DA32CK2'),
-            private_memory=decision.private_memory.to_dict())
-        self.assertIsNone(continuation.call)
-        self.assertTrue(any('QUEEN_ASK_CONTINUATION_UNAUTHORED' in item
-                            for item in continuation.trace.diagnostics))
+    def test_queen_answer_table_completes_or_signs_off(self):
+        base = {'kind': 'keycard_slam', 'owner': 's', 'source_index': 6,
+                'source_call': '4N', 'trump': 'H',
+                'owns_trump_queen': False,
+                'rkcb_stage': 'choose_continuation',
+                'answer_category': '1/4', 'status': 'active'}
+        cases = (
+            ('1NP4CP4HP4NP5CP5DP5HP', 3, False, 'P'),
+            ('1NP4CP4HP4NP5CP5DP6CP', 3, False, '6H'),
+            ('1NP4CP4HP4NP5CP5DP5NP', 3, False, '6H'),
+            ('1NP4CP4HP4NP5CP5DP6HP', 4, True, '7H'),
+            ('1NP4CP4HP4NP5CP5DP6HP', 4, False, 'P'),
+        )
+        for auction, own, grand, expected in cases:
+            with self.subTest(auction=auction, own=own, grand=grand):
+                purpose = dict(base, own_keycards=own,
+                               grand_candidate=grand)
+                decision = self.choose(
+                    auction, 'SA2HAKQ976DA32C42', purpose)
+                self.assertEqual(decision.call, expected)
+                self.assertEqual(decision.private_memory.purposes[0].status,
+                                 'completed')
+
+    def test_selected_queen_ask_finishes_from_the_public_answer(self):
+        hand = Hand.parse('SA2HAJ9765DA32C43')
+        asked = choose_bid(self.profile, Auction.parse('1NP4CP4HP'), hand)
+        self.assertEqual(asked.call, '4N')
+        ask = choose_bid(
+            self.profile, Auction.parse('1NP4CP4HP4NP5CP'), hand,
+            private_memory=asked.private_memory.to_dict())
+        self.assertEqual(ask.call, '5D')
+        for auction, expected in (
+            ('1NP4CP4HP4NP5CP5DP5HP', 'P'),
+            ('1NP4CP4HP4NP5CP5DP6CP', '6H'),
+            ('1NP4CP4HP4NP5CP5DP5NP', '6H'),
+        ):
+            with self.subTest(auction=auction):
+                decision = choose_bid(
+                    self.profile, Auction.parse(auction), hand,
+                    private_memory=ask.private_memory.to_dict())
+                self.assertEqual(decision.call, expected)
 
     def test_keycard_plan_uses_public_answer_not_partner_cards(self):
         purpose = {'kind': 'keycard_slam', 'owner': 's', 'source_index': 6,

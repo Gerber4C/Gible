@@ -118,6 +118,49 @@ class DaqiushKeycardPrefixTests(unittest.TestCase):
             self.profile, Auction.parse('1NP4CP4HP4NP5NP7HP'))
         self.assertEqual(ordinary_rkcb_frame(final).status, 'completed')
 
+    def test_queen_ask_answer_table(self):
+        prefix = Auction.parse('1NP4CP4HP4NP5CP5DP')
+        cases = (
+            ('SKQJHKJ7DQJ7CQJ76', '5H'),   # no queen
+            ('SQJ2HQJ7DQJ7CKQJ7', '6C'),   # queen plus club king
+            ('SQJ2HQJ7DKJ7CQJ76', '6D'),   # queen plus diamond king
+            ('SAQ2HQJ7DQJ7CQJ76', '6H'),   # queen, no side king, minimum
+            ('SAKQHQJ7DQJ7CQJ76', '5N'),   # queen, no side king, maximum
+        )
+        for cards, call in cases:
+            with self.subTest(call=call):
+                self.assertEqual(
+                    choose_bid(self.profile, prefix, Hand.parse(cards)).call,
+                    call)
+
+        trace = replay_auction(
+            self.profile, Auction.parse('1NP4CP4HP4NP5CP5DP6CP'))
+        frame = ordinary_rkcb_frame(trace)
+        self.assertEqual(
+            (frame.continuation_stage, frame.queen_answer_call,
+             frame.queen_answer_category, frame.queen_side_king,
+             frame.trump_queen),
+            ('queen_answered', '6C', 'queen_side_king', 'C', True))
+
+    def test_queen_answer_placements_replay(self):
+        for auction in (
+            '1NP4CP4HP4NP5CP5DP5HPP',
+            '1NP4CP4HP4NP5CP5DP6CP6HP',
+            '1NP4CP4HP4NP5CP5DP5NP6HP',
+            '1NP4CP4HP4NP5CP5DP6HP7HP',
+        ):
+            with self.subTest(auction=auction):
+                trace = replay_auction(
+                    self.profile, Auction.parse(auction))
+                frame = ordinary_rkcb_frame(trace)
+                self.assertEqual(frame.status, 'completed')
+                entry = trace.applied_meanings[-1]
+                self.assertEqual(
+                    entry['public_meaning']['action_type'],
+                    'rkcb_1430_queen_answer_placement')
+                self.assertTrue(
+                    entry['public_meaning']['purpose_completed'])
+
     def test_derived_ordinary_six_minor_placement_replays(self):
         trace = replay_auction(
             self.profile,

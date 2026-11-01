@@ -96,6 +96,45 @@ def queen_answer_geometry(trump: str, category: str) -> QueenAnswerGeometry | No
     )
 
 
+def queen_answer_call(hand, trump: str, category: str, *,
+                      high: bool = False) -> str | None:
+    """The responder's queen answer, choosing one call for this hand.
+
+    With no queen, bid the nearest five/six of trumps.  With the queen and a
+    showable side king, show the first (lowest) one.  With the queen and no
+    showable side king use six of trumps for a minimum and 5NT for a maximum
+    when both are available.
+    """
+    geometry = queen_answer_geometry(trump, category)
+    if geometry is None or hand is None:
+        return None
+    if not hand.contains_rank(trump, 'Q'):
+        return geometry.no_queen
+    for call in geometry.side_king_answers:
+        if hand.contains_rank(call[1], 'K'):
+            return call
+    if len(geometry.queen_no_king_answers) == 1:
+        return geometry.queen_no_king_answers[0]
+    return geometry.queen_no_king_answers[1 if high else 0]
+
+
+def queen_answer_facts(call: str, trump: str, category: str) -> dict | None:
+    """Classify an observed queen answer into public queen/side-king facts."""
+    geometry = queen_answer_geometry(trump, category)
+    if geometry is None:
+        return None
+    if call == geometry.no_queen:
+        return {'trump_queen': False, 'side_king': None,
+                'queen_answer_category': 'no_queen'}
+    if call in geometry.side_king_answers:
+        return {'trump_queen': True, 'side_king': call[1],
+                'queen_answer_category': 'queen_side_king'}
+    if call in geometry.queen_no_king_answers:
+        return {'trump_queen': True, 'side_king': None,
+                'queen_answer_category': 'queen_no_side_king'}
+    return None
+
+
 def five_spade_role(answer: str, trump: str) -> str:
     if trump == 'S':
         return 'stop'
