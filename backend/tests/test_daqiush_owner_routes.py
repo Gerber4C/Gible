@@ -199,6 +199,14 @@ class OwnerRouteTests(unittest.TestCase):
             self.bid('1NP2NTP3DP3NTP4CP5DP',
                      'SAK5HQJ4DQ76CAT32'), 'P')
 
+    def test_voidwood_six_spade_placement_is_replayable(self):
+        south = 'SAKQ8632HAK9DKQ3C-'
+        north = 'SJT9HQDAJ974CAK74'
+        self.assertEqual(
+            self.bid('1NP2HP2SP5CP5SP', south), '6S')
+        self.assertEqual(
+            self.bid('1NP2HP2SP5CP5SP6SP', north), 'P')
+
     def test_voidwood_two_keycard_answer_offers_king_ask_and_placement(self):
         south = 'S-HKQJT864DK85CAK8'
         north = 'SA754HA752DACQJ43'
