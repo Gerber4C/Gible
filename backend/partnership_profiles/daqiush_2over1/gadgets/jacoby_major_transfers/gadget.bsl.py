@@ -197,13 +197,12 @@ def second_minor_game_force(ctx, trump, minor):
     if shaped_points is not None:
         return shaped_points >= 9
     if ctx.hand.length(trump) == 5 and ctx.hand.length(minor) >= 5:
-        if (ctx.hand.length(minor) == 5
-                and shapely_combined_effective_points(ctx.hand) >= 9):
-            return True
-        # A strong nine with a five-five or five-six was excluded from the
-        # invitation band, but its shape is worth a natural game force.
-        return (ctx.hand.hcp == 9
-                and ctx.hand_quality['kr_delta'] >= 1.0)
+        # Five-five and five-six shapes that were excluded from the
+        # invitation band are worth a natural game force once their shapely
+        # strength reaches the same threshold as the five-five branch.
+        return (shapely_combined_effective_points(ctx.hand) >= 9
+                or (ctx.hand.hcp == 9
+                    and ctx.hand_quality['kr_delta'] >= 1.0))
     return ctx.hand.hcp >= 10
 
 

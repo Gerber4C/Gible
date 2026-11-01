@@ -173,6 +173,10 @@ class DaqiushJacobyTests(unittest.TestCase):
         # A weaker nine in the same shape remains an invitation.
         self.assertEqual(self.bid('1NP2HP2SP', 'SQJ865HQJD6CQJT54'), '2N')
 
+    def test_five_six_with_game_strength_forces_second_minor(self):
+        hand = 'SAK762H8DKCKQT843'
+        self.assertEqual(self.bid('1NP2HP2SP', hand), '3C')
+
     def test_five_four_after_second_minor_three_notrump_invites(self):
         self.assertEqual(
             self.bid('1NP2HP2SP3DP3NTP', 'SAK982H9DQJT3CK64'), '4N')
