@@ -66,8 +66,10 @@ class DaqiushJacobyTests(unittest.TestCase):
         self.assertEqual(
             self.bid('1NP2DP2HP', 'S-HA9763DAQ32CAQ32'), '3D')
 
-    def test_six_minor_five_major_invite_uses_description_proxy(self):
-        self.assertEqual(self.bid('1NP2DP2HP', 'S3HKQJ76D4CQ98765'), '3H')
+    def test_five_six_with_seven_effective_points_forces_second_minor(self):
+        self.assertEqual(self.bid('1NP2DP2HP', 'S3HKQJ76D4CQ98765'), '3C')
+        self.assertEqual(
+            self.bid('1NP2HP2SP', 'SKJ865HJD6CQJ7543'), '3C')
 
     def test_three_notrump_choice_keeps_flat_4333_without_major_support(self):
         self.assertEqual(self.bid('1NP2HP2SP3NP', 'SAKQHJT98DAK2C432'), 'P')
