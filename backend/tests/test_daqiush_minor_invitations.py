@@ -109,6 +109,46 @@ class DaqiushMinorInvitationTests(unittest.TestCase):
         # placing five clubs.
         self.assertEqual(self.bid('1NP', 'SAHQ3D42JCAKQ9876'), '2S')
 
+    def test_good_five_four_minor_hands_transfer_then_show_four_notrump(self):
+        club_long = 'SA2HK3DQJ54CKQ765'
+        diamond_long = 'SA2HQ3DKQ765CQJ54'
+        for auction in ('1NP',):
+            self.assertEqual(self.bid(auction, club_long), '2S')
+            self.assertEqual(self.bid(auction, diamond_long), '2N')
+
+        for auction in ('1NP2SP3CP', '1NP2SP2NTP'):
+            decision = choose_bid(self.profile, Auction.parse(auction),
+                                  Hand.parse(club_long))
+            self.assertEqual(decision.call, '4N')
+            self.assertNotEqual(
+                decision.selected_candidate.public_meaning.get('action_type'),
+                'rkcb_1430')
+
+        for auction in ('1NP2NTP3DP', '1NP2NTP3CP'):
+            decision = choose_bid(self.profile, Auction.parse(auction),
+                                  Hand.parse(diamond_long))
+            self.assertEqual(decision.call, '4N')
+            self.assertNotEqual(
+                decision.selected_candidate.public_meaning.get('action_type'),
+                'rkcb_1430')
+
+    def test_five_four_minor_four_notrump_response_table(self):
+        club_route = '1NP2SP3CP4NP'
+        diamond_route = '1NP2NTP3DP4NP'
+        self.assertEqual(self.bid(club_route, 'SAQ7HKJ8D762CAK54'), '5C')
+        self.assertEqual(self.bid(diamond_route, 'SAQ7HKJ8DAK54C762'), '5D')
+        self.assertEqual(self.bid(club_route, 'SAQ74HKJ8DK62CQ54'), 'P')
+        self.assertEqual(self.bid(club_route, 'SKQ74HAK8DK62CQ54'), '5N')
+
+        club_long = 'SA2HK3DQJ54CKQ765'
+        diamond_long = 'SA2HQ3DKQ765CQJ54'
+        self.assertEqual(self.bid(club_route + '5NP', club_long), '6C')
+        self.assertEqual(self.bid(diamond_route + '5NP', diamond_long), '6D')
+        self.assertEqual(self.bid(club_route + '5CP', club_long), 'P')
+        self.assertEqual(self.bid(diamond_route + '5DP', diamond_long), 'P')
+        self.assertEqual(self.bid(club_route + '5NP6CP',
+                                  'SAQ7HKJ8D762CAK54'), 'P')
+
     def test_good_minor_private_plan_survives_normalized_notrump_calls(self):
         result = simulate_auction(self.profile, {
             'n': 'SKQ59HTAD9TJAC98Q',

@@ -23,8 +23,22 @@ def featureless(ctx):
     return (ctx.hand is not None and max(ctx.hand.length(s) for s in 'HS') <= 3)
 
 
+def five_four_minor_show(ctx, suit=None):
+    """The 14--15 HCP 2-2-4-5 / 2-2-5-4 minor-showing hand."""
+    if (ctx.hand is None or ctx.hand.hcp not in (14, 15)
+            or ctx.hand.length('S') != 2 or ctx.hand.length('H') != 2
+            or sorted(ctx.hand.length(s) for s in 'CD') != [4, 5]):
+        return False
+    if suit is None:
+        return True
+    other = 'D' if suit == 'C' else 'C'
+    return ctx.hand.length(suit) == 5 and ctx.hand.length(other) == 4
+
+
 def no_minor_transfer(ctx):
-    return max(ctx.hand.length(s) for s in 'CD') <= 5
+    return (ctx.hand is not None
+            and max(ctx.hand.length(s) for s in 'CD') <= 5
+            and not five_four_minor_show(ctx))
 
 
 def weak_featureless(ctx):
@@ -241,12 +255,13 @@ def shortage_has_control(ctx, suit):
 def asks_stayman(ctx):
     if named_evaluator(ctx, 'good_16_17_3c_family'):
         return False  # These hands use the 3C major inquiry first.
-    return (ordinary_invite(ctx) or spade_invite(ctx) or heart_invite(ctx)
+    return (not five_four_minor_show(ctx)
+            and (ordinary_invite(ctx) or spade_invite(ctx) or heart_invite(ctx)
             or double_major_invite(ctx) or both_four_major_invite(ctx) or game_stayman(ctx)
             or minor_slam_probe(ctx) or minor_stayman_probe(ctx)
             or garbage_stayman(ctx) or seven_minor_four_major_game(ctx) is not None
             or 5 <= (six_four_major_strength(ctx) or 0) < 7
-            or six_four_slam_band(ctx) is not None)
+            or six_four_slam_band(ctx) is not None))
 
 
 def direct_notrump_power(ctx):
@@ -441,7 +456,20 @@ def minor_transfer(ctx, suit):
     return (not solid_club_inquiry
             and not direct_minor_game(ctx, suit) and not solid_minor_three_notrump(ctx, suit)
             and (weak_minor(ctx, suit) or minor_invite(ctx, suit) or shapely_invite(ctx, suit)
-                 or minor_slam_transfer(ctx, suit)))
+                 or minor_slam_transfer(ctx, suit)
+                 or five_four_minor_show(ctx, suit)))
+
+
+def five_four_minor_game_fit(ctx, target, shown_long_minor):
+    """A known nine-card minor fit takes precedence over 4NT or 5NT."""
+    if ctx.hand is None:
+        return False
+    other = 'D' if target == 'C' else 'C'
+    shown_length = 5 if target == shown_long_minor else 4
+    other_shown_length = 5 if other == shown_long_minor else 4
+    total = ctx.hand.length(target) + shown_length
+    other_total = ctx.hand.length(other) + other_shown_length
+    return total >= 9 and (total > other_total or target == shown_long_minor)
 
 
 def superaccept(ctx, suit):
@@ -1544,12 +1572,27 @@ class OneNotrumpInvitations(Gadget):
             ('C', '2S', '3C', '2NT', '4C'),
             ('D', '2NT', '3D', '3C', '4D'),
         ):
+            # This exact 5-4-minor hand must use the transfer rather than
+            # competing with Stayman at the same strength.
+            five_four_ask = self.call('transfer_' + suit.lower() + '_five_four_minor')
+            five_four_ask.when = '1NP'
+            five_four_ask.bid = transfer
+            five_four_ask.applies = lambda ctx, s=suit: five_four_minor_show(ctx, s)
+            five_four_ask.meaning.action = 'minor_transfer'
+            five_four_ask.meaning.nature = ['artificial']
+            five_four_ask.meaning.acts = ['directive']
+            five_four_ask.meaning.target_suit = suit
+            five_four_ask.priority = 20
+            five_four_ask.description = (
+                'Transfer with 14--15 HCP, two-card majors, and a 5-4 minor shape.')
+
             ask = self.call('transfer_' + suit.lower())
             ask.when = '1NP'
             ask.bid = transfer
             ask.applies = lambda ctx, s=suit: minor_transfer(ctx, s)
             ask.private_purpose = lambda ctx, s=suit, low=ordinary, high=special: (
-                None if minor_slam_transfer(ctx, s) else
+                None if (minor_slam_transfer(ctx, s)
+                         or five_four_minor_show(ctx, s)) else
                 {'kind': 'response_plan', 'trump': s,
                  'responses': {low: 'P', high: '3NT' if minor_invite(ctx, s) else '3' + s}}
                 if not shapely_invite(ctx, s) else None)
@@ -1557,7 +1600,9 @@ class OneNotrumpInvitations(Gadget):
             ask.meaning.nature = ['artificial']
             ask.meaning.acts = ['directive']
             ask.meaning.target_suit = suit
-            ask.description = 'Six-plus minor transfer: weak signoff, good-suit 3NT invite, or shapely 5m invite.'
+            ask.description = (
+                'Minor transfer: the 14--15 HCP 5-4-minor show, or a six-plus '
+                'minor weak signoff, good-suit 3NT invite, or shapely 5m invite.')
 
             for answer, applies, action in (
                 (ordinary, lambda ctx, s=suit: ordinary_accept(ctx, s), 'ordinary'),
@@ -1599,6 +1644,115 @@ class OneNotrumpInvitations(Gadget):
                         follow.meaning.target_suit = 'N' if bid == '3NT' else suit
                         follow.meaning.acts = ['signoff', 'final_placement']
                         follow.meaning.purpose_completed = True
+
+                five_four = self.call('transfer_' + suit.lower() + '_' + action
+                                      + '_five_four_minor_show')
+                five_four.when = prefix
+                five_four.bid = '4NT'
+                five_four.applies = lambda ctx, s=suit: five_four_minor_show(ctx, s)
+                five_four.meaning.action = 'five_four_minor_show'
+                five_four.meaning.nature = ['artificial']
+                five_four.meaning.acts = ['descriptive', 'slam_try']
+                five_four.meaning.target_suit = 'N'
+                five_four.meaning.shape_class = '2-2-4-5/2-2-5-4'
+                five_four.meaning.hcp_min = 14
+                five_four.meaning.hcp_max = 15
+                five_four.priority = 20
+                five_four.description = (
+                    'Show 14--15 HCP with two-card majors and 5-4 minors; '
+                    'this 4NT is neither RKCB nor a generic quantitative bid.')
+
+                five_four_prefix = prefix + '4NTP'
+                for target in 'CD':
+                    game = self.call('transfer_' + suit.lower() + '_' + action
+                                     + '_five_four_game_' + target.lower())
+                    game.when = five_four_prefix
+                    game.bid = '5' + target
+                    game.applies = (lambda ctx, t=target, s=suit: (
+                        five_four_minor_game_fit(ctx, t, s)))
+                    game.meaning.action = 'five_four_minor_game_signoff'
+                    game.meaning.nature = ['natural']
+                    game.meaning.acts = ['signoff', 'final_placement']
+                    game.meaning.target_suit = target
+                    game.meaning.agreed_suit = target
+                    game.meaning.purpose_completed = True
+                    game.effect('agreed_suit').suit = target
+                    game.priority = 20
+                    game.description = 'Forced signoff in the chosen known-fit minor game.'
+
+                    close = self.call('transfer_' + suit.lower() + '_' + action
+                                      + '_five_four_game_close_' + target.lower())
+                    close.when = five_four_prefix + '5' + target + 'P'
+                    close.bid = 'P'
+                    close.applies = lambda ctx: ctx.hand is not None
+                    close.meaning.action = 'five_four_minor_game_close'
+                    close.meaning.nature = ['natural']
+                    close.meaning.acts = ['signoff', 'final_placement']
+                    close.meaning.target_suit = target
+                    close.meaning.purpose_completed = True
+                    close.priority = 20
+
+                choice = self.call('transfer_' + suit.lower() + '_' + action
+                                   + '_five_four_minor_choice')
+                choice.when = five_four_prefix
+                choice.bid = '5NT'
+                choice.applies = (lambda ctx, s=suit: (
+                    ctx.hand is not None and ctx.hand.hcp >= 17
+                    and not any(five_four_minor_game_fit(ctx, target, s)
+                                for target in 'CD')))
+                choice.meaning.action = 'five_four_minor_slam_choice'
+                choice.meaning.nature = ['artificial']
+                choice.meaning.acts = ['inquiry', 'slam_try']
+                choice.priority = 20
+                choice.description = (
+                    'Accept the 5-4-minor slam try; ask responder to name '
+                    'the longer minor at the six level.')
+
+                for target in 'CD':
+                    named = self.call('transfer_' + suit.lower() + '_' + action
+                                      + '_five_four_minor_choice_6' + target.lower())
+                    named.when = five_four_prefix + '5NTP'
+                    named.bid = '6' + target
+                    named.applies = (lambda ctx, t=target, s=suit: (
+                        five_four_minor_show(ctx, s) and t == s))
+                    named.meaning.action = 'five_four_minor_slam_signoff'
+                    named.meaning.nature = ['natural']
+                    named.meaning.acts = ['signoff', 'final_placement']
+                    named.meaning.target_suit = target
+                    named.meaning.agreed_suit = target
+                    named.meaning.purpose_completed = True
+                    named.effect('agreed_suit').suit = target
+                    named.priority = 20
+                    named.description = 'Name the shown longer minor at the six level; forced signoff.'
+
+                    named_close = self.call('transfer_' + suit.lower() + '_' + action
+                                            + '_five_four_minor_choice_close_6'
+                                            + target.lower())
+                    named_close.when = five_four_prefix + '5NTP6' + target + 'P'
+                    named_close.bid = 'P'
+                    named_close.applies = lambda ctx: ctx.hand is not None
+                    named_close.meaning.action = 'five_four_minor_slam_close'
+                    named_close.meaning.nature = ['natural']
+                    named_close.meaning.acts = ['signoff', 'final_placement']
+                    named_close.meaning.target_suit = target
+                    named_close.meaning.purpose_completed = True
+                    named_close.priority = 20
+
+                accept_nt = self.call('transfer_' + suit.lower() + '_' + action
+                                      + '_five_four_notrump_accept')
+                accept_nt.when = five_four_prefix
+                accept_nt.bid = 'P'
+                accept_nt.applies = (lambda ctx, s=suit: (
+                    ctx.hand is not None and ctx.hand.hcp < 17
+                    and not any(five_four_minor_game_fit(ctx, target, s)
+                                for target in 'CD')))
+                accept_nt.meaning.action = 'five_four_notrump_accept'
+                accept_nt.meaning.nature = ['natural']
+                accept_nt.meaning.acts = ['signoff', 'final_placement']
+                accept_nt.meaning.target_suit = 'N'
+                accept_nt.meaning.purpose_completed = True
+                accept_nt.priority = 20
+                accept_nt.description = 'Accept the 5-4-minor show and play 4NT.'
 
                 # Slam-interest continuations. After the ordinary completion
                 # the other minor is natural; after a superaccept the same bid
