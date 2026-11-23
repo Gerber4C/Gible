@@ -21,3 +21,18 @@ When the owner supplies an auction or call as the starting point, first check
 whether its continuations are defined. If any continuation is missing or
 ambiguous, **ask the owner before implementing**. Do not invent, guess, or
 silently author a continuation. This is a repository-level requirement.
+
+### Suit-symmetric continuations
+
+When a major-suit route is added or changed, inspect the counterpart with
+hearts and spades exchanged and report whether it is covered. If the counterpart
+is absent or differs, record the gap in the project roadmap and ask the owner
+for its intended meaning before changing bidding behavior. Do not infer a
+symmetric auction solely from the shape of the first route.
+
+### Grand-slam simulation threshold
+
+Treat a sampled seven-level contract as qualifying only when its completion
+rate is at least two thirds. The small-slam threshold remains separate at
+one half. A quantitative 5NT invites **7NT**, not 6NT; acceptance of an
+invitation and direct placement must still follow the profile's auction rules.

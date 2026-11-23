@@ -84,6 +84,17 @@ def five_four_minor(ctx, five, four):
             and sorted(ctx.hand.length(s) for s in 'HS') == [1, 3])
 
 
+def balanced_minor_slam(ctx, five, four):
+    return (ctx.hand is not None and ctx.hand.hcp >= 14
+            and ctx.hand.length('S') == 2 and ctx.hand.length('H') == 2
+            and ctx.hand.length(five) == 5 and ctx.hand.length(four) == 4)
+
+
+def club_long_minor_slam(ctx):
+    return (balanced_minor_slam(ctx, 'C', 'D')
+            or (five_four_minor(ctx, 'C', 'D') and ctx.hand.hcp >= 14))
+
+
 def five_four_shortage(ctx):
     return (five_four_minor(ctx, 'C', 'D')
             or five_four_minor(ctx, 'D', 'C'))
@@ -147,6 +158,12 @@ def set_final(call, target):
     call.meaning.acts = ['signoff', 'final_placement']
     call.meaning.target_suit = target
     call.meaning.purpose_completed = True
+
+
+def has_control(ctx, suit):
+    return (ctx.hand.contains_rank(suit, 'A')
+            or ctx.hand.contains_rank(suit, 'K')
+            or ctx.hand.length(suit) <= 1)
 
 
 class FiveCardMajorInquiry(Gadget):
@@ -254,8 +271,11 @@ class FiveCardMajorInquiry(Gadget):
                     minor.when = prefix
                     minor.bid = '4' + five
                     minor.applies = (lambda ctx, s=suit, f=five, o=four:
-                                     major_singleton(ctx, s)
-                                     and five_four_minor(ctx, f, o))
+                                     (major_singleton(ctx, s)
+                                      and five_four_minor(ctx, f, o)
+                                      or (ctx.hand is not None
+                                          and ctx.hand.length(s) < 3
+                                          and balanced_minor_slam(ctx, f, o))))
                     minor.meaning.action = 'five_four_minor_shape'
                     minor.meaning.nature = ['natural']
                     minor.meaning.acts = ['descriptive', 'slam_try']
@@ -266,6 +286,83 @@ class FiveCardMajorInquiry(Gadget):
                     minor.meaning.max_lengths = {five: 5, four: 4}
                     minor.description = ('With a singleton in opener’s major, '
                                          'show the five-card minor and slam interest.')
+
+        club_after_denial = self.call('balanced_minor_clubs_after_denial')
+        club_after_denial.when = '1NP3CP3DP'
+        club_after_denial.bid = '4C'
+        club_after_denial.applies = lambda ctx: balanced_minor_slam(ctx, 'C', 'D')
+        club_after_denial.meaning.action = 'five_four_minor_shape'
+        club_after_denial.meaning.nature = ['natural']
+        club_after_denial.meaning.acts = ['descriptive', 'slam_try']
+        club_after_denial.meaning.five_card_suit = 'C'
+        club_after_denial.meaning.four_card_suit = 'D'
+        club_after_denial.meaning.hcp_min = 14
+        club_after_denial.meaning.min_lengths = {'C': 5, 'D': 4}
+        club_after_denial.description = '14+ HCP, 2-2 majors, five clubs and four diamonds; slam interest.'
+
+        for shortage in 'HS':
+            delayed_clubs = self.call('five_four_clubs_after_three_notrump_'
+                                      + shortage.lower())
+            delayed_clubs.when = '1NP3CP3DP3' + shortage + 'P3NTP'
+            delayed_clubs.bid = '4C'
+            delayed_clubs.applies = club_long_minor_slam
+            delayed_clubs.meaning.action = 'five_four_minor_shape'
+            delayed_clubs.meaning.nature = ['natural']
+            delayed_clubs.meaning.acts = ['descriptive', 'slam_try']
+            delayed_clubs.meaning.five_card_suit = 'C'
+            delayed_clubs.meaning.four_card_suit = 'D'
+            delayed_clubs.meaning.hcp_min = 14
+            delayed_clubs.meaning.min_lengths = {'C': 5, 'D': 4}
+            delayed_clubs.meaning.max_lengths = {'C': 5, 'D': 4}
+            delayed_clubs.priority = 20
+            delayed_clubs.description = 'Delayed 4C shows five clubs, four diamonds and slam interest.'
+
+            delayed_prefix = '1NP3CP3DP3' + shortage + 'P3NTP4CP'
+            for bid, trump in (('4D', 'D'), ('4H', 'C'), ('4S', 'C')):
+                support = self.call('delayed_clubs_support_' + shortage.lower()
+                                    + '_' + bid.lower())
+                support.when = delayed_prefix
+                support.bid = bid
+                if bid == '4D':
+                    support.applies = lambda ctx: (ctx.hand is not None
+                                                   and ctx.hand.length('D') >= 4)
+                else:
+                    support.applies = lambda ctx, b=bid: (
+                        ctx.hand is not None and ctx.hand.length('C') >= 3
+                        and (has_control(ctx, 'S') if b == '4S'
+                             else has_control(ctx, 'H')
+                             or not has_control(ctx, 'S')))
+                support.meaning.action = 'select_minor_trump'
+                support.meaning.nature = ['artificial']
+                support.meaning.acts = ['trump_setting']
+                support.meaning.target_suit = trump
+                set_agreed_suit(support, trump)
+                support.description = ('Support and set ' + trump + ' as trump. '
+                                       '4D promises neither extra strength nor control.')
+
+            for trump in 'CD':
+                stop = self.call('delayed_clubs_suggest_five_' + shortage.lower()
+                                 + '_' + trump.lower())
+                stop.when = delayed_prefix
+                stop.bid = '5' + trump
+                stop.applies = lambda ctx, s=trump: (
+                    ctx.hand is not None and ctx.hand.length(s) >= (3 if s == 'C' else 4))
+                stop.meaning.action = 'minor_game_suggested_signoff'
+                stop.meaning.nature = ['natural']
+                stop.meaning.acts = ['signoff']
+                stop.meaning.target_suit = trump
+                set_agreed_suit(stop, trump)
+                stop.description = 'Suggest stopping in the supported minor game; partner may continue.'
+
+                accept = self.call('delayed_clubs_accept_five_' + shortage.lower()
+                                   + '_' + trump.lower())
+                accept.when = delayed_prefix + '5' + trump + 'P'
+                accept.bid = 'P'
+                accept.applies = lambda ctx: ctx.hand is not None
+                accept.meaning.action = 'accept_minor_game_suggestion'
+                accept.meaning.nature = ['natural']
+                set_final(accept, trump)
+                accept.description = 'Accept the suggested five-level minor contract.'
 
         quantitative = self.call('flat_4333_quantitative_after_denial')
         quantitative.when = '1NP3CP3DP'
@@ -466,6 +563,11 @@ class FiveCardMajorInquiry(Gadget):
             show.meaning.nature = ['artificial']
             show.meaning.acts = ['descriptive']
             show.meaning.short_suit = shortage
+            counterpart_major = 'S' if shortage == 'H' else 'H'
+            show.meaning.min_lengths = {shortage: 1, counterpart_major: 3,
+                                        'C': 4, 'D': 4}
+            show.meaning.max_lengths = {shortage: 1, counterpart_major: 3,
+                                        'C': 5, 'D': 5}
             show.description = 'After 3D denies a five-card major, show the singleton major in 3-1-5-4.'
 
             continuation = '1NP3CP3DP3' + shortage + 'P'
@@ -473,11 +575,15 @@ class FiveCardMajorInquiry(Gadget):
             finish.when = continuation
             finish.bid = '3NT'
             finish.applies = lambda ctx, s=shortage: (ctx.hand is not None
-                                                      and inquiry_stopper(ctx.hand, s))
+                                                      and (inquiry_stopper(ctx.hand, s)
+                                                           or (ctx.hand.length(other_major(s)) == 4
+                                                               and sorted(ctx.hand.length(m) for m in 'CD') == [2, 3])))
             finish.meaning.action = 'singleton_major_three_notrump'
             finish.meaning.nature = ['natural']
-            set_final(finish, 'N')
-            finish.description = 'Opener has a stopper in the shown singleton major; play 3NT.'
+            finish.meaning.acts = ['descriptive']
+            finish.meaning.target_suit = 'N'
+            finish.description = ('Opener has a stopper in the shown singleton major; '
+                                  'responder may play 3NT or describe the minors further.')
 
             special = self.call('both_minors_after_singleton_' + shortage.lower())
             special.when = continuation
@@ -513,15 +619,149 @@ class FiveCardMajorInquiry(Gadget):
             choose_major.bid = '4' + other
             choose_major.applies = (lambda ctx, s=shortage, o=other:
                                     ctx.hand is not None
-                                    and ctx.hand.length(o) == 4
-                                    and all(ctx.hand.length(x) < 4 for x in 'CD')
+                                    and (ctx.hand.length(o) >= 5
+                                         or (ctx.hand.length(o) == 4
+                                             and all(ctx.hand.length(x) < 4 for x in 'CD')))
                                     and not both_minor_special(ctx, s))
             choose_major.meaning.action = 'other_major_four_three_fit'
             choose_major.meaning.nature = ['natural']
             choose_major.meaning.acts = ['descriptive']
             choose_major.meaning.target_suit = other
-            set_agreed_suit(choose_major, other)
-            choose_major.description = 'Place the contract in the known four-three other-major fit.'
+            if other == 'S':
+                set_agreed_suit(choose_major, other)
+            choose_major.description = ('Show the other-major route; after 4S, '
+                                        '4NT asks spade keycards, while after 4H '
+                                        'the notrump ladder remains available.')
+
+            if shortage == 'H':
+                spade_fit = self.call('show_four_spade_fit_after_heart_shortage')
+                spade_fit.when = continuation
+                spade_fit.bid = '3S'
+                spade_fit.applies = lambda ctx: (
+                    ctx.hand is not None and ctx.hand.length('S') == 4
+                    and sorted(ctx.hand.length(m) for m in 'CD') == [2, 3])
+                spade_fit.meaning.action = 'show_four_spade_fit'
+                spade_fit.meaning.nature = ['natural']
+                spade_fit.meaning.acts = ['descriptive']
+                spade_fit.meaning.target_suit = 'S'
+                spade_fit.description = ('Four spades: simulation favors the spade game '
+                                         'over 3NT; the notrump ladder remains available.')
+
+                for five, four in (('C', 'D'), ('D', 'C')):
+                    minor_show = self.call('after_three_spades_show_' + five.lower())
+                    minor_show.when = continuation + '3SP'
+                    minor_show.bid = '4' + five
+                    minor_show.applies = (lambda ctx, f=five, o=four: (
+                        major_singleton(ctx, 'H')
+                        and five_four_minor(ctx, f, o)
+                        and ctx.hand.hcp >= 14
+                        and minor_slam_interest(ctx.hand)))
+                    minor_show.meaning.action = 'five_four_minor_shape'
+                    minor_show.meaning.nature = ['natural']
+                    minor_show.meaning.acts = ['descriptive', 'slam_try']
+                    minor_show.meaning.five_card_suit = five
+                    minor_show.meaning.four_card_suit = four
+                    minor_show.meaning.hcp_min = 14
+                    minor_show.meaning.min_lengths = {five: 5, four: 4}
+                    minor_show.meaning.max_lengths = {five: 5, four: 4}
+                    minor_show.description = ('Keep the longer minor and slam-interest '
+                                               'meaning after opener shows four spades.')
+
+                    suggest = self.call('after_three_spades_' + five.lower()
+                                        + '_four_notrump_suggest')
+                    suggest.when = continuation + '3SP4' + five + 'P'
+                    suggest.bid = '4NT'
+                    suggest.applies = lambda ctx, f=five: (
+                        ctx.hand is not None and ctx.hand.length(f) < 3)
+                    suggest.meaning.action = 'notrump_suggested_signoff'
+                    suggest.meaning.nature = ['natural']
+                    suggest.meaning.acts = ['signoff']
+                    suggest.meaning.target_suit = 'N'
+                    suggest.description = ('Suggest 4NT as a stopping place after '
+                                           'the two-minor shape is shown; partner may pass.')
+
+                    accept = self.call('after_three_spades_' + five.lower()
+                                       + '_accept_four_notrump')
+                    accept.when = continuation + '3SP4' + five + 'P4NTP'
+                    accept.bid = 'P'
+                    accept.applies = lambda ctx: ctx.hand is not None
+                    accept.meaning.action = 'accept_notrump_suggestion'
+                    accept.meaning.nature = ['natural']
+                    set_final(accept, 'N')
+                    accept.description = 'Accept the suggested 4NT contract.'
+
+                    for nt_bid in ('5NT', '6NT', '7NT'):
+                        ladder = self.call('after_three_spades_' + five.lower()
+                                           + '_four_notrump_' + nt_bid.lower())
+                        ladder.when = continuation + '3SP4' + five + 'P4NTP'
+                        ladder.bid = nt_bid
+                        ladder.applies = lambda ctx: ctx.hand is not None
+                        ladder.meaning.action = 'notrump_ladder'
+                        ladder.meaning.nature = ['natural']
+                        ladder.meaning.acts = (['invite'] if nt_bid == '5NT'
+                                               else ['signoff', 'final_placement'])
+                        ladder.meaning.target_suit = 'N'
+                        if nt_bid != '5NT':
+                            ladder.meaning.purpose_completed = True
+                        ladder.description = ('Notrump ladder meaning is fixed; '
+                                              'automatic selection awaits a simulation boundary.')
+
+                three_nt = self.call('after_three_spades_game_notrump')
+                three_nt.when = continuation + '3SP'
+                three_nt.bid = '3NT'
+                three_nt.applies = lambda ctx: (
+                    ctx.hand is not None and major_singleton(ctx, 'H'))
+                three_nt.meaning.action = 'notrump_game_placement'
+                three_nt.meaning.nature = ['natural']
+                set_final(three_nt, 'N')
+                three_nt.description = 'Only game values: stop in 3NT.'
+
+                for nt_bid in ('4NT', '5NT', '6NT', '7NT'):
+                    ladder = self.call('after_three_spades_' + nt_bid.lower())
+                    ladder.when = continuation + '3SP'
+                    ladder.bid = nt_bid
+                    ladder.applies = lambda ctx: ctx.hand is not None
+                    ladder.meaning.action = 'notrump_ladder'
+                    ladder.meaning.nature = ['natural']
+                    ladder.meaning.acts = (['invite'] if nt_bid in ('4NT', '5NT')
+                                           else ['signoff', 'final_placement'])
+                    ladder.meaning.target_suit = 'N'
+                    if nt_bid in ('6NT', '7NT'):
+                        ladder.meaning.purpose_completed = True
+                    ladder.description = ('Notrump ladder after 3S; automatic '
+                                          'selection awaits a simulation boundary.')
+
+            if shortage == 'S':
+                for nt_bid in ('4NT', '5NT', '6NT', '7NT'):
+                    ladder = self.call('after_four_hearts_' + nt_bid.lower())
+                    ladder.when = continuation + '4HP'
+                    ladder.bid = nt_bid
+                    ladder.applies = lambda ctx: ctx.hand is not None
+                    ladder.meaning.action = 'notrump_ladder'
+                    ladder.meaning.nature = ['natural']
+                    ladder.meaning.acts = (['invite'] if nt_bid in ('4NT', '5NT')
+                                           else ['signoff', 'final_placement'])
+                    ladder.meaning.target_suit = 'N'
+                    if nt_bid in ('6NT', '7NT'):
+                        ladder.meaning.purpose_completed = True
+                    ladder.description = ('Notrump ladder after 4H; automatic '
+                                          'selection awaits a simulation boundary.')
+
+            ladder_head = '3S' if shortage == 'H' else '4H'
+            for answer_bid, high in (('P', False), ('6NT', True)):
+                answer = self.call('notrump_ladder_small_answer_'
+                                   + shortage.lower() + '_' + answer_bid.lower())
+                answer.when = continuation + ladder_head + 'P4NTP'
+                answer.bid = answer_bid
+                answer.applies = lambda ctx, strong=high: (
+                    ctx.hand is not None and (ctx.hand.hcp >= 16) == strong)
+                answer.meaning.action = ('quantitative_notrump_'
+                                         + ('accept' if high else 'reject'))
+                answer.meaning.nature = ['natural']
+                answer.meaning.acts = ['accept' if high else 'reject', 'final_placement']
+                answer.meaning.target_suit = 'N'
+                answer.meaning.purpose_completed = True
+                answer.description = 'Answer the 4NT invitation to 6NT by the 1NT range.'
 
             other_prefix = continuation + '4' + other + 'P'
             stop_other = self.call('stop_in_other_major_after_singleton_'
@@ -573,8 +813,7 @@ class FiveCardMajorInquiry(Gadget):
             three_three.bid = '4NT'
             three_three.applies = (lambda ctx, s=shortage: (
                 ctx.hand is not None
-                and ctx.hand.length('C') == 3 and ctx.hand.length('D') == 3
-                and ctx.hand.length(other_major(s)) != 4))
+                and ctx.hand.length('C') == 3 and ctx.hand.length('D') == 3))
             three_three.meaning.action = 'three_three_minor_placement_request'
             three_three.meaning.nature = ['artificial']
             three_three.meaning.acts = ['inquiry']
@@ -604,12 +843,14 @@ class FiveCardMajorInquiry(Gadget):
                 set_agreed_suit(slam, five)
                 slam.description = 'Name the five-card minor for the small slam.'
 
-        for shown_major in 'HS':
+        for shown_major in 'DHS':
             major_prefix = '1NP3CP3' + shown_major + 'P'
             for shown_minor, selectors in (
                     ('C', (('4D', 'D', False), ('4H', 'C', False),
                            ('4S', 'C', False), ('5C', 'C', True))),
                     ('D', (('4H', 'C', False), ('4S', 'D', False)))):
+                if shown_major == 'D' and shown_minor == 'D':
+                    continue
                 selector_prefix = major_prefix + '4' + shown_minor + 'P'
                 for selector_bid, trump, final in selectors:
                     selector = self.call('select_' + trump.lower() + '_after_'
@@ -618,7 +859,18 @@ class FiveCardMajorInquiry(Gadget):
                                          + selector_bid.lower())
                     selector.when = selector_prefix
                     selector.bid = selector_bid
-                    selector.applies = lambda ctx: ctx.hand is not None
+                    if shown_minor == 'C' and selector_bid in ('4H', '4S'):
+                        selector.applies = (lambda ctx, b=selector_bid: (
+                            ctx.hand is not None and ctx.hand.length('C') >= 3
+                            and (has_control(ctx, 'S') if b == '4S'
+                                 else has_control(ctx, 'H')
+                                 or not has_control(ctx, 'S'))))
+                    elif shown_minor == 'C' and selector_bid == '4D':
+                        selector.applies = lambda ctx: (ctx.hand is not None
+                                                        and ctx.hand.length('D') >= 4)
+                    else:
+                        selector.applies = lambda ctx, t=trump: (
+                            ctx.hand is not None and ctx.hand.length(t) >= 3)
                     selector.meaning.action = 'select_minor_trump'
                     selector.meaning.nature = ['artificial']
                     selector.meaning.acts = ['trump_setting']
@@ -627,7 +879,10 @@ class FiveCardMajorInquiry(Gadget):
                     if final:
                         set_final(selector, trump)
                     selector.description = ('Select the minor trump; the suit bid '
-                                            'does not promise a control.')
+                                            'does not promise a control after 4D; '
+                                            'after 4C the higher club selector '
+                                            'shows its control, with 4H also '
+                                            'available when no control exists.')
 
         ordinary_notrump = self.call('ordinary_three_notrump_after_denial')
         ordinary_notrump.when = '1NP3CP3DP'
@@ -641,6 +896,15 @@ class FiveCardMajorInquiry(Gadget):
         ordinary_notrump.meaning.nature = ['natural']
         set_final(ordinary_notrump, 'N')
         ordinary_notrump.description = 'With no five-card-major fit or special minor route, play three notrump.'
+
+        ordinary_pass = self.call('ordinary_three_notrump_after_denial_pass')
+        ordinary_pass.when = '1NP3CP3DP3NTP'
+        ordinary_pass.bid = 'P'
+        ordinary_pass.applies = lambda ctx: ctx.hand is not None
+        ordinary_pass.meaning.action = 'accept_three_notrump_signoff'
+        ordinary_pass.meaning.nature = ['natural']
+        set_final(ordinary_pass, 'N')
+        ordinary_pass.description = 'Accept the natural three-notrump game.'
 
         probe = self.call('good_5422_minor_slam_probe')
         probe.when = '1NP3CP3DP'

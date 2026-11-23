@@ -1,4 +1,5 @@
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from engine.auction import Auction
@@ -284,6 +285,16 @@ class GrandSlamPolicyTests(unittest.TestCase):
             self.assertTrue(accept_grand(
                 seventeen, deals=({'n': seventeen},), trump='S', declarer='s',
                 solve_table=lambda deal: None))
+
+    def test_grand_completion_requires_two_thirds(self):
+        seventeen = Hand.parse('SAQJ76HAKJD43CQ76')
+        for rate, expected in ((0.66, False), (2 / 3, True)):
+            with self.subTest(rate=rate), patch(
+                    'engine.grand_slam_policy.compare_contract_targets',
+                    return_value=(SimpleNamespace(completion_rate=rate),)):
+                self.assertEqual(accept_grand(
+                    seventeen, deals=({'n': seventeen},), trump='S',
+                    declarer='s', solve_table=lambda deal: None), expected)
 
 
 if __name__ == '__main__':

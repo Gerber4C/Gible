@@ -53,6 +53,11 @@ def deterministic_after_singleton(
         candidates.append(('4NT', None, 'Exact three-three minors'))
 
     has_stopper = inquiry_stopper(opener, reported)
+    if (has_stopper and opener.length('C') >= 3
+            and opener.length('D') >= 3):
+        return InquiryDecision(
+            call='3NT', source='deterministic',
+            reason='Reported shortage is stopped; retain room for responder to show minors')
     if has_stopper and not candidates and not ambiguous_minors:
         return InquiryDecision(
             call='3NT', source='deterministic',
@@ -118,6 +123,12 @@ def deterministic_after_major(opener_major: str,
         return InquiryDecision(
             call='4NT', source='deterministic',
             reason='Good 16-17 without three-card support: quantitative 4NT')
+    if (responder.hcp >= 14 and responder.length(major) < 3
+            and responder.length('C') == 5 and responder.length('D') == 4
+            and (responder.length('H'), responder.length('S')) in ((2, 2), (3, 1), (1, 3))):
+        return InquiryDecision(
+            call='4C', source='deterministic',
+            reason='Five clubs and four diamonds with slam interest and no major fit')
     support = responder.length(major) >= threshold
     singleton_shape = (responder.length(major) == 1
                        and sorted(responder.length(s) for s in 'CD') == [4, 5])
@@ -224,6 +235,21 @@ def inquiry_decision_kind(profile_id: str, auction) -> str | None:
     if profile_id != 'daqiush_2over1':
         return None
     calls = tuple(auction.calls)
+    if (len(calls) == 14 and calls[0] == '1N' and calls[2] == '3C'
+            and calls[4] == '3D' and calls[6] == '3H'
+            and calls[8] == '3S' and calls[10] in ('4C', '4D')
+            and calls[12] == '4N' and calls[13] == 'P'):
+        return 'responder_notrump_ladder_after_offer'
+    if (len(calls) == 10 and calls[0] == '1N' and calls[2] == '3C'
+            and calls[4] == '3D'
+            and ((calls[6], calls[8]) in (('3H', '3S'), ('3S', '4H')))
+            and calls[9] == 'P'):
+        return 'responder_notrump_ladder'
+    if (len(calls) == 12 and calls[0] == '1N' and calls[2] == '3C'
+            and calls[4] == '3D' and calls[6] in ('3H', '3S')
+            and calls[8] == '3N' and calls[10] == '4C'
+            and calls[11] == 'P'):
+        return 'opener_after_delayed_minor'
     if (len(calls) == 8 and calls[0] == '1N' and calls[2] == '3C'
             and calls[4] == '3D' and calls[6] in ('3H', '3S') and calls[7] == 'P'):
         return 'opener_after_singleton'
@@ -259,11 +285,62 @@ def decide_five_major_inquiry(profile, auction, hand: Hand, *,
                                'Not a five-major inquiry decision point')
     actor = auction.actor_to_call
     partner = _partner(actor)
-    if kind == 'opener_after_singleton':
+    if kind in ('responder_notrump_ladder', 'responder_notrump_ladder_after_offer'):
+        return _decide_notrump_ladder(profile, auction, hand, trace, solve_table,
+                                      after_offer=kind.endswith('after_offer'))
+    partner_hcp_cap = None
+    if kind == 'opener_after_delayed_minor':
+        from .contract_evaluation import ContractTarget
+        from .cue_slam_policy import partner_hcp_bounds
+
+        low, _ = partner_hcp_bounds(trace, partner) if trace is not None else (14, 37)
+        partner_hcp_cap = low + 2
+        targets = [ContractTarget(level, suit, partner if suit == 'C' else actor)
+                   for level in (5, 6) for suit in 'CD'
+                   if hand.length(suit) >= (3 if suit == 'C' else 4)]
+        fallback_suit = _preferred_minor(hand)
+        fallback = InquiryDecision(
+            '5' + fallback_suit, 'deterministic',
+            'No compatible low-range DDS estimate; suggest the better supported minor',
+            agreed_suit=fallback_suit)
+        mapping = {}
+    elif kind == 'opener_after_singleton':
         shortage = auction.calls[6][-1]
+        other_major = 'S' if shortage == 'H' else 'H'
         fallback = deterministic_after_singleton(hand, singleton_major=shortage)
-        targets = _singleton_targets(hand, actor, shortage)
-        mapping = _singleton_targets(hand, actor, shortage)[1]
+        if hand.length(other_major) >= 5:
+            return InquiryDecision('4' + other_major, 'deterministic',
+                                   'Five cards in the other major take priority',
+                                   agreed_suit=other_major)
+        if (hand.length(other_major) == 4
+                and sorted(hand.length(suit) for suit in 'CD') == [2, 3]):
+            from .contract_evaluation import ContractTarget
+            targets = (ContractTarget(3, 'NT', actor),
+                       ContractTarget(4, other_major, actor))
+            mapping = {'3NT': '3NT',
+                       '4' + other_major: '3S' if other_major == 'S' else '4H'}
+            fallback = InquiryDecision(
+                '3NT' if inquiry_stopper(hand, shortage)
+                else mapping['4' + other_major],
+                'deterministic', 'No DDS estimate for the other-major game')
+        elif (inquiry_stopper(hand, shortage)
+                and hand.length('C') >= 3 and hand.length('D') >= 3):
+            from .contract_evaluation import ContractTarget
+            minors = tuple(suit for suit in 'CD' if hand.length(suit) >= 4)
+            if not minors:
+                minors = ('C', 'D')
+            targets = (ContractTarget(3, 'NT', actor), *(
+                ContractTarget(5, suit, actor) for suit in minors))
+            mapping = {'3NT': '3NT'}
+            for suit in minors:
+                mapping['5' + suit] = (
+                    '4NT' if not any(hand.length(m) >= 4 for m in 'CD')
+                    else '4C' if suit == 'C' else '4D')
+            if ('D' in minors and _both_minor_special(
+                    hand, shortage, {s: hand.length(s) for s in 'CD'})):
+                mapping['5D'] = '4' + shortage
+        else:
+            targets, mapping = _singleton_targets(hand, actor, shortage)
     elif kind == 'responder_after_major':
         major = auction.calls[4][-1]
         fallback = deterministic_after_major(major, hand)
@@ -309,8 +386,35 @@ def decide_five_major_inquiry(profile, auction, hand: Hand, *,
         from .replay import replay_auction
         trace = replay_auction(profile, auction)
     estimates = _sampled_best(profile, auction, hand, trace, partner,
-                              targets, solve_table)
+                              targets, solve_table,
+                              partner_max_hcp=partner_hcp_cap)
     if estimates:
+        if kind == 'opener_after_delayed_minor':
+            return _delayed_minor_decision(hand, estimates, _vulnerable(auction))
+        if (kind == 'opener_after_singleton' and hand.length(other_major) == 4
+                and sorted(hand.length(suit) for suit in 'CD') == [2, 3]):
+            best = max(estimates, key=lambda estimate: _game_expected_score(
+                estimate, _vulnerable(auction)))
+            selected = mapping.get(best.contract)
+            if selected is not None:
+                return InquiryDecision(
+                    selected, 'dds',
+                    'Compared three notrump with four of the other major',
+                    agreed_suit=other_major if selected != '3NT' else None)
+        if (kind == 'opener_after_singleton'
+                and targets and targets[0].contract == '3NT'
+                and all(target.contract in ('3NT', '5C', '5D')
+                        for target in targets)):
+            best = max(estimates, key=lambda estimate: _game_expected_score(
+                estimate, _vulnerable(auction)))
+            selected = mapping.get(best.contract)
+            if selected is not None:
+                return InquiryDecision(
+                    selected, 'dds',
+                    'Compared three notrump with the supported minor games',
+                    agreed_suit=(mapping[best.contract][1]
+                                 if selected in ('4C', '4D') else
+                                 'D' if selected == '4' + shortage else None))
         best = _best_estimate(estimates, _vulnerable(auction))
         selected = mapping.get(best.contract)
         if selected is not None:
@@ -401,8 +505,56 @@ def _vulnerable(auction) -> bool:
     return auction.vulnerability in ('both', side)
 
 
+def _decide_notrump_ladder(profile, auction, hand, trace, solve_table, *, after_offer):
+    """Use the opener's public minimum and maximum, never the actual hand."""
+    from .contract_evaluation import ContractTarget
+    from .cue_slam_policy import SLAM_QUALIFY_RATE, partner_hcp_bounds
+    from .grand_slam_policy import GRAND_QUALIFY_RATE
+    from .replay import replay_auction
+
+    if not after_offer and auction.calls[8] == '3S' and minor_slam_interest(hand):
+        if sorted((hand.length('C'), hand.length('D'))) == [4, 5] and hand.hcp >= 14:
+            minor = _five_minor(hand)
+            return InquiryDecision('4' + minor, 'deterministic',
+                                   'Describe the longer minor with slam interest')
+    fallback = 'P' if after_offer or auction.calls[8] == '4H' else '3NT'
+    if trace is None:
+        trace = replay_auction(profile, auction)
+    actor = auction.actor_to_call
+    partner = _partner(actor)
+    low, high = partner_hcp_bounds(trace, partner)
+    targets = (ContractTarget(6, 'NT', actor), ContractTarget(7, 'NT', actor))
+    bands = []
+    for hcp in (low, high):
+        estimates = _sampled_best(
+            profile, auction, hand, trace, partner, targets, solve_table,
+            partner_min_hcp=hcp, partner_max_hcp=hcp)
+        if not estimates:
+            return InquiryDecision(fallback, 'deterministic',
+                                   'Notrump ladder simulation unavailable')
+        bands.append({item.contract: item.completion_rate for item in estimates})
+    low_rates, high_rates = bands
+    small_low = low_rates.get('6NT', 0.0) >= SLAM_QUALIFY_RATE
+    small_high = high_rates.get('6NT', 0.0) >= SLAM_QUALIFY_RATE
+    grand_low = low_rates.get('7NT', 0.0) >= GRAND_QUALIFY_RATE
+    grand_high = high_rates.get('7NT', 0.0) >= GRAND_QUALIFY_RATE
+    if grand_low:
+        call = '7NT'
+    elif small_low and grand_high:
+        call = '5NT'  # Invites seven, never six.
+    elif small_low:
+        call = '6NT'
+    elif small_high and not after_offer:
+        call = '4NT'  # Invites the small slam.
+    else:
+        call = fallback
+    return InquiryDecision(call, 'dds',
+                           'Compared six and seven notrump at the opener range endpoints',
+                           final=call in ('3NT', '6NT', '7NT', 'P'))
+
+
 def _sampled_best(profile, auction, hand, trace, partner, targets,
-                  solve_table):
+                  solve_table, *, partner_max_hcp=None, partner_min_hcp=None):
     if not targets:
         return None
     from .cue_slam_policy import sample_process_hands
@@ -410,7 +562,13 @@ def _sampled_best(profile, auction, hand, trace, partner, targets,
     from .dds_adapter import DDSUnavailableError, calculate_available_table
     from .deal_sampler import SamplingExhausted
     try:
-        deals = sample_process_hands(profile, auction, trace, hand, partner)
+        if partner_max_hcp is None and partner_min_hcp is None:
+            deals = sample_process_hands(profile, auction, trace, hand, partner)
+        else:
+            deals = sample_process_hands(
+                profile, auction, trace, hand, partner,
+                partner_count=10, partner_max_hcp=partner_max_hcp,
+                partner_min_hcp=partner_min_hcp)
     except (SamplingExhausted, RuntimeError, ValueError):
         return None
     if not deals:
@@ -434,6 +592,70 @@ def _best_estimate(estimates, vulnerable):
         if best_score is None or score > best_score:
             best, best_score = estimate, score
     return best
+
+
+def _game_expected_score(estimate, vulnerable: bool) -> float:
+    """Score only making the target or going one down, without overtricks."""
+    contract = estimate.contract
+    level = int(contract[0])
+    suit = contract[1:]
+    if suit == 'NT':
+        tricks = 40 + (level - 1) * 30
+    elif suit in 'HS':
+        tricks = level * 30
+    else:
+        tricks = level * 20
+    game = 500 if vulnerable else 300
+    slam = ((1500 if vulnerable else 1000) if level == 7 else
+            (750 if vulnerable else 500) if level == 6 else 0)
+    made = tricks + game + slam
+    set_one = -100 if vulnerable else -50
+    return (estimate.completion_rate * made
+            + (1 - estimate.completion_rate) * set_one)
+
+
+def _preferred_minor(hand: Hand) -> str:
+    candidates = [suit for suit in 'CD'
+                  if hand.length(suit) >= (3 if suit == 'C' else 4)]
+    return max(candidates, key=lambda suit: (
+        (5 if suit == 'C' else 4) + hand.length(suit),
+        minor_game_control_points(
+            hand, suit, partner_long_suits=('D' if suit == 'C' else 'C',)),
+        suit == 'D'))
+
+
+def _delayed_minor_decision(hand: Hand, estimates, vulnerable: bool) -> InquiryDecision:
+    available = {item.contract: item for item in estimates}
+    games = [available['5' + suit] for suit in 'CD'
+             if '5' + suit in available]
+    if not games:
+        suit = _preferred_minor(hand)
+        return InquiryDecision('5' + suit, 'deterministic',
+                               'No sampled minor game result; suggest five of the supported minor',
+                               agreed_suit=suit)
+    best_game = max(games, key=lambda item: _game_expected_score(item, vulnerable))
+    slams = [available['6' + suit] for suit in 'CD'
+             if '6' + suit in available]
+    best_slam = (max(slams, key=lambda item: _game_expected_score(item, vulnerable))
+                 if slams else None)
+    if (best_slam is not None and
+            _game_expected_score(best_slam, vulnerable)
+            > _game_expected_score(best_game, vulnerable)):
+        suit = best_slam.contract[1]
+        if suit == 'D':
+            call = '4D'
+        else:
+            spade_control = (hand.contains_rank('S', 'A')
+                             or hand.contains_rank('S', 'K')
+                             or hand.length('S') <= 1)
+            call = '4S' if spade_control else '4H'
+        return InquiryDecision(call, 'dds',
+                               'Low-range samples favor investigating ' + best_slam.contract,
+                               agreed_suit=suit)
+    suit = best_game.contract[1]
+    return InquiryDecision('5' + suit, 'dds',
+                           'Low-range samples favor suggesting ' + best_game.contract,
+                           agreed_suit=suit)
 
 
 def _singleton_targets(hand: Hand, actor: str, shortage: str):

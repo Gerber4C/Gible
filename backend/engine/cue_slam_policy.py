@@ -523,6 +523,52 @@ def _process_seed(auction, hand: Hand) -> int:
     return int.from_bytes(sha256(serial.encode('ascii')).digest()[:8], 'big')
 
 
+def _shape_conditioned_process_deals(actor_hand: Hand, partner: str,
+                                     bounds: dict, *, count: int,
+                                     seed: int, max_attempts: int,
+                                     max_seconds: float):
+    """Draw publicly known partner shapes before applying their HCP interval."""
+    from itertools import product
+    from math import comb, prod
+    import random
+    import time
+
+    from .constrained_deals import DECK
+    from .cards import normalize_suit_name
+    from .deal_sampler import _hand_from_cards
+
+    low_lengths = bounds.get('min_lengths', {})
+    high_lengths = bounds.get('max_lengths', {})
+    if not all(suit in low_lengths and suit in high_lengths for suit in 'SHDC'):
+        return None
+    remaining = {suit: tuple(card for card in DECK
+                             if card[0] == normalize_suit_name(suit)
+                             and card[1] not in actor_hand.holding(suit))
+                 for suit in 'SHDC'}
+    ranges = [range(low_lengths[suit], high_lengths[suit] + 1) for suit in 'SHDC']
+    shapes = [shape for shape in product(*ranges)
+              if sum(shape) == 13 and all(length <= len(remaining[suit])
+                                          for suit, length in zip('SHDC', shape))]
+    if not shapes or len(shapes) > 16:
+        return None
+    weights = [prod(comb(len(remaining[suit]), length)
+                    for suit, length in zip('SHDC', shape)) for shape in shapes]
+    rng = random.Random(seed)
+    deadline = time.monotonic() + max_seconds
+    deals = []
+    attempts = 0
+    while (len(deals) < count and attempts < max_attempts
+           and time.monotonic() < deadline):
+        attempts += 1
+        shape = rng.choices(shapes, weights=weights, k=1)[0]
+        cards = tuple(card for suit, length in zip('SHDC', shape)
+                      for card in rng.sample(remaining[suit], length))
+        hand = _hand_from_cards(cards)
+        if bounds['min_hcp'] <= hand.hcp <= bounds['max_hcp']:
+            deals.append({partner: hand})
+    return tuple(deals)
+
+
 def _complete_opponents(actor: str, partner: str, actor_hand: Hand,
                         partner_hand: Hand, count: int,
                         rng) -> list[dict]:
@@ -555,7 +601,9 @@ def sample_process_hands(profile, auction, trace, actor_hand: Hand,
                          ew_count: int = 4, seed=None,
                          max_attempts: int = 20000,
                          max_seconds: float = 8.0,
-                         extra_filter=None) -> tuple[dict, ...]:
+                         extra_filter=None,
+                         partner_max_hcp: int | None = None,
+                         partner_min_hcp: int | None = None) -> tuple[dict, ...]:
     """Infer partner's range by simulating what hands would bid this way.
 
     Candidate hands are drawn inside partner's public HCP and length bounds,
@@ -569,7 +617,7 @@ def sample_process_hands(profile, auction, trace, actor_hand: Hand,
 
     from .auction import Auction
     from .candidate_generation import generate_candidates
-    from .deal_sampler import sample_deals
+    from .deal_sampler import MAX_ATTEMPTS, MAX_SAMPLES, MAX_SECONDS, sample_deals
     from .memory import SeatMemory
     from .replay import active_environment_for, replay_auction
 
@@ -598,14 +646,32 @@ def sample_process_hands(profile, auction, trace, actor_hand: Hand,
     if seed is None:
         seed = _process_seed(auction, actor_hand)
     constraints = {partner: partner_constraints(trace, partner)}
-    sampled = sample_deals(
-        auction.actor_to_call, actor_hand, public_constraints=constraints,
-        sample_count=max(partner_count * 6, 24), seed=seed,
-        max_attempts=max_attempts, max_seconds=max_seconds)
+    if partner_max_hcp is not None:
+        constraints[partner]['max_hcp'] = min(
+            constraints[partner]['max_hcp'], partner_max_hcp)
+    if partner_min_hcp is not None:
+        constraints[partner]['min_hcp'] = max(
+            constraints[partner]['min_hcp'], partner_min_hcp)
+    if constraints[partner]['max_hcp'] < constraints[partner]['min_hcp']:
+        return ()
+    sample_count = max(partner_count * 6, 24)
+    if (isinstance(sample_count, bool) or not 1 <= sample_count <= MAX_SAMPLES
+            or isinstance(max_attempts, bool) or not 1 <= max_attempts <= MAX_ATTEMPTS
+            or isinstance(max_seconds, bool) or not isinstance(max_seconds, (int, float))
+            or not 0 < max_seconds <= MAX_SECONDS):
+        raise ValueError('process sampling exceeds the bounded deal-sampler limits')
+    sampled = _shape_conditioned_process_deals(
+        actor_hand, partner, constraints[partner], count=sample_count,
+        seed=seed, max_attempts=max_attempts, max_seconds=max_seconds)
+    if sampled is None:
+        sampled = sample_deals(
+            auction.actor_to_call, actor_hand, public_constraints=constraints,
+            sample_count=sample_count, seed=seed,
+            max_attempts=max_attempts, max_seconds=max_seconds).deals
 
     distinct = []
     seen = set()
-    for deal in sampled.deals:
+    for deal in sampled:
         hand = deal[partner]
         key = tuple(hand.holding(suit) for suit in 'SHDC')
         if key in seen:

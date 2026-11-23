@@ -342,6 +342,14 @@ def good_minor(ctx, suit):
     return ctx.hand.honor_count(suit, ('A', 'K', 'Q')) >= 2
 
 
+def smolen_hand(ctx, five, four):
+    return (ctx.hand is not None and ctx.hand.hcp >= 10
+            and ctx.hand.length(five) >= 5
+            and ctx.hand.length(four) >= 4
+            and ctx.hand.length(five) > ctx.hand.length(four)
+            and six_four_slam_band(ctx) != 'weak')
+
+
 def strong_nine_minor(ctx, suit):
     """A strong nine with a six-card minor invites 3NT through the transfer."""
     return (ctx.hand is not None and ctx.hand.length(suit) >= 6
@@ -627,7 +635,12 @@ class OneNotrumpInvitations(Gadget):
             answer.bid = contract
             # Quantitative 5NT invites the top half of the 15-17 range, so
             # 16 HCP accepts (the owner's 50% rule); 15 declines.
-            for prefix in nt_route_prefixes:
+            grand_answer_prefixes = nt_route_prefixes + (
+                '1NP3CP3DP3HP3SP', '1NP3CP3DP3SP4HP',
+                '1NP3CP3DP3HP3SP4CP4NTP',
+                '1NP3CP3DP3HP3SP4DP4NTP',
+            )
+            for prefix in grand_answer_prefixes:
                 route_answer = self.call('strong_notrump_five_nt_' + contract.lower()
                                          + '_after_' + prefix.lower())
                 route_answer.when = prefix + '5NTP'
@@ -804,6 +817,9 @@ class OneNotrumpInvitations(Gadget):
             for bid, applies, action in (
                 ('3NT', lambda ctx, a=answer: game_stayman(ctx)
                  and not named_evaluator(ctx, 'good_16_17_4324')
+                 and not (a == '2D' and any(
+                     smolen_hand(ctx, five, four)
+                     for five, four in (('S', 'H'), ('H', 'S'))))
                  and (a == '2D' or ctx.hand.length(a[-1]) < 4)
                  and not four_four_four_one(ctx, a)
                  and not any(strong_minor_with_other_major(ctx, a, m) for m in 'CD'),
@@ -2410,6 +2426,21 @@ class OneNotrumpInvitations(Gadget):
 
         # Six-four majors: game-only hands use direct Texas (in that gadget).
         # Slam-interest hands start with Stayman; H/S are handled symmetrically.
+        for five, four in (('S', 'H'), ('H', 'S')):
+            bid = '3' + four
+            smolen = self.call('smolen_' + five.lower() + '_after_denial')
+            smolen.when = '1NP2CP2DP'
+            smolen.bid = bid
+            smolen.applies = lambda ctx, f=five, o=four: smolen_hand(ctx, f, o)
+            smolen.meaning.action = 'smolen_show_four_major'
+            smolen.meaning.nature = ['artificial']
+            smolen.meaning.acts = ['descriptive', 'game_forcing']
+            smolen.meaning.forcing = 'game_forcing'
+            smolen.meaning.min_lengths = {five: 5, four: 4}
+            smolen.meaning.target_suit = five
+            smolen.priority = 10
+            smolen.description = 'Smolen: four cards in the bid major and at least five in the other major.'
+
         for long_major, short_major in (('H', 'S'), ('S', 'H')):
             denial = '1NP2CP2DP'
             weak_transfer = '4D' if long_major == 'H' else '4H'

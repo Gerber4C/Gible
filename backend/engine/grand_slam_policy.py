@@ -26,7 +26,7 @@ from .dds_adapter import DDSUnavailableError
 
 GRAND_INVITE_QUANTILE = 0.15
 QUANTITATIVE_QUANTILE = 0.50
-GRAND_QUALIFY_RATE = 0.5
+GRAND_QUALIFY_RATE = 2 / 3
 
 # The 1NT opening is 15-17 for the strong hands plus authored upgrades. A
 # responder's range after a transfer is wide, so only the opener's range is
@@ -69,7 +69,7 @@ def accept_grand(
     """
     if not in_top_quantile(hand, low, high, quantile_for(quantitative)):
         return False
-    if not deals or trump not in 'CDHS' or declarer not in 'NESW':
+    if not deals or trump not in 'CDHS' or declarer not in 'nesw':
         return True
     table = solve_table
     if table is None:

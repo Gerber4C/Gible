@@ -353,6 +353,16 @@ by Axioms require an explicit design, not an implicit override by a DDS score.
     interference, simulation/fallback, and strict separation from RKCB,
     NFRKCB, Voidwood, and natural 4NT. The bounded Daqiush 1NT routes remain
     explicitly authored until this redesign has its own approved specification.
+12. After `1NT–3C–3D–3H–3S` or `1NT–3C–3D–3S–4H`, and after the
+    `3S–4m–4NT` suggested signoff, preserve the notrump ladder: `4NT`
+    (where legal) invites small slam, `5NT` invites grand slam, `6NT`
+    stops in small slam, and `7NT` places grand slam. The owner chose
+    simulation rather than existing raw-HCP cutoffs for automatic choices.
+    Compare the opener's publicly possible low and high HCP endpoints: small
+    slam needs at least 50% completion, grand slam at least two thirds.
+    `5NT` invites seven when six qualifies at the low end and seven only at
+    the high end. A 4NT suggested signoff means no fit in the shown minor;
+    it does not assert that opener is minimum.
 
 ## Meow 2/1 Benchmark Roadmap
 

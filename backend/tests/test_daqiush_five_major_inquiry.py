@@ -160,6 +160,64 @@ class DaqiushFiveMajorInquiryEndToEndTests(unittest.TestCase):
     def bid(self, auction, cards):
         return self.decision(auction, cards).call
 
+    def test_four_clubs_shows_club_long_minor_slam_after_major_or_denial(self):
+        south = 'SA2HK3DQJ54CKQ765'
+        for auction in ('1NP3CP3DP', '1NP3CP3HP', '1NP3CP3SP'):
+            with self.subTest(auction=auction):
+                self.assertEqual(self.bid(auction, south), '4C')
+
+    def test_five_major_inquiry_game_notrump_is_final(self):
+        self.assertEqual(self.bid('1NP3CP3DP3NTP',
+                                  'SAQ7HKJ8DA762CQ54'), 'P')
+
+    def test_singleton_inquiry_can_choose_three_notrump_then_show_clubs(self):
+        north = 'SAQ7HKJ8DA762CQ54'
+        south = 'S3HAQ6DKQJ5CA7632'
+        self.assertEqual(self.bid('1NP3CP3DP3SP', north), '3N')
+        self.assertEqual(self.bid('1NP3CP3DP3SP3NP', south), '4C')
+
+    def test_four_spade_fit_preserves_minor_show_and_natural_notrump_offer(self):
+        prefix = '1NP3CP3DP3HP3SP'
+        responder = 'SKQ5H2DKQJ5CA7632'
+        opener = 'SAKQ7HAJ82DK54C98'
+        self.assertEqual(self.bid(prefix, responder), '4C')
+        self.assertEqual(self.bid(prefix + '4CP', opener), '4N')
+        self.assertEqual(self.meaning(prefix + '4CP4N', '4N')['action_type'],
+                         'notrump_suggested_signoff')
+        self.assertEqual(self.bid(prefix + '4CP4NTP', responder), 'P')
+        for call in ('5N', '6N', '7N'):
+            self.assertEqual(self.meaning(prefix + '4CP4NTP' + call, call)['action_type'],
+                             'notrump_ladder')
+
+    def test_four_notrump_suggestion_depends_on_fit_not_opener_limit(self):
+        prefix = '1NP3CP3DP3HP3SP4CP'
+        self.assertEqual(self.bid(prefix, 'SAQ76HKJ82DKQ4C98'), '4N')
+        self.assertEqual(self.bid(prefix, 'SAQ76HAJ82DKQ4C98'), '4N')
+        self.assertNotEqual(self.bid(prefix, 'SAQ7HKJ8DA762CQ54'), '4N')
+
+    def test_other_major_notrump_ladders_leave_four_spade_keycard_distinct(self):
+        for prefix in ('1NP3CP3DP3HP3SP', '1NP3CP3DP3SP4HP'):
+            with self.subTest(prefix=prefix):
+                self.assertEqual(self.meaning(prefix + '4N', '4N')['action_type'],
+                                 'notrump_ladder')
+        self.assertEqual(self.meaning('1NP3CP3DP3HP4SP4N', '4N')['action_type'],
+                         'rkcb_1430')
+
+    def test_notrump_ladder_invitations_have_separate_six_and_seven_answers(self):
+        self.assertEqual(self.bid('1NP3CP3DP3SP4HP4NTP',
+                                  'SAQ7HKJ8DA762CQ54'), '6N')
+        self.assertEqual(self.bid('1NP3CP3DP3SP4HP5NTP',
+                                  'SAQ7HKJ8DA762CQ54'), '7N')
+        self.assertEqual(self.bid('1NP3CP3DP3SP4HP5NTP',
+                                  'SKQ7HKJ8DA762CQ54'), '6N')
+
+    def test_club_long_minor_selector_meanings_after_denial(self):
+        prefix = '1NP3CP3DP4CP'
+        for call, trump in (('4D', 'D'), ('4H', 'C'), ('4S', 'C')):
+            with self.subTest(call=call):
+                meaning = self.meaning(prefix + call, call)
+                self.assertEqual(meaning['agreed_suit'], trump)
+
     def meaning(self, auction, call):
         trace = replay_auction(self.profile, Auction.parse(auction))
         matches = [item['public_meaning'] for item in trace.applied_meanings
@@ -186,16 +244,17 @@ class DaqiushFiveMajorInquiryEndToEndTests(unittest.TestCase):
                 meaning = self.meaning('1NP3CP3DP3' + shortage, '3' + shortage)
                 self.assertEqual(meaning['short_suit'], shortage)
 
-    def test_singleton_stopper_only_signs_off_but_overlap_remains_td(self):
+    def test_singleton_stopper_allows_delayed_minor_description(self):
         for shortage, no_route, overlap in (
                 ('H', 'S876HAKQ32D842C96', 'SAK4HA32DQ876C842'),
                 ('S', 'SAKQ32H876D842C96', 'SA32HAK4DQ876C842')):
             prefix = '1NP3CP3DP3' + shortage + 'P'
             with self.subTest(shortage=shortage, route='notrump'):
                 self.assertEqual(self.bid(prefix, no_route), '3N')
-                self.assert_final(prefix + '3N', '3N')
+                meaning = self.meaning(prefix + '3N', '3N')
+                self.assertNotIn('final_placement', meaning['call_act_types'])
             with self.subTest(shortage=shortage, route='overlap'):
-                self.assertIsNone(self.bid(prefix, overlap))
+                self.assertEqual(self.bid(prefix, overlap), '3N')
 
     def test_singleton_structural_routes_and_trump_effects_are_symmetric(self):
         cases = (
@@ -351,6 +410,120 @@ class DaqiushFiveMajorInquirySelectorTests(unittest.TestCase):
         self.assertIsNone(decision.call)
         self.assertEqual(decision.trace.simulation_decision['source'],
                          'inconclusive')
+
+    def test_delayed_club_show_uses_low_range_slam_comparison(self):
+        north = 'SAQ7HKJ8DA762CQ54'
+        for shortage in 'HS':
+            with self.subTest(shortage=shortage):
+                prefix = '1NP3CP3DP3' + shortage + 'P3NTP4CP'
+                strong = self.decision(prefix, north, estimates=(
+                    ('5C', 0.7), ('5D', 1.0), ('6C', 0.4), ('6D', 0.8)))
+                self.assertEqual(strong.call, '4D')
+                self.assertEqual(strong.trace.simulation_decision['source'], 'dds')
+                stop = self.decision(prefix, north, estimates=(
+                    ('5C', 0.7), ('5D', 1.0), ('6C', 0.1), ('6D', 0.1)))
+                self.assertEqual(stop.call, '5D')
+
+    def test_notrump_ladder_five_notrump_invites_seven_at_two_thirds(self):
+        prefix = '1NP3CP3DP3SP4HP'
+        hand = 'S3HAQ4DK543CAKJ32'
+        low = (SimpleNamespace(contract='6NT', completion_rate=0.7),
+               SimpleNamespace(contract='7NT', completion_rate=0.6))
+        high = (SimpleNamespace(contract='6NT', completion_rate=0.9),
+                SimpleNamespace(contract='7NT', completion_rate=0.7))
+        with patch('engine.five_major_inquiry_policy._sampled_best', side_effect=(low, high)) as sampled:
+            decision = self.decision(prefix, hand)
+        self.assertEqual(decision.call, '5N')
+        self.assertEqual(decision.selected_candidate.public_meaning['call_act_types'], ['invite'])
+        self.assertEqual(sampled.call_args_list[0].kwargs['partner_min_hcp'],
+                         sampled.call_args_list[0].kwargs['partner_max_hcp'])
+        self.assertEqual(sampled.call_args_list[1].kwargs['partner_min_hcp'],
+                         sampled.call_args_list[1].kwargs['partner_max_hcp'])
+        self.assertLess(sampled.call_args_list[0].kwargs['partner_min_hcp'],
+                        sampled.call_args_list[1].kwargs['partner_min_hcp'])
+
+    def test_notrump_ladder_direct_grand_needs_two_thirds_at_minimum(self):
+        prefix = '1NP3CP3DP3SP4HP'
+        hand = 'S3HAQ4DK543CAKJ32'
+        enough = (SimpleNamespace(contract='6NT', completion_rate=0.9),
+                  SimpleNamespace(contract='7NT', completion_rate=0.67))
+        with patch('engine.five_major_inquiry_policy._sampled_best', side_effect=(enough, enough)):
+            decision = self.decision(prefix, hand)
+        self.assertEqual(decision.call, '7N')
+
+    def test_delayed_club_sampling_caps_partner_at_two_hcp_above_floor(self):
+        prefix = '1NP3CP3DP3SP3NTP4CP'
+        with patch('engine.five_major_inquiry_policy._sampled_best', return_value=None) as sampled:
+            self.decision(prefix, 'SAQ7HKJ8DA762CQ54')
+        targets = sampled.call_args.args[5]
+        self.assertEqual({target.contract for target in targets},
+                         {'5C', '5D', '6C', '6D'})
+        self.assertEqual(sampled.call_args.kwargs['partner_max_hcp'], 16)
+
+    def test_singleton_spade_stopper_compares_three_notrump_with_diamond_game(self):
+        prefix = '1NP3CP3DP3SP'
+        north = 'SA75HKJ8DAQ72CQ54'
+        diamonds = self.decision(prefix, north, estimates=(
+            ('3NT', 0.2), ('5D', 0.8)))
+        self.assertEqual(diamonds.call, '4D')
+        notrump = self.decision(prefix, north, estimates=(
+            ('3NT', 0.9), ('5D', 0.2)))
+        self.assertEqual(notrump.call, '3N')
+
+    def test_singleton_spade_stopper_samples_only_the_two_relevant_games(self):
+        prefix = '1NP3CP3DP3SP'
+        with patch('engine.five_major_inquiry_policy._sampled_best', return_value=None) as sampled:
+            self.decision(prefix, 'SA75HKJ8DAQ72CQ54')
+        targets = sampled.call_args.args[5]
+        self.assertEqual({target.contract for target in targets},
+                         {'3NT', '5D'})
+
+    def test_singleton_spade_with_four_clubs_compares_club_game(self):
+        north = 'SA75HKJ8DAQ7CQ542'
+        for shortage in 'HS':
+            with self.subTest(shortage=shortage):
+                prefix = '1NP3CP3DP3' + shortage + 'P'
+                clubs = self.decision(prefix, north, estimates=(
+                    ('3NT', 0.2), ('5C', 0.8)))
+                self.assertEqual(clubs.call, '4C')
+                with patch('engine.five_major_inquiry_policy._sampled_best', return_value=None) as sampled:
+                    self.decision(prefix, north)
+                self.assertEqual({target.contract for target in sampled.call_args.args[5]},
+                                 {'3NT', '5C'})
+
+    def test_singleton_spade_with_three_three_minors_uses_four_notrump_to_select(self):
+        north = 'SA75HKJ83DAQ7CQ54'
+        for shortage in 'HS':
+            with self.subTest(shortage=shortage):
+                prefix = '1NP3CP3DP3' + shortage + 'P'
+                minor = self.decision(prefix, north, estimates=(
+                    ('3NT', 0.2), ('5C', 0.6), ('5D', 0.8)))
+                self.assertEqual(minor.call, '4N')
+                with patch('engine.five_major_inquiry_policy._sampled_best', return_value=None) as sampled:
+                    self.decision(prefix, north)
+                self.assertEqual({target.contract for target in sampled.call_args.args[5]},
+                                 {'3NT', '5C', '5D'})
+
+    def test_four_card_other_major_compares_major_game_for_either_shortage(self):
+        for shortage, expected, contract in (
+                ('H', '3S', '4S'), ('S', '4H', '4H')):
+            with self.subTest(shortage=shortage):
+                prefix = '1NP3CP3DP3' + shortage + 'P'
+                hand = 'SAKQ7HAJ82DK54C98'
+                major = self.decision(prefix, hand, estimates=(
+                    ('3NT', 0.2), (contract, 0.8)))
+                self.assertEqual(major.call, expected)
+                notrump = self.decision(prefix, hand, estimates=(
+                    ('3NT', 0.9), (contract, 0.2)))
+                self.assertEqual(notrump.call, '3N')
+
+    def test_five_card_other_major_takes_priority_without_dds(self):
+        for shortage, hand, expected in (
+                ('H', 'SAKQJ7HA82DK54C98', '4S'),
+                ('S', 'SA82HAKQJ7DK54C98', '4H')):
+            with self.subTest(shortage=shortage):
+                prefix = '1NP3CP3DP3' + shortage + 'P'
+                self.assertEqual(self.decision(prefix, hand).call, expected)
 
     def test_responder_slam_classification_uses_dds_then_fallback(self):
         strong_fit = 'S9HKQ3DA9754CKQ76'

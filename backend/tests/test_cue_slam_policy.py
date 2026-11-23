@@ -136,6 +136,23 @@ class CuePolicyHelperTests(unittest.TestCase):
         self.assertIs(deals[0]['s'], kept)
         self.assertEqual(set(deals[0]), {'n', 'e', 's', 'w'})
 
+    def test_shape_conditioned_partner_draw_respects_public_cards_and_low_range(self):
+        actor = Hand.parse('SAQ7HKJ8DA762CQ54')
+        bounds = {'min_hcp': 14, 'max_hcp': 16,
+                  'min_lengths': {'S': 1, 'H': 3, 'D': 4, 'C': 5},
+                  'max_lengths': {'S': 1, 'H': 3, 'D': 4, 'C': 5}}
+        sampled = policy._shape_conditioned_process_deals(
+            actor, 's', bounds, count=12, seed=41,
+            max_attempts=5000, max_seconds=2)
+        self.assertEqual(len(sampled), 12)
+        for deal in sampled:
+            partner = deal['s']
+            self.assertIn(partner.hcp, (14, 15, 16))
+            self.assertEqual(tuple(partner.length(suit) for suit in 'SHDC'),
+                             (1, 3, 4, 5))
+            self.assertTrue(all(set(actor.holding(suit)).isdisjoint(
+                partner.holding(suit)) for suit in 'SHDC'))
+
 
     def test_cue_three_way_requires_unknown_range(self):
         from engine.auction import Auction

@@ -19,6 +19,16 @@ class DaqiushStaymanTests(unittest.TestCase):
     def bid(self, auction, cards):
         return choose_bid(self.profile, Auction.parse(auction), Hand.parse(cards)).call
 
+    def test_smolen_five_spades_four_hearts_after_denial(self):
+        south = 'SA9643HAKQ7DAK85C-'
+        self.assertEqual(self.bid('1NP2CP2DP', south), '3H')
+        hearts = 'SAKQ7HKJ982DA32C4'
+        self.assertEqual(self.bid('1NP2CP2DP', hearts), '3S')
+
+    def test_three_notrump_after_stayman_denial_is_final(self):
+        north = 'SKQH54DQ76CAKJ852'
+        self.assertEqual(self.bid('1NP2CP2DP3NP', north), 'P')
+
     def test_screenshot_game_hand_finds_four_spades(self):
         result = simulate_auction(self.profile, {
             'n': 'SAJ65H96DAQ3CKQJ3',
