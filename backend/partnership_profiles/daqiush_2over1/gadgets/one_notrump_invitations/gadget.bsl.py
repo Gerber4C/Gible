@@ -2156,9 +2156,10 @@ class OneNotrumpInvitations(Gadget):
                                          + cue_bid.lower())
                     cue_call.when = prefix
                     cue_call.bid = cue_bid
-                    cue_call.applies = (lambda ctx, s=suit, c=control, p=prior: (
+                    cue_call.applies = (lambda ctx, s=suit, c=control, p=prior,
+                                        superaccepted=(answer == special): (
                         minor_slam_transfer(ctx, s) and slam_transfer_shape(ctx, s)
-                        and not minor_serious_overstrength(ctx, s)
+                        and (superaccepted or not minor_serious_overstrength(ctx, s))
                         and minor_control(ctx, c)
                         and not any(minor_control(ctx, x) for x in p)))
                     cue_call.meaning.action = 'minor_slam_control_cue'

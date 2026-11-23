@@ -78,8 +78,10 @@ def render_html(report: Mapping) -> str:
         report = dict(report)
         min_boards, min_pairs = _budget_minimums(report)
         complete = report['complete_cases']
+        staged = bool(report.get('two_stage'))
         eligible = [case for case in complete
                     if isinstance(case, Mapping)
+                    and (not staged or case.get('scan_stage') == 'validation')
                     and isinstance(case.get('contract'), str)
                     and case.get('declarer') in ('n', 's')]
         complete_cases = []
@@ -102,6 +104,10 @@ def render_html(report: Mapping) -> str:
             if id(source) in handled:
                 continue
             case = dict(source)
+            if staged and source.get('scan_stage') != 'validation':
+                case['analysis'] = {'status': 'preliminary', 'flags': []}
+                complete_cases.append(case)
+                continue
             case['analysis'] = reclassify_analysis(
                 case.get('contract'), case.get('analysis') or {})
             unhandled.setdefault(

@@ -100,6 +100,59 @@ class CoverageExtendTests(unittest.TestCase):
             self.assertEqual(case['calls'][:2], ['1N', 'P'])
             self.assertIn('blocked', case)
 
+    def test_process_topup_only_validates_selected_auction(self):
+        selected = base_case(1)
+        selected['blocked'] = {'seat': 's', 'auction': '1NP'}
+        other = base_case(2)
+        other['calls'] = ['1N', 'P', '2S', 'P']
+        other['auction'] = '1NP2SP'
+        other['blocked'] = {'seat': 'n', 'auction': '1NP2SP'}
+        source = report_with(blocked=[selected, other])
+        updated = extend_process_pairs(
+            source, blocking_profile(), target_pairs=2,
+            selected_processes={('1N', 'P')}, case_stage='validation',
+            allow_new_processes=False, max_attempts_per_cell=5, seed=5)
+        self.assertEqual(updated['extension']['added_pairs'], 1)
+        self.assertEqual(sum(case['calls'] == other['calls']
+                             for case in updated['cases']), 1)
+        fresh = next(case for case in updated['cases'] if case['id'] > 2)
+        self.assertEqual(fresh['scan_stage'], 'validation')
+
+    def test_validation_target_counts_only_validation_pairs(self):
+        scout = base_case(1)
+        scout['blocked'] = {'seat': 's', 'auction': '1NP'}
+        scout['scan_stage'] = 'scout'
+        source = report_with(blocked=[scout])
+        updated = extend_process_pairs(
+            source, blocking_profile(), target_pairs=2,
+            selected_processes={('1N', 'P')}, case_stage='validation',
+            target_stage_pairs=True, allow_new_processes=False,
+            max_attempts_per_cell=5, seed=5)
+        self.assertEqual(updated['extension']['added_pairs'], 2)
+        self.assertEqual(sum(case.get('scan_stage') == 'validation'
+                             for case in updated['cases']), 2)
+
+    def test_frontier_discovers_branch_after_existing_group_reaches_target(self):
+        from types import SimpleNamespace
+
+        scout = base_case(1)
+        scout['blocked'] = {'seat': 's', 'auction': '1NP'}
+        source = report_with(blocked=[scout])
+        simulation = SimpleNamespace(
+            calls=('1N', 'P', '2C'), status='blocked', call_records=(),
+            compact_sequence=lambda: '1N P 2C',
+            blocked={'seat': 'n', 'diagnostics': ['No call']})
+        with patch('engine.coverage_extend.simulate_auction',
+                   return_value=simulation):
+            updated = extend_process_pairs(
+                source, blocking_profile(), target_pairs=1,
+                selected_cell_prefixes={
+                    'legacy:10:6-3-2-2': {('1N', 'P')}},
+                allow_new_processes=True, discovery_idle_limit=1,
+                max_attempts_per_cell=2, seed=5)
+        self.assertEqual(updated['extension']['new_process_groups'], 1)
+        self.assertEqual(updated['extension']['added_pairs'], 1)
+
     def test_existing_cell_at_target_is_untouched(self):
         source = self.legacy_report()
         first = extend_ns_pairs(source, blocking_profile(), target_pairs=3, seed=5)

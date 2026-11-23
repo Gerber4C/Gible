@@ -11,7 +11,8 @@ from engine.coverage_extend import (
 )
 from engine.cards import Hand
 from engine.iv_scanner import (
-    copy_report, delete_report, list_reports, project_report, read_report,
+    _scout_frontiers, _scout_targets, copy_report, delete_report, list_reports,
+    project_report, read_report,
     scan_options,
 )
 from engine.outcome_metrics import RULE_ID
@@ -138,6 +139,100 @@ class IVScannerTests(unittest.TestCase):
         listed = project_report(self.sample_report(), 'sample.json',
                                 include_pairs=False)
         self.assertEqual(listed['process_groups'], [])
+
+    def test_scout_targets_confirm_suspicious_complete_processes_only(self):
+        targets = _scout_targets(self.sample_report(), max_processes=1)
+        self.assertEqual(targets, [('1N', 'P', '2H', 'P', '2S', 'P',
+                                    '4S', 'P', 'P', 'P')])
+
+    def test_scout_frontier_starts_from_observed_auction_prefix(self):
+        frontiers = _scout_frontiers(self.sample_report(), max_frontiers=1)
+        self.assertEqual(frontiers, {
+            '11:1': {('1N', 'P', '2H', 'P', '2S', 'P', '3D')},
+        })
+
+    def test_scout_frontier_can_revisit_first_response_td(self):
+        report = self.sample_report()
+        report['complete_cases'] = []
+        report['limit_cases'] = []
+        report['cases'][0]['calls'] = ['1N', 'P']
+        report['cases'][0]['auction'] = '1NP'
+        report['cases'][0]['blocked']['seat'] = 's'
+        self.assertEqual(_scout_frontiers(report, max_frontiers=1), {
+            '11:1': {('1N', 'P')},
+        })
+
+    def test_scout_frontier_rounds_skip_visited_prefixes(self):
+        first = _scout_frontiers(self.sample_report(), max_frontiers=1)
+        visited = {(cell, prefix) for cell, prefixes in first.items()
+                   for prefix in prefixes}
+        second = _scout_frontiers(
+            self.sample_report(), max_frontiers=1, visited=visited)
+        self.assertTrue(second)
+        self.assertFalse(any((cell, prefix) in visited
+                             for cell, prefixes in second.items()
+                             for prefix in prefixes))
+
+    def test_staged_projection_keeps_confirmation_rates_independent(self):
+        report = self.sample_report()
+        report['two_stage'] = {'scout_pairs_per_cell': 1,
+                               'validation_pairs_per_process': 1}
+        scout = report['complete_cases'][0]
+        scout['scan_stage'] = 'scout'
+        confirmed = report['complete_cases'][1]
+        confirmed['scan_stage'] = 'validation'
+        confirmed['dds_tables'] = [self.table(nt=7)] * 3
+        for case in report['complete_cases'][2:]:
+            case['scan_stage'] = 'scout'
+        for case in report['cases'] + report['limit_cases']:
+            case['scan_stage'] = 'scout'
+        projected = project_report(report, 'staged.json')
+        nt = next(group for group in projected['tree_process_groups']
+                  if group['auction'] == '1NP3NPPP')
+        self.assertEqual(nt['review_stage'], 'validation')
+        self.assertEqual(nt['cases'], 1)
+        self.assertEqual(nt['contracts'][0]['boards'], 3)
+        self.assertEqual(nt['contracts'][0]['rates']['contract_failure'], 1.0)
+
+    def test_scanner_run_confirms_only_scouted_suspicious_process(self):
+        import time
+        from engine.iv_scanner import ScannerJobs
+
+        source = self.sample_report()
+        captured = {}
+
+        def fake_scan(profile, **options):
+            captured['scout_options'] = options
+            return json.loads(json.dumps(source))
+
+        def fake_extend(report, profile, **options):
+            captured['validation_options'] = options
+            report['extension'] = {'added_pairs': 0}
+            return report
+
+        with tempfile.TemporaryDirectory() as directory:
+            jobs = ScannerJobs(root=Path(directory))
+            with patch('engine.iv_scanner.scan_coverage', side_effect=fake_scan), \
+                    patch('engine.iv_scanner.extend_process_pairs', side_effect=fake_extend), \
+                    patch('engine.iv_scanner.render_html', return_value='<html></html>'):
+                jobs.start({'profile': 'daqiush_2over1', 'hcp_min': 0,
+                            'hcp_max': 0, 'scout_pairs_per_cell': 1,
+                            'validation_pairs_per_process': 3})
+                for _ in range(300):
+                    status = jobs.status() or {}
+                    if status.get('status') in ('completed', 'failed'):
+                        break
+                    time.sleep(.01)
+            self.assertEqual(status['status'], 'completed', status.get('error'))
+            self.assertEqual(captured['scout_options']['pairs_per_cell'], 1)
+            self.assertEqual(captured['scout_options']['ew_samples'], 2)
+            expected = ('1N', 'P', '2H', 'P', '2S', 'P', '4S', 'P', 'P', 'P')
+            self.assertEqual(captured['validation_options']['selected_processes'],
+                             {expected})
+            self.assertEqual(captured['validation_options']['case_stage'],
+                             'validation')
+            self.assertEqual(captured['validation_options']['target_pairs'], 3)
+            self.assertTrue(captured['validation_options']['target_stage_pairs'])
 
     def test_report_splits_every_cell_by_auction_process_and_keeps_siblings(self):
         projected = project_report(self.sample_report(), 'sample.json')
@@ -279,13 +374,17 @@ class IVScannerTests(unittest.TestCase):
 
     def test_scan_options_are_bounded_and_north_one_notrump(self):
         settings = scan_options({})
-        self.assertEqual(settings['planned_pairs'], 23 * 23 * 2)
+        self.assertEqual(settings['planned_pairs'], 23 * 23)
         self.assertEqual(settings['ew_samples'], 10)
+        self.assertEqual(settings['scout_ew_samples'], 2)
+        self.assertEqual(settings['validation_pairs_per_process'], 4)
         self.assertEqual(len(settings['shapes']), 23)
         self.assertIn((8, 3, 2, 0), settings['shapes'])
         self.assertNotIn((7, 5, 1, 0), settings['shapes'])
         for invalid in ({'hcp_min': 10, 'hcp_max': 9}, {'ew_samples': 21},
                         {'pairs_per_cell': 0}, {'pairs_per_cell': 21},
+                        {'scout_pairs_per_cell': 0},
+                        {'validation_pairs_per_process': 0},
                         {'seed': True}, {'scope': 'full'},
                         {'profile': '../private'}, {'unexpected': 1}):
             with self.assertRaises(ValueError):

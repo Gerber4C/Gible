@@ -6,7 +6,7 @@ import {
   stopScannerRun,
 } from "../api/gibleApi.js";
 import {
-  DEFAULT_THRESHOLDS, filterProcessGroups, filterScannerGroups,
+  DEFAULT_THRESHOLDS, buildProcessTree, filterProcessGroups, filterScannerGroups,
   groupCategories, pairFlags, pairMatches, paginateGroups,
   processBoardCount, processCategories, processFlags,
   processWorstFailure, selectPairForGroup, wrongGameScores,
@@ -429,6 +429,9 @@ function processCard(process, selected, thresholds, onSelect) {
     e("span", { className: "iv-case-top" },
       e("strong", null, `${process.cases ?? 0} N/S pairs`),
       e("span", null, `${processBoardCount(process)} DDS boards`)),
+    process.review_stage && e("span", { className: `iv-stage iv-stage-${process.review_stage}` },
+      process.review_stage === "validation" ? "Validation sample"
+        : process.review_stage === "scout" ? "Scout sample" : "Earlier report"),
     processFlagTags(process, thresholds),
     e("span", { className: "iv-case-auction" }, process.auction || "—"),
     e("span", { className: "iv-process-contracts" },
@@ -442,6 +445,27 @@ function processCard(process, selected, thresholds, onSelect) {
     process.overflow > 0 && e("span", { className: "iv-process-overflow" },
       `+${process.overflow} overflowed`),
   );
+}
+
+function ProcessTreeList({ processes, thresholds, selectedKey, onSelect }) {
+  const tree = buildProcessTree(processes);
+  function branch(node, depth, path) {
+    const key = `${path}/${node.call}`;
+    const hasChildren = node.children.length > 0;
+    return e("div", { className: "iv-tree-node", key },
+      hasChildren
+        ? e("details", { defaultOpen: depth < 3 },
+          e("summary", null,
+            e("strong", null, node.call),
+            e("span", null, `${node.cases} pairs`)),
+          node.processes.map((process) => processCard(
+            process, processKey(process) === selectedKey, thresholds, onSelect)),
+          node.children.map((child) => branch(child, depth + 1, key)))
+        : node.processes.map((process) => processCard(
+          process, processKey(process) === selectedKey, thresholds, onSelect)));
+  }
+  return e("div", { className: "iv-list-scroll iv-tree-list" },
+    tree.children.map((node) => branch(node, 0, "")));
 }
 
 const PROCESS_SEATS = ["N", "E", "S", "W"];
@@ -519,7 +543,8 @@ function primaryMetricCards(primary, thresholds) {
       ratio != null && ratio < thresholds.wrong ? "bad" : ""));
 }
 
-function ProcessView({ processes, thresholds, selectedKey, onSelect, search, onSearch }) {
+function ProcessView({ processes, thresholds, selectedKey, onSelect, search, onSearch,
+                       tree = false }) {
   const [primarySide, setPrimarySide] = React.useState("south");
   const [primaryIndex, setPrimaryIndex] = React.useState(0);
   const [partnerIndex, setPartnerIndex] = React.useState(0);
@@ -571,16 +596,20 @@ function ProcessView({ processes, thresholds, selectedKey, onSelect, search, onS
           "aria-label": "Search process groups",
           onChange: (event) => onSearch(event.target.value),
         })),
-      e("div", { className: "iv-list-scroll" },
-        processes.map((process) => processCard(
-          process, processKey(selected) === processKey(process),
-          thresholds, onSelect)))),
+      tree
+        ? e(ProcessTreeList, { processes, thresholds,
+            selectedKey: processKey(selected), onSelect })
+        : e("div", { className: "iv-list-scroll" },
+          processes.map((process) => processCard(
+            process, processKey(selected) === processKey(process),
+            thresholds, onSelect)))),
     e("div", { className: "iv-process-main" },
       e("section", { className: "iv-process-auction" },
         e("div", { className: "iv-process-section-head" },
           e("span", { className: "iv-eyebrow" },
             "PROCESS · SAME FOR EVERY HAND IN THIS BUCKET"),
-          e("span", null, `${selected.cases ?? 0} N/S pairs · `
+            e("span", null, `${selected.review_stage === "validation" ? "Validation · "
+            : selected.review_stage === "scout" ? "Scout only · " : ""}${selected.cases ?? 0} N/S pairs · `
             + `${processBoardCount(selected)} DDS boards`
             + (selected.overflow > 0
               ? ` · +${selected.overflow} overflowed` : ""))),
@@ -683,7 +712,7 @@ export function IVScanner({ profileId }) {
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState("");
   const [category, setCategory] = React.useState("all");
-  const [view, setView] = React.useState("process-findings");
+  const [view, setView] = React.useState("process-tree");
   const [page, setPage] = React.useState(1);
   const [selectedGroupId, setSelectedGroupId] = React.useState(null);
   const [selectedPairId, setSelectedPairId] = React.useState(null);
@@ -696,6 +725,10 @@ export function IVScanner({ profileId }) {
   const [southCap, setSouthCap] = React.useState(2);
   const [linkCaps, setLinkCaps] = React.useState(true);
   const [ewSamples, setEwSamples] = React.useState(10);
+  const [scoutPairs, setScoutPairs] = React.useState(1);
+  const [scoutEwSamples, setScoutEwSamples] = React.useState(2);
+  const [validationPairs, setValidationPairs] = React.useState(4);
+  const [maxReviewProcesses, setMaxReviewProcesses] = React.useState(24);
   const [seed, setSeed] = React.useState(23);
   const loadedRun = React.useRef(null);
   const loadedRunId = React.useRef(null);
@@ -846,6 +879,10 @@ export function IVScanner({ profileId }) {
         // contradict each other.
         pairs_per_cell: Math.max(Number(northCap), Number(southCap)),
         ew_samples: Number(ewSamples),
+        scout_pairs_per_cell: Number(scoutPairs),
+        scout_ew_samples: Number(scoutEwSamples),
+        validation_pairs_per_process: Number(validationPairs),
+        max_review_processes: Number(maxReviewProcesses),
         north_cap: Number(northCap), south_cap: Number(southCap),
       });
       setRun(result.run);
@@ -864,13 +901,15 @@ export function IVScanner({ profileId }) {
   }, [report, thresholds]);
   const processCounts = React.useMemo(() => {
     const result = { block: 0, missed: 0, down: 0, wrong: 0 };
-    (report?.process_groups || []).forEach((process) => {
+    (view === "process-tree"
+      ? report?.tree_process_groups || report?.process_groups || []
+      : report?.process_groups || []).forEach((process) => {
       processCategories(process, thresholds).forEach((key) => {
         result[key] += 1;
       });
     });
     return result;
-  }, [report, thresholds]);
+  }, [report, thresholds, view]);
   const flaggedGroups = React.useMemo(
     () => (report?.groups || []).filter(
       (group) => groupCategories(group, thresholds).length > 0),
@@ -881,7 +920,9 @@ export function IVScanner({ profileId }) {
   const processSource = React.useMemo(() => {
     if (!isProcessView) return [];
     let items = filterProcessGroups(
-      report?.process_groups || [], category, search, thresholds);
+      view === "process-tree"
+        ? report?.tree_process_groups || report?.process_groups || []
+        : report?.process_groups || [], category, search, thresholds);
     if (view === "process-findings") {
       items = items.filter(
         (process) => processCategories(process, thresholds).length > 0);
@@ -941,8 +982,8 @@ export function IVScanner({ profileId }) {
   }, [processSource, selectedProcessKey]);
 
   const running = ["running", "queued", "stopping"].includes(run?.status);
-  const plannedPairsPerCell = Math.max(Number(northCap), Number(southCap));
-  const planned = (Number(hcpMax) - Number(hcpMin) + 1) * FULL_SCAN_SHAPES * plannedPairsPerCell;
+  const planned = (Number(hcpMax) - Number(hcpMin) + 1)
+    * FULL_SCAN_SHAPES * Number(scoutPairs);
 
   return e("section", { className: "iv-scanner" },
     e("header", { className: "iv-header" },
@@ -990,6 +1031,16 @@ export function IVScanner({ profileId }) {
             e("small", null, "both change together")),
           e("label", null, "E/W deals per pair", e("input", { type: "number", min: 1, max: 20, value: ewSamples,
             onChange: (event) => setEwSamples(event.target.value) })),
+          e("label", null, "Scout pairs per cell", e("input", { type: "number", min: 1, max: 20,
+            value: scoutPairs, onChange: (event) => setScoutPairs(event.target.value) })),
+          e("label", null, "Scout E/W deals", e("input", { type: "number", min: 1, max: 20,
+            value: scoutEwSamples, onChange: (event) => setScoutEwSamples(event.target.value) })),
+          e("label", null, "New pairs per suspicious process", e("input", {
+            type: "number", min: 1, max: 20, value: validationPairs,
+            onChange: (event) => setValidationPairs(event.target.value) })),
+          e("label", null, "Processes to confirm", e("input", { type: "number", min: 1,
+            max: 200, value: maxReviewProcesses,
+            onChange: (event) => setMaxReviewProcesses(event.target.value) })),
           e("label", null, "Seed", e("input", { type: "number", min: 0, value: seed,
             onChange: (event) => setSeed(event.target.value) })),
         ),
@@ -1005,7 +1056,7 @@ export function IVScanner({ profileId }) {
             disabled: running || !reportId,
             title: "Re-bid every stored hand, update changed processes, then fill N/S caps",
           }, "Complete report"),
-          e("span", null, `North 1NT · all ${FULL_SCAN_SHAPES} South shapes · opponents pass · DDS evaluates completed auctions`),
+          e("span", null, `North 1NT · all ${FULL_SCAN_SHAPES} South shapes · scout, then independent confirmation`),
         ),
         run && e("div", { className: `iv-progress iv-progress-${run.status}`, role: "status" },
           e("div", null,
@@ -1014,7 +1065,9 @@ export function IVScanner({ profileId }) {
               : run.status === "stopped" ? "Scan stopped"
               : run.status === "failed" ? (run.mode === "complete"
                 ? "Report completion failed" : "Scan failed")
-              : run.mode === "complete" ? "Completing report" : "Scanning deals"),
+              : run.mode === "complete" ? "Completing report"
+                : run.phase === "validation" ? "Confirming suspicious processes"
+                  : "Exploring auctions"),
             e("span", null, `${run.completed_pairs}/${run.planned_pairs} pairs · ${run.dds_boards} DDS boards`),
           ),
           e("div", { className: "iv-progress-track" },
@@ -1048,7 +1101,13 @@ export function IVScanner({ profileId }) {
           `${report.summary?.pairs ?? 0} N/S pairs · ${report.summary?.dds_boards ?? 0} DDS boards · `,
           `${report.summary?.overflow ?? 0} overflow hands (weighted, not stored) · `,
           `${report.summary?.unassessed ?? 0} completed cases without enough comparable boards`),
-        report && !report.partner_matching && e("p", {
+        report?.stage_counts && e("p", { className: "iv-completion-note" },
+          `Scout: ${report.stage_counts.scout?.pairs ?? 0} pairs / `
+          + `${report.stage_counts.scout?.dds_boards ?? 0} boards · `
+          + `Independent confirmation: ${report.stage_counts.validation?.pairs ?? 0} pairs / `
+          + `${report.stage_counts.validation?.dds_boards ?? 0} boards. `
+          + "Tree results use confirmation samples when available."),
+        report && !report.partner_matching && !report.two_stage && e("p", {
           className: "iv-completion-note warn",
         }, "This report predates process partner matching. "
           + "Restart the backend if needed, rerun the scan, or use "
@@ -1076,6 +1135,11 @@ export function IVScanner({ profileId }) {
         ),
         report && e("div", { className: "iv-view-switch", role: "group",
           "aria-label": "Scanner view" },
+          e("button", {
+            type: "button", className: view === "process-tree" ? "active" : "",
+            "aria-pressed": view === "process-tree",
+            onClick: () => { setView("process-tree"); setCategory("all"); },
+          }, "Process · Tree"),
           e("button", {
             type: "button",
             className: view === "process-findings" ? "active" : "",
@@ -1105,7 +1169,9 @@ export function IVScanner({ profileId }) {
           Object.entries(CATEGORY).map(([key, item], index) => e("button", {
             key, className: `iv-category iv-category-${key} ${category === key ? "selected" : ""}`,
             onClick: () => {
-              setView(isProcessView ? "process-findings" : "cell-findings");
+              setView(isProcessView
+                ? (view === "process-tree" ? "process-tree" : "process-findings")
+                : "cell-findings");
               setCategory(category === key ? "all" : key);
             },
             "aria-pressed": category === key,
@@ -1118,7 +1184,7 @@ export function IVScanner({ profileId }) {
             processes: processSource, thresholds,
             selectedKey: selectedProcessKey,
             onSelect: setSelectedProcessKey,
-            search, onSearch: setSearch,
+            search, onSearch: setSearch, tree: view === "process-tree",
           })
           : e("div", { className: "iv-inspection" },
           e("div", { className: "iv-list" },

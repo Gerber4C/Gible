@@ -117,6 +117,15 @@ class BlockReportViewerTests(unittest.TestCase):
         self.assertNotIn('odds ratio', html)
         self.assertNotIn('Down > 50%', html)
 
+        staged = json.loads(json.dumps(report))
+        staged['two_stage'] = {'scout_pairs_per_cell': 1}
+        staged['complete_cases'][0]['scan_stage'] = 'scout'
+        staged_html = render_html(staged)
+        staged_payload = json.loads(re.search(
+            r'const REPORT = (.*?);\n', staged_html).group(1))
+        self.assertEqual(staged_payload['suspicious_cases'], [])
+        self.assertIn('data-mode="tree"', staged_html)
+
     def test_suspicious_groups_split_by_sampling_cell_and_auction_process(self):
         cell_a = {'coverage_cell': {'target_hcp': 10, 'base_shape_index': 0,
                                     'base_shape': [6, 3, 2, 2], 'pair_slot': 0}}

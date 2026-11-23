@@ -15,7 +15,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .block_report_viewer import render_html
-from .coverage_extend import complete_report, match_process_partners
+from .coverage_extend import (complete_report, extend_process_pairs,
+                              match_process_partners)
 from .coverage_scan import COVERAGE_SHAPES, scan_coverage
 from .loader import load_profile
 from .outcome_metrics import (
@@ -90,7 +91,9 @@ def scan_options(request: dict) -> dict:
     """Validate a bounded North-1NT scan request."""
     if not isinstance(request, dict) or set(request) - {
             'profile', 'seed', 'hcp_min', 'hcp_max',
-            'pairs_per_cell', 'ew_samples', 'north_cap', 'south_cap'}:
+            'pairs_per_cell', 'ew_samples', 'north_cap', 'south_cap',
+            'scout_pairs_per_cell', 'scout_ew_samples',
+            'validation_pairs_per_process', 'max_review_processes'}:
         raise ValueError('Unsupported scanner setting')
     profile_id = request.get('profile', 'daqiush_2over1')
     if not isinstance(profile_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]+', profile_id):
@@ -101,11 +104,19 @@ def scan_options(request: dict) -> dict:
                 'pairs_per_cell': request.get('pairs_per_cell', 2),
                 'ew_samples': request.get('ew_samples', 10),
                 'north_cap': request.get('north_cap', NORTH_CAP),
-                'south_cap': request.get('south_cap', SOUTH_CAP)}
+                'south_cap': request.get('south_cap', SOUTH_CAP),
+                'scout_pairs_per_cell': request.get('scout_pairs_per_cell', 1),
+                'scout_ew_samples': request.get('scout_ew_samples', 2),
+                'validation_pairs_per_process': request.get(
+                    'validation_pairs_per_process', 4),
+                'max_review_processes': request.get('max_review_processes', 24)}
     bounds = {'seed': (0, 2**32 - 1), 'hcp_min': (0, 22),
               'hcp_max': (0, 22), 'pairs_per_cell': (1, 20),
               'ew_samples': (1, 20), 'north_cap': (1, 200),
-              'south_cap': (1, 200)}
+              'south_cap': (1, 200), 'scout_pairs_per_cell': (1, 20),
+              'scout_ew_samples': (1, 20),
+              'validation_pairs_per_process': (1, 20),
+              'max_review_processes': (1, 200)}
     for key, value in settings.items():
         lower, upper = bounds[key]
         if isinstance(value, bool) or not isinstance(value, int) or not lower <= value <= upper:
@@ -114,8 +125,76 @@ def scan_options(request: dict) -> dict:
         raise ValueError('hcp_min cannot exceed hcp_max')
     settings.update(profile=profile_id, shapes=COVERAGE_SHAPES)
     settings['planned_pairs'] = ((settings['hcp_max'] - settings['hcp_min'] + 1)
-                                 * len(settings['shapes']) * settings['pairs_per_cell'])
+                                 * len(settings['shapes'])
+                                 * settings['scout_pairs_per_cell'])
     return settings
+
+
+def _scout_targets(report: dict, *, max_processes: int) -> list[tuple[str, ...]]:
+    """Prioritize actual complete auctions whose small sample raised an alarm.
+
+    TD is recorded at discovery and does not need DDS confirmation. The
+    confirmation sample uses a fresh random stream and is assessed separately.
+    """
+    projection = project_report(report, 'scout.json')
+    scores = {}
+    for group in projection['groups']:
+        warnings = group['warning_counts']
+        if not any(warnings.get(name) for name in ('missed', 'down', 'wrong')):
+            continue
+        complete = next((pair for pair in group['pairs']
+                         if pair.get('status') == 'complete'), None)
+        if complete is None:
+            continue
+        process = tuple(complete['calls'])
+        score = (3 * warnings.get('missed', 0)
+                 + 2 * warnings.get('wrong', 0)
+                 + warnings.get('down', 0))
+        scores[process] = max(score, scores.get(process, 0))
+    return [process for process, _ in sorted(
+        scores.items(), key=lambda item: (-item[1], len(item[0]), item[0]))
+        [:max_processes]]
+
+
+def _scout_frontiers(report: dict, *, max_frontiers: int,
+                     visited: set[tuple[str, tuple[str, ...]]] | None = None
+                     ) -> dict[str, set[tuple[str, ...]]]:
+    """Choose witnessed auction prefixes for a bounded branch-discovery pass.
+
+    A prefix is never inferred from hand shape alone: at least one actual pair
+    must have reached it. TD and preliminary alarms receive first attention;
+    low-occupancy cells break ties so common branches do not consume the pass.
+    """
+    projection = project_report(report, 'scout.json')
+    ranked = []
+    for group in projection['groups']:
+        pair = next((item for item in group['pairs'] if item.get('calls')), None)
+        if pair is None:
+            continue
+        calls = tuple(pair['calls'])
+        warnings = group['warning_counts']
+        decision_positions = [index for index in range(0, len(calls), 2)
+                              if calls[index] != 'P']
+        if not decision_positions:
+            continue
+        prefix = (calls if warnings.get('block')
+                  else calls[:decision_positions[-1]])
+        if len(prefix) < 2:
+            continue
+        priority = (3 if warnings.get('block') else
+                    2 if any(warnings.get(name)
+                             for name in ('missed', 'down', 'wrong')) else 1)
+        ranked.append((-priority, group['actual_pair_count'],
+                       -len(prefix), group['parent_id'], prefix))
+    result: dict[str, set[tuple[str, ...]]] = {}
+    visited = visited or set()
+    for _, _, _, cell_id, prefix in sorted(ranked):
+        if (cell_id, prefix) in visited or prefix in result.get(cell_id, set()):
+            continue
+        if sum(len(items) for items in result.values()) >= max_frontiers:
+            break
+        result.setdefault(cell_id, set()).add(prefix)
+    return result
 
 
 def _valid_hcp(value) -> bool:
@@ -709,7 +788,7 @@ def project_report(report: dict, report_id: str, *,
     summary['suspicious'] = sum(
         1 for group in groups if any(group['warning_counts'].values()))
     summary['unassessed'] = total_unassessed
-    return _json_safe({
+    projected = _json_safe({
         'id': report_id, 'profile': report.get('profile'),
         'seed': report.get('seed'), 'filters': report.get('filters'),
         'budget': report.get('budget'), 'summary': summary,
@@ -725,6 +804,41 @@ def project_report(report: dict, report_id: str, *,
             if include_pairs else []),
         'method_note': report.get('method_note'),
     })
+    if report.get('two_stage') and include_pairs:
+        stage_groups = {}
+        stage_counts = {}
+        for stage in ('scout', 'validation'):
+            source = {**report, 'two_stage': None,
+                      'budget': {**budget, 'min_class_boards': (
+                          1 if stage == 'scout' else max(10, min_boards))},
+                      'cases': [case for case in collections['cases']
+                                if case.get('scan_stage') == stage],
+                      'complete_cases': [case for case in complete
+                                         if case.get('scan_stage') == stage],
+                      'limit_cases': [case for case in collections['limit_cases']
+                                     if case.get('scan_stage') == stage],
+                      'overflow_cases': []}
+            stage_view = project_report(source, report_id)
+            stage_counts[stage] = {
+                'pairs': sum(len(source[name]) for name in
+                             ('cases', 'complete_cases', 'limit_cases')),
+                'dds_boards': sum(len(case.get('dds_tables') or ())
+                                  for case in source['complete_cases']),
+            }
+            for group in stage_view['process_groups']:
+                key = tuple(group['process'])
+                if stage == 'validation' or key not in stage_groups:
+                    stage_groups[key] = {**group, 'review_stage': stage}
+        projected['tree_process_groups'] = sorted(
+            stage_groups.values(),
+            key=lambda group: (tuple(group['process']), group['review_stage']))
+        projected['stage_counts'] = stage_counts
+        projected['two_stage'] = report['two_stage']
+    elif include_pairs:
+        projected['tree_process_groups'] = [
+            {**group, 'review_stage': 'legacy'}
+            for group in projected['process_groups']]
+    return projected
 
 
 def _report_path(report_id: str, root: Path) -> Path:
@@ -973,28 +1087,84 @@ class ScannerJobs:
             report = scan_coverage(
                 profile, seed=options['seed'],
                 hcp_targets=tuple(range(options['hcp_min'], options['hcp_max'] + 1)),
-                shapes=options['shapes'], pairs_per_cell=options['pairs_per_cell'],
-                ew_samples=options['ew_samples'],
+                shapes=options['shapes'],
+                pairs_per_cell=options['scout_pairs_per_cell'],
+                ew_samples=options['scout_ew_samples'],
                 north_cap=options.get('north_cap', NORTH_CAP),
                 south_cap=options.get('south_cap', SOUTH_CAP),
                 progress=progress,
                 snapshot=snapshot,
                 snapshot_every=options.get('snapshot_every', 20),
-                stop=stop_event.is_set, adaptive=True)
-            if options.get('north_cap', NORTH_CAP) > 1 or options.get(
-                    'south_cap', SOUTH_CAP) > 1:
-                for _round in range(2):
-                    report = match_process_partners(
-                        report, profile,
-                        north_cap=options.get('north_cap', NORTH_CAP),
-                        south_cap=options.get('south_cap', SOUTH_CAP),
-                        ew_samples=options['ew_samples'],
-                        seed=options['seed'] + _round,
-                        progress=lambda summary, total: progress(
-                            {'pairs': summary.get('pairs', 0),
-                             'dds_boards': summary.get('dds_boards', 0)}, total),
-                        snapshot=snapshot,
-                        snapshot_every=options.get('snapshot_every', 20))
+                stop=stop_event.is_set, adaptive=False)
+            report['budget']['min_class_boards'] = 1
+            report['budget']['min_class_pairs'] = 1
+            for name in ('cases', 'complete_cases', 'limit_cases'):
+                for case in report.get(name, ()):
+                    case['scan_stage'] = 'scout'
+            visited_frontiers: set[tuple[str, tuple[str, ...]]] = set()
+            frontier_results = []
+            for frontier_round in range(3):
+                if stop_event.is_set():
+                    break
+                frontiers = _scout_frontiers(
+                    report, max_frontiers=min(12, options['max_review_processes']),
+                    visited=visited_frontiers)
+                if not frontiers:
+                    break
+                visited_frontiers.update((cell, prefix)
+                                         for cell, prefixes in frontiers.items()
+                                         for prefix in prefixes)
+                report = extend_process_pairs(
+                    report, profile,
+                    target_pairs=options['scout_pairs_per_cell'] + 1,
+                    ew_samples=options['scout_ew_samples'],
+                    seed=options['seed'] + 17 + frontier_round,
+                    max_attempts_per_cell=12,
+                    allow_new_processes=True, discovery_idle_limit=3,
+                    selected_cell_prefixes=frontiers, case_stage='scout',
+                    stop=stop_event.is_set)
+                frontier_results.append(report['extension'])
+            targets = (_scout_targets(
+                report, max_processes=options['max_review_processes'])
+                if not stop_event.is_set() else [])
+            report['two_stage'] = {
+                'scout_pairs_per_cell': options['scout_pairs_per_cell'],
+                'scout_ew_samples': options['scout_ew_samples'],
+                'validation_pairs_per_process': options['validation_pairs_per_process'],
+                'validation_ew_samples': options['ew_samples'],
+                'selected_processes': [list(process) for process in targets],
+                'frontier_prefixes': [
+                    {'cell': cell, 'calls': list(prefix)}
+                    for cell, prefix in sorted(visited_frontiers)],
+                'frontier_results': frontier_results,
+                'validation_seed': options['seed'] + 1,
+            }
+            snapshot(report)
+            if targets and not stop_event.is_set():
+                scout_pairs = report['summary']['pairs']
+                scout_boards = report['summary']['dds_boards']
+
+                def validation_progress(stage: dict, total: int) -> None:
+                    with self._lock:
+                        if self._current and self._current['id'] == job_id:
+                            self._current.update(
+                                status='running', phase='validation',
+                                completed_pairs=scout_pairs + stage['added_pairs'],
+                                planned_pairs=scout_pairs + max(
+                                    total, stage['total_missing']),
+                                dds_boards=scout_boards + (
+                                    stage['added_pairs'] * options['ew_samples']))
+
+                report = extend_process_pairs(
+                    report, profile,
+                    target_pairs=options['validation_pairs_per_process'],
+                    ew_samples=options['ew_samples'], seed=options['seed'] + 1,
+                    max_attempts_per_cell=80, allow_new_processes=False,
+                    selected_processes=set(targets), case_stage='validation',
+                    target_stage_pairs=True,
+                    stop=stop_event.is_set, progress=validation_progress)
+                report['two_stage']['validation_result'] = report['extension']
+            report['budget']['min_class_boards'] = 10
             snapshot(report)
             html_path.write_text(render_html(report), encoding='utf-8')
             stopped = stop_event.is_set()

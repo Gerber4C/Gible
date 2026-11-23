@@ -1,9 +1,26 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  DEFAULT_THRESHOLDS, filterScannerGroups, groupCategories, paginateGroups,
+  DEFAULT_THRESHOLDS, buildProcessTree, filterScannerGroups, groupCategories, paginateGroups,
   pairBadges, pairFlags, pairMatches, selectPairForGroup, wrongGameScores,
 } from "../src/lib/ivScanner.js";
+
+test("auction tree shares bidding prefixes and counts descendant evidence", () => {
+  const processes = [
+    { process: ["1N", "P", "2C", "P", "2D", "P", "3N", "P", "P", "P"],
+      cases: 2, review_stage: "validation", contracts: [] },
+    { process: ["1N", "P", "2C", "P", "2H", "P", "4H", "P", "P", "P"],
+      cases: 1, review_stage: "scout", contracts: [] },
+  ];
+  const tree = buildProcessTree(processes);
+  const opening = tree.children[0];
+  const stayman = opening.children[0];
+  assert.equal(stayman.call, "2C");
+  assert.equal(stayman.cases, 3);
+  assert.deepEqual(stayman.children.map((child) => child.call), ["2D", "2H"]);
+  assert.equal(stayman.children[0].children[0].processes[0].review_stage,
+    "validation");
+});
 
 const LOW_RATES = {
   contract_failure: .10,

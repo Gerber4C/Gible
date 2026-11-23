@@ -124,11 +124,15 @@ class OwnerRouteTests(unittest.TestCase):
         self.assertIn('4C', result.calls)
         self.assertEqual(result.calls[-1], 'P')
 
-    def test_minor_superaccept_publishes_the_club_fit_and_avoids_6nt(self):
+    def test_minor_superaccept_overstrength_cues_diamond_control(self):
         decision = choose_bid(
             self.profile, Auction.parse('1NP2SP2NP'),
             Hand.parse('SAJ6HKDACAKJT9532'))
-        self.assertEqual(decision.call, '4N')
+        self.assertEqual(decision.call, '3D')
+        self.assertEqual(decision.selected_candidate.public_meaning['action_type'],
+                         'minor_slam_control_cue')
+        self.assertEqual(decision.selected_candidate.public_meaning['control_suit'],
+                         'D')
         self.assertEqual(decision.trace.trump_state('ns').suit, 'C')
         self.assertEqual(decision.trace.trump_state('ns').status, 'agreed')
 

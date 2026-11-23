@@ -72,6 +72,9 @@
     .segment { flex: 1; color: #bed8cc; background: transparent; border: 1px solid #ffffff28; border-radius: 8px; padding: 8px 2px; font-size: 12px; }
     .segment.active { background: #def1e3; color: var(--deep); border-color: #def1e3; font-weight: 700; }
     .point-list { overflow-y: auto; padding: 0 4px 16px; scrollbar-color: #7aaf99 transparent; }
+    .auction-tree-branch { margin: 5px 0 5px 9px; border-left: 1px solid #ffffff3d; padding-left: 9px; }
+    .auction-tree-branch > .auction-tree-call { cursor: pointer; color: #d9e9dd; font-weight: 700; font-size: 12px; padding: 7px 2px; }
+    .auction-tree-branch > .point { margin: 5px 0; }
     .point {
       display: block; width: 100%; text-align: left; border: 1px solid transparent;
       border-radius: 10px; color: #f3f7f0; background: transparent;
@@ -172,7 +175,7 @@
   <div class="shell">
     <aside class="rail" aria-label="TD 进程列表">
       <div class="brand"><div class="brand-mark">G</div><div><div class="brand-name">Gible</div><div class="brand-sub">Bidding audit deck</div></div></div>
-      <div id="mode-switch" class="mode-switch" hidden><button class="active" type="button" data-mode="blocked">TD</button><button type="button" data-mode="suspicious">可疑</button><button type="button" data-mode="all">全部牌例</button></div>
+      <div id="mode-switch" class="mode-switch" hidden><button class="active" type="button" data-mode="blocked">TD</button><button type="button" data-mode="tree">进程树</button><button type="button" data-mode="suspicious">可疑</button><button type="button" data-mode="all">全部牌例</button></div>
       <div class="rail-heading"><strong id="rail-title">TD 进程</strong><span id="point-total"></span></div>
       <div class="search-wrap"><input id="search" class="search" type="search" placeholder="搜索牌号、叫牌或座位" aria-label="搜索牌例"></div>
       <div id="stratum-segments" class="segments" role="group" aria-label="样本类型">
@@ -222,6 +225,16 @@
         return {id:`group-${index}`, auction:members[0]?.auction || '',
                 case:members[0], cases:members, count:members.length};
       }).filter(point => point.count);
+      const treePoints = [
+        ...suspiciousPoints,
+        ...points.map((point, index) => ({
+          id:`td-${index}`, auction:point.auction, seat:point.seat,
+          cases:cases.filter(item => `${item.blocked?.auction || item.auction}|${item.blocked?.seat || ''}`
+            === `${point.auction}|${point.seat}`),
+          case:cases.find(item => `${item.blocked?.auction || item.auction}|${item.blocked?.seat || ''}`
+            === `${point.auction}|${point.seat}`), count:point.count,
+        })),
+      ].filter(point => point.case);
       const state = {mode:'blocked', stratum:'all', query:'', selected:null, index:0};
       const byId = id => document.getElementById(id);
       const elt = (tag, className, content) => {
@@ -243,9 +256,9 @@
       const handHcp = parts => Object.values(parts).join('').split('').reduce((sum, rank) => sum + ({A:4,K:3,Q:2,J:1}[rank] || 0), 0);
       const stratumName = value => value === 'rare_hcp' ? '稀有点力层' : '普通随机层';
       const caseKey = item => `${item.blocked?.auction || item.auction}|${item.blocked?.seat || ''}`;
-      const available = point => state.mode === 'suspicious' ? point.cases : state.mode === 'all' ? [point.case] :
+      const available = point => state.mode === 'suspicious' || state.mode === 'tree' ? point.cases : state.mode === 'all' ? [point.case] :
         cases.filter(item => caseKey(item) === keyOf(point) && (state.stratum === 'all' || item.stratum === state.stratum));
-      const activePoints = () => state.mode === 'all' ? allPoints : state.mode === 'suspicious' ? suspiciousPoints : points;
+      const activePoints = () => state.mode === 'all' ? allPoints : state.mode === 'suspicious' ? suspiciousPoints : state.mode === 'tree' ? treePoints : points;
       const visiblePoints = () => activePoints().filter(point => {
         const numberQuery = state.query.trim().match(/^#?(\d+)$/);
         if (numberQuery) {
@@ -280,6 +293,7 @@
           byId('profile-line').textContent = `${REPORT.profile?.name || REPORT.profile?.id || 'Profile'} · seed ${REPORT.seed ?? '—'} · 北 ${describe(north)} · 南 ${describe(south)}`;
           byId('mode-switch').hidden = false;
           byId('mode-switch').querySelector('[data-mode="suspicious"]').hidden = true;
+          byId('mode-switch').querySelector('[data-mode="tree"]').hidden = true;
           byId('stratum-segments').hidden = true;
           byId('report-title').textContent = '定向发牌叫牌结果';
           byId('rail-foot').textContent = '南北两家按各自手牌与所选体系自动叫牌；东西两家不叫。牌型、HCP 和 K–R 均按指定区间发牌。';
@@ -297,6 +311,11 @@
           byId('profile-line').textContent += ` · 南家 HCP ${limits.responder_hcp?.[0] ?? '?'}–${limits.responder_hcp?.at(-1) ?? '?'} · 最长套 ${limits.longest_suit?.[0] ?? '?'}–${limits.longest_suit?.at(-1) ?? '?'} · 两门最长 ${limits.top_two_suits?.[0] ?? '?'}–${limits.top_two_suits?.at(-1) ?? '?'}`;
           byId('mode-switch').hidden = false;
           byId('stratum-segments').hidden = true;
+          if (REPORT.two_stage) {
+            state.mode = 'tree';
+            for (const button of byId('mode-switch').querySelectorAll('button'))
+              button.classList.toggle('active', button.dataset.mode === 'tree');
+          }
           byId('report-title').textContent = '叫牌扫描图谱';
           byId('rail-foot').textContent = '北家统一开叫 1NT；南家按点力和牌型配额发牌。警报规则：SET > 60%；只有 best-other > 40% 才评估 chosen / best-other success probability ratio < 0.8。';
           byId('summary').replaceChildren(
@@ -322,7 +341,7 @@
       }
       function renderPoints() {
         const shown = visiblePoints();
-        byId('rail-title').textContent = state.mode === 'all' ? '全部牌例' : state.mode === 'suspicious' ? '可疑类别' : 'TD 进程';
+        byId('rail-title').textContent = state.mode === 'all' ? '全部牌例' : state.mode === 'suspicious' ? '可疑类别' : state.mode === 'tree' ? '可疑进程树' : 'TD 进程';
         byId('point-total').textContent = `${shown.length} / ${activePoints().length}`;
         if (!shown.some(point => keyOf(point) === state.selected)) {
           state.selected = shown.length ? keyOf(shown[0]) : null;
@@ -338,6 +357,43 @@
         const list = byId('point-list');
         list.replaceChildren();
         if (!shown.length) list.append(elt('p','rail-foot','没有匹配的 TD 进程。'));
+        if (state.mode === 'tree') {
+          const root = {children:new Map(), points:[]};
+          for (const point of shown) {
+            const decisions = (point.case?.calls || []).filter((_, index) => index % 2 === 0);
+            while (decisions.length > 1 && decisions.at(-1) === 'P') decisions.pop();
+            let node = root;
+            for (const call of decisions) {
+              if (!node.children.has(call)) node.children.set(call, {children:new Map(), points:[]});
+              node = node.children.get(call);
+            }
+            node.points.push(point);
+          }
+          const branch = (node, call, depth) => {
+            const wrap = elt('details','auction-tree-branch');
+            const containsSelected = current => current.points.some(
+              point => keyOf(point) === state.selected)
+              || [...current.children.values()].some(containsSelected);
+            if (depth < 3 || containsSelected(node)) wrap.open = true;
+            wrap.append(elt('summary','auction-tree-call',call));
+            for (const point of node.points) {
+              const item = elt('button','point' + (keyOf(point) === state.selected ? ' active' : ''));
+              item.type = 'button';
+              item.append(elt('span','point-auction',readable(point.auction)),
+                elt('span','point-count',`${point.count} 副 · ${point.seat ? 'TD' : 'DDS'}`));
+              item.addEventListener('click', () => {
+                state.selected = keyOf(point); state.index = 0; renderPoints();
+              });
+              wrap.append(item);
+            }
+            for (const [childCall, child] of node.children)
+              wrap.append(branch(child, childCall, depth + 1));
+            return wrap;
+          };
+          for (const [call, node] of root.children) list.append(branch(node, call, 0));
+          renderCase();
+          return;
+        }
         for (const point of shown) {
           const item = elt('button','point' + (keyOf(point) === state.selected ? ' active' : ''));
           item.type = 'button';

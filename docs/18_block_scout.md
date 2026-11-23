@@ -237,10 +237,25 @@ bridge-frequency estimate.
 Open **IV Scanner** beside System Editor and Table. It reads existing coverage
 reports and can start a new North-1NT scan in the background. The scan sweeps
 all twenty-three South shapes from the standard shape-probability table (rows
-1–22 and 24), South's HCP range, the number of independent N/S pairs per cell,
-E/W completions per pair, and a reproducible seed. The default is ten E/W
-completions. Progress remains visible while the other pages are usable;
-completed reports are saved under `reports/block_scans/`.
+1–22 and 24), South's HCP range, and a reproducible seed. A new scan first
+draws a small number of N/S pairs and E/W completions in every coverage cell.
+It then explores a bounded set of observed auction prefixes for up to three
+rounds, prioritizing TD and other suspicious outcomes and skipping prefixes
+already tried. Finally it selects complete suspicious paths
+and draws fresh N/S pairs for those paths, with the requested number of E/W
+completions. The confirmation target counts only fresh validation pairs; the
+exploratory pairs do not fill its quota. Progress remains visible while the
+other pages are usable; completed reports are saved under
+`reports/block_scans/`.
+
+The **Process · Tree** view groups witnessed paths by their North/South calls.
+Each path shows whether its evidence comes from exploration or confirmation.
+The standalone HTML report opens its tree view for two-stage reports and bases
+DDS warnings on validation samples; exploratory DDS outcomes remain visible
+as preliminary cases. A path with too few confirming boards remains
+unassessed. This is a search of observed branches under the coverage budget,
+not proof that unobserved branches are sound. Existing reports keep their
+previous views and statistics.
 
 A full scan also covers the complete Daqiush 1NT opener space. The 529 South
 cells are matched to 92 North strata: 68 legal named normal shapes (4333,

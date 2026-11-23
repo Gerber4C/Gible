@@ -1865,6 +1865,20 @@ textarea {
   font-weight: 600 !important;
 }
 .iv-process-card { gap: 6px; }
+.iv-tree-list { padding: 8px; }
+.iv-tree-node { margin: 3px 0 3px 12px; border-left: 1px solid #cddfd2; }
+.iv-tree-list > .iv-tree-node { margin-left: 0; border-left: 0; }
+.iv-tree-node summary {
+  display: flex; justify-content: space-between; gap: 8px;
+  padding: 7px 9px; border-radius: 5px; cursor: pointer;
+  color: #184b3d; background: #edf5ef;
+}
+.iv-tree-node summary span { color: #637c6c; font-size: 11px; }
+.iv-tree-node .iv-process-card { margin: 5px 0 5px 9px; width: calc(100% - 9px); }
+.iv-stage { align-self: flex-start; padding: 2px 6px; border-radius: 4px;
+  font-size: 10px; font-weight: 800; background: #ecf2f6; color: #30546e; }
+.iv-stage-validation { background: #e4f5eb; color: #126b42; }
+.iv-stage-scout { background: #fff1d7; color: #8a5c17; }
 .iv-process-contracts { display: flex; flex-wrap: wrap; gap: 4px; }
 .iv-process-contracts em {
   padding: 2px 5px;

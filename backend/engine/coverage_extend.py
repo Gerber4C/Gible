@@ -544,12 +544,18 @@ def extend_process_pairs(
     max_attempts_per_cell: int | None = None,
     allow_new_processes: bool = True,
     discovery_idle_limit: int | None = 100,
+    selected_processes: set[tuple[str, ...]] | None = None,
+    selected_cell_prefixes: Mapping[str, set[tuple[str, ...]]] | None = None,
+    case_stage: str | None = None,
+    target_stage_pairs: bool = False,
+    stop: Callable[[], bool] | None = None,
     solve_table: Callable = calculate_available_table,
     progress: Callable[[dict, int], None] | None = None,
 ) -> dict:
     """Top up every auction-process cell inside each sampling cell.
 
     New N/S pairs keep the sampling cell's exact shape/HCP/K–R constraints.
+    ``selected_processes`` restricts validation to observed complete paths.
     Known process groups are filled first. Once they are complete, a candidate
     whose complete auction is a new process opens a new process sub-cell and
     is topped up to the same target while attempts remain. After
@@ -560,6 +566,8 @@ def extend_process_pairs(
     """
     if report.get('schema_version') != 2:
         raise ValueError('source must be a coverage report (schema version 2)')
+    if target_stage_pairs and not case_stage:
+        raise ValueError('case_stage is required when target_stage_pairs is true')
     if not isinstance(target_pairs, int) or isinstance(target_pairs, bool) or target_pairs < 1:
         raise ValueError('target_pairs must be a positive integer')
     if max_attempts_per_cell is not None and (
@@ -611,13 +619,25 @@ def extend_process_pairs(
         groups: dict[tuple, list[Mapping]] = {}
         for case, status in members:
             groups.setdefault(_process_group_key(case, status), []).append(case)
-        needed = {key: target_pairs - len(cases)
+        prefixes = (selected_cell_prefixes.get(cell_key, set())
+                    if selected_cell_prefixes is not None else None)
+        if selected_cell_prefixes is not None and not prefixes:
+            continue
+        stage_count = lambda cases: sum(
+            case.get('scan_stage') == case_stage for case in cases
+        ) if target_stage_pairs else len(cases)
+        needed = {key: target_pairs - stage_count(cases)
                   for key, cases in groups.items()
-                  if len(cases) < target_pairs}
+                  if stage_count(cases) < target_pairs
+                  and (selected_processes is None
+                       or key[0] in selected_processes)
+                  and (prefixes is None or any(
+                      key[0][:len(prefix)] == prefix for prefix in prefixes))}
         if (not needed
                 and not (allow_new_processes
-                         and _members_identity(members)
-                         in repair_created_identities)):
+                         and (prefixes is not None
+                              or _members_identity(members)
+                              in repair_created_identities))):
             continue
         spec = _cell_spec(members)
         if spec is None:
@@ -629,6 +649,8 @@ def extend_process_pairs(
     discovered_index = {}
 
     for cell_key, members, groups, needed, spec in work:
+        if stop is not None and stop():
+            break
         remaining_before = sum(needed.values())
         attempts = 0
         attempt_cap = max_attempts_per_cell or max(200, remaining_before * 20)
@@ -637,6 +659,8 @@ def extend_process_pairs(
         idle_attempts = 0
         added_cases = []
         while attempts < attempt_cap:
+            if stop is not None and stop():
+                break
             discovery_phase = not any(needed.values())
             if discovery_phase:
                 if not allow_new_processes:
@@ -679,7 +703,10 @@ def extend_process_pairs(
             key = _simulation_group_key(simulation, contract, declarer)
             created_new = False
             if key not in groups:
-                if not allow_new_processes or any(needed.values()):
+                if (not allow_new_processes or any(needed.values())
+                        or (prefixes is not None and not any(
+                            key[0][:len(prefix)] == prefix
+                            for prefix in prefixes))):
                     if discovery_phase:
                         idle_attempts += 1
                     continue
@@ -706,6 +733,8 @@ def extend_process_pairs(
             case = _new_case(next_id, hands, simulation,
                              cell_meta=spec['coverage_cell'],
                              pair_slot=slot)
+            if case_stage is not None:
+                case['scan_stage'] = case_stage
             sampled_key = case_cell_key(case)
             if sampled_key != cell_key:
                 raise RuntimeError(
@@ -741,7 +770,8 @@ def extend_process_pairs(
                 sample = groups[key][0]
                 unreached.append({
                     'cell': cell_key, 'auction': _auction_label(sample),
-                    'status': key[-1], 'existing_pairs': len(groups[key]),
+                    'status': key[-1],
+                    'existing_pairs': stage_count(groups[key]),
                     'remaining': remaining,
                 })
         if progress is not None:
@@ -762,6 +792,12 @@ def extend_process_pairs(
         'seed': seed, 'ew_samples': ew_samples,
         'max_attempts_per_cell': max_attempts_per_cell,
         'allow_new_processes': allow_new_processes,
+        'selected_processes': (len(selected_processes)
+                               if selected_processes is not None else None),
+        'selected_frontier_cells': (len(selected_cell_prefixes)
+                                    if selected_cell_prefixes is not None else None),
+        'case_stage': case_stage,
+        'target_stage_pairs': target_stage_pairs,
         'discovery_idle_limit': discovery_idle_limit,
         'new_process_groups': len(discovered),
         'discovered_processes': discovered,

@@ -215,6 +215,30 @@ export function processCategories(process = {}, thresholds = DEFAULT_THRESHOLDS)
   ));
 }
 
+export function buildProcessTree(processes = []) {
+  const root = { call: "Auction", cases: 0, children: [], processes: [] };
+  for (const process of processes) {
+    // E/W pass in this scanner. Show the N/S decisions; the full auction
+    // remains in the selected process detail.
+    const decisions = (process.process || [])
+      .filter((_, index) => index % 2 === 0);
+    while (decisions.length > 1 && decisions.at(-1) === "P") decisions.pop();
+    let node = root;
+    node.cases += process.cases || 0;
+    for (const call of decisions) {
+      let child = node.children.find((item) => item.call === call);
+      if (!child) {
+        child = { call, cases: 0, children: [], processes: [] };
+        node.children.push(child);
+      }
+      child.cases += process.cases || 0;
+      node = child;
+    }
+    node.processes.push(process);
+  }
+  return root;
+}
+
 export function processMatches(process = {}, category = "all", search = "",
                                thresholds = DEFAULT_THRESHOLDS) {
   if (category !== "all" && !processCategories(process, thresholds).includes(category)) {
